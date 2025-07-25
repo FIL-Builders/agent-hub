@@ -1,3 +1,5 @@
+# Agent Hub
+
 ### 1 . Vision & Positioning
 
 Build **AgentHub**—the Git‑style home for *opinionated, executable “agent files”* that teach LLMs how to use specific APIs, SDKs, and frameworks.
