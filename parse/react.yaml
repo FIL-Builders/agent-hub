@@ -1,0 +1,232 @@
+schemaVersion: 1
+library: react
+generated: 2025‑07‑24
+overview:
+  purpose: |
+    Teach an AI assistant how to help TypeScript/React developers
+    build, debug and optimise applications using the public surface
+    represented by the exported declarations below.
+  guidingPrinciples:
+    - Prefer idiomatic, future‑proof patterns (function components, hooks,
+      Suspense) over legacy ones (class components, deprecated lifecycles,
+      string refs).
+    - Always surface TypeScript‑specific guidance (generic parameters,
+      conditional types, utility aliases) because the audience works in TS.
+    - Highlight performance & accessibility best‑practices (memoisation,
+      ARIA props, controlled vs uncontrolled inputs, concurrent features).
+    - Warn about foot‑guns (double invocation in StrictMode, stale closures,
+      dependency‑array pitfalls, invalid key usage).
+    - Provide concise runnable examples; link related APIs; suggest
+      migration paths from legacy to modern patterns.
+
+groups:
+
+  # -------------------------------------------------------------
+  - name: Element Creation & Mutation
+    exports: [createElement, cloneElement, isValidElement]
+    keyConcepts:
+      createElement:
+        summary: |
+          Core factory that React’s JSX transpiles to.
+          Multiple overloads specialise for:
+          – HTML/SVG tag names               ➜ DOMElement / ReactSVGElement
+          – Function components              ➜ FunctionComponentElement
+          – Class components                 ➜ CElement
+        strongInferences:
+          - When answering “Why is TS angry at my `<foo>`?” inspect the
+            inferred generic P (props) & T (element) to locate mismatch.
+          - `props` may be `null` or `undefined`; children are variadic.
+          - `key` & `ref` live *outside* `props`; prefer `ref` inside props
+            in new code (legacy signatures mark external `ref` as deprecated).
+      cloneElement:
+        summary: |
+          Produces a shallow clone with optionally merged props/children.
+        strongInferences:
+          - Merge order: new props override existing; children replace unless
+            explicitly appended by spreading `...element.props.children`.
+          - Use to inject `key` when mapping over existing elements,
+            or to attach refs to 3rd‑party children.
+          - Warn that cloning invalidates element identity => avoid for large
+            lists, prefer render callbacks.
+
+  # -------------------------------------------------------------
+  - name: Components & Composition Helpers
+    exports:
+      [createContext, forwardRef, memo, lazy, Fragment, StrictMode,
+       Suspense, Profiler, Children]
+    keyConcepts:
+      createContext:
+        summary: >
+          Produces { Provider, Consumer } plus the context object itself.
+        howToAnswer:
+          - Explain defaultValue semantics (used only when no ancestor Provider).
+          - Encourage `displayName` for DevTools clarity.
+          - Suggest `useContext` over `<Consumer>` for new code.
+      forwardRef:
+        summary: >
+          Bridges function components & legacy ref expectations.
+        Q&A:
+          - Q: “Why is my ref undefined?” ➜ ensure ref is either
+            `React.useRef` or `React.forwardRef`, not plain callback inside
+            render; confirm you’re not passing ref through memo without
+            `forwardRef`.
+      memo:
+        summary: >
+          Shallow‑prop memoisation wrapper. Comparable to `PureComponent`.
+        pitfalls:
+          - Default comparison is `Object.is` on each prop; functions & objects
+            re‑create each render ⇒ consider `useCallback` / `useMemo`.
+      lazy:
+        summary: >
+          Code‑split at component boundary; must be wrapped in <Suspense>.
+        edgeCases:
+          - Rejected promise bubbles to nearest Error Boundary.
+          - Server‑side rendering: hydrate must preload chunk.
+      Children:
+        quickNotes:
+          - `Children.only` throws if multiple children – AI should caution.
+
+  # -------------------------------------------------------------
+  - name: Hooks (State, Refs, Effects)
+    exports:
+      [useState, useReducer, useRef, useEffect, useLayoutEffect,
+       useImperativeHandle, useCallback, useMemo, useDebugValue,
+       useId, useInsertionEffect]
+    canonicalPatterns:
+      - useState:
+          pattern: |
+            const [value, setValue] = useState<SomeType>(() => initial());
+          guidance:
+            - Lazy initialiser recommended for expensive computation.
+            - Setter accepts value or updater fn (`prev => next`).
+      - useReducer:
+          pattern: |
+            const [state, dispatch] = useReducer(reducer, initArg, initFn?);
+          whenToPrefer: complex state, dependent updates, undo/redo.
+      - useRef:
+          pattern: |
+            const inputRef = useRef<HTMLInputElement>(null);
+          inferences:
+            - `.current` is mutable & persists without causing re‑renders.
+            - For callback refs use `useCallback` to avoid recreation.
+      - useEffect vs useLayoutEffect:
+          difference: layout is synchronous after DOM mutation – block paint.
+          advice: prefer `useEffect`; reserve layout for measurements
+          (e.g., `getBoundingClientRect`).
+      - useImperativeHandle:
+          purpose: expose selective methods (`scrollIntoView`) to parent refs.
+          onlyUseWith: `forwardRef`.
+      - useCallback & useMemo:
+          sharedPitfalls: stale deps; over‑memoisation; function identity.
+      - useInsertionEffect:
+          SSR/hydration safe CSS‑in‑JS hook; must only write DOM.
+
+  # -------------------------------------------------------------
+  - name: Hooks (Concurrent & Optimistic features)
+    exports:
+      [useDeferredValue, useTransition, startTransition,
+       useSyncExternalStore, useOptimistic, useActionState, cache, use]
+    AI‑Guidance:
+      useTransition/startTransition:
+        teach: wrap *state updates that may suspend* (e.g., route changes).
+        pattern: |
+          const [isPending, start] = useTransition();
+          const onClick = () => {
+            start(() => setSearchTerm(input.value));
+          };
+      useDeferredValue:
+        explain: decouple typing latency from expensive list rendering.
+      useSyncExternalStore:
+        crucialFor: writing *correct concurrent* external store adapters –
+        always supply stable `subscribe` and *pure* `getSnapshot`.
+      useOptimistic:
+        scenario: optimistic UI updates (e.g., todo‑list add).
+      cache:
+        unify: deterministic memoisation across components/server renders.
+      use:
+        experimental: unwrap promises/contexts; only in React 19+
+
+  # -------------------------------------------------------------
+  - name: Testing Helpers
+    exports: [act]
+    act:
+      why: flush pending effects for deterministic tests.
+      syncSignature: act(() => { /* render */ });
+      asyncSignature: await act(async () => { /* async */ });
+      FAQ:
+        - “Why double render in tests?” ➜ StrictMode intentional.
+
+  # -------------------------------------------------------------
+  - name: Type Utilities & Aliases
+    exports:
+      [ElementType, ComponentType, FC, ComponentProps,
+       ComponentPropsWithRef, ComponentPropsWithoutRef,
+       ComponentRef, Key, ReactNode, Ref, RefObject, ForwardedRef,
+       SetStateAction, Dispatch, Reducer, MemoExoticComponent,
+       LazyExoticComponent]
+    crossCuttingInsights:
+      - ElementType vs ComponentType: ElementType includes intrinsic tags;
+        ComponentType is only user components.
+      - `ComponentProps<"button">` pulls correct union incl. ARIA props.
+      - Prefer `FC<Props>` or `FunctionComponent<Props>`?
+        ↳ identical; mention optional children inference difference.
+      - `Key` accepts bigint since React 18.
+      - `Ref<T>` union: null | RefObject | callback – string refs obsolete.
+
+  # -------------------------------------------------------------
+  - name: DOM & SVG Attribute Maps
+    purpose: >
+      Map intrinsic element names to prop interfaces (InputHTMLAttributes,
+      SVGAttributes, etc.). Allow AI to autocomplete & validate attributes.
+    quickRules:
+      - HTML boolean attributes use `boolean`, not `"true" | "false"`.
+      - `aria-*` and `data-*` always permitted (index signatures).
+      - For `<input type="file">` value is read‑only; must inspect `files`.
+      - SVG camelCase (e.g., `viewBox`, `strokeWidth`) vs HTML lowerCase.
+
+  # -------------------------------------------------------------
+  - name: Event System Helpers
+    exports: [SyntheticEvent subclasses, EventHandler aliases]
+    mustKnow:
+      - SyntheticEvent pooling was removed in React 17; but types remain.
+      - Always type generic `<T=HTMLDivElement>` if accessing `.target`.
+      - KeyboardEvent.key recommended over .keyCode (.which deprecated).
+
+examples:
+  snippets:
+    createContext: |
+      // theme-context.tsx
+      import { createContext, useContext } from 'react';
+
+      export const ThemeContext = createContext<'light' | 'dark'>('light');
+      export const useTheme = () => useContext(ThemeContext);
+    useReducer: |
+      interface Action { type: 'add' | 'remove'; payload: string }
+      const reducer: Reducer<string[], Action> = (s, a) =>
+        a.type === 'add' ? [...s, a.payload] : s.filter(x => x !== a.payload);
+
+      const [todos, dispatch] = useReducer(reducer, []);
+troubleshootingCheatsheet:
+  - symptom: "Warning: Each child in a list should have a unique 'key' prop"
+    cause: key missing or unstable
+    fix: stable identifier, not index
+  - symptom: "Rendered more hooks than during the previous render"
+    cause: conditional hook call
+    fix: move hook to top‑level or split component
+  - symptom: "Cannot read property 'current' of undefined"
+    cause: forgot to initialise ref or used callback ref incorrectly
+    fix: `const ref = useRef<T>(null);` & pass `ref={ref}`
+  - symptom: stale closure in setState callback
+    cause: missing deps in useCallback/useEffect
+    fix: include variables or derive state updater `(prev) => …`
+references:
+  docs:
+    reactDocs: https://react.dev
+    tsCheatsheet: https://react-typescript-cheatsheet.netlify.app
+    concurrentWG: https://github.com/reactwg/react-18/discussions
+notes:
+  deprecations:
+    - String refs, Legacy `createReactClass`, Deprecated lifecycle methods.
+  experimental:
+    - `use`, `useActionState`, `useOptimistic`, `cache` – caution dev flags.
+

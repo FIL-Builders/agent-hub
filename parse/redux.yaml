@@ -1,0 +1,325 @@
+meta:
+  spec_name: redux/core
+  spec_version: 5.2
+  generated: 2025‑07‑24
+  purpose: |
+    Teach an AI assistant to be maximally helpful to developers building on Redux’s low‑level API,
+    while steering them toward modern best practices (Redux Toolkit, serialisable actions, etc.).
+
+################################################################################
+# 0. HIGH‑LEVEL PRIMER
+################################################################################
+primer:
+  core_principles:
+    - Single immutable state tree
+    - State changed *only* by dispatching plain‑object actions (`{type: …}`)
+    - Pure, synchronous reducers compute next state
+    - Middleware/enhancers extend dispatching & store behaviour in a composable way
+  modern_recommendation: |
+    The Redux maintainers recommend **Redux Toolkit (RTK)** for new code.
+    `configureStore()` replaces nearly every `createStore` use‑case and prevents many errors.
+  when_low_level_api_is_still_worth_it:
+    - Education: understanding Redux internals
+    - Extremely specialised store enhancers or middleware
+    - Porting legacy code that predates RTK
+    - Library authors providing framework‑agnostic bindings
+
+################################################################################
+# 1. QUICK‑REFERENCE SYMBOL MAP
+################################################################################
+# Symbols are grouped by conceptual role.  For each symbol the assistant learns:
+#   desc        – one‑sentence purpose
+#   tips        – pragmatic advice / common pitfalls
+#   example     – minimal TypeScript usage snippet (inline, no extraneous imports)
+#   ai_support  – typical developer questions the AI should proactively answer
+################################################################################
+
+symbols:
+
+  # ──────────────────────────── 1.1 Action layer ────────────────────────────
+  Action:
+    kind: type
+    desc: "Base shape of every action object (`{type: string}`)."
+    tips:
+      - The `type` field **must be serialisable** (string / string literal).
+      - Additional payload fields are allowed but not required.
+      - For FSA compliance include `payload`, `meta`, `error` keys.
+    example: |
+      type Increment = Action<'counter/increment'>
+    ai_support:
+      - “Show a canonical FSA‑style action shape.”
+      - “How can I narrow `Action<string>` to my literal types?”
+
+  AnyAction:
+    kind: interface
+    desc: "`Action` with *any* extra props (deprecated)."
+    tips:
+      - Prefer `Action` or `UnknownAction` to preserve type safety.
+      - Exists only for backwards compatibility with generic reducers.
+    ai_support:
+      - “Why does `AnyAction` weaken my reducer type guarantees?”
+
+  UnknownAction:
+    kind: interface
+    desc: "Like `Action<string>` but extra props are `unknown` not `any`."
+    tips:
+      - Use in generic utilities when the exact shape is not known.
+    ai_support:
+      - “When should I accept `UnknownAction` vs a concrete union?”
+
+  ActionCreator:
+    kind: interface
+    desc: "Function that returns an action."
+    tips:
+      - *Does not* dispatch; you still call `store.dispatch`.
+      - Return type should be a specific action, not `AnyAction`.
+    example: |
+      const addTodo: ActionCreator<TodoAdded> = text => ({type: 'todo/added', payload: text})
+    ai_support:
+      - “Wrap an action creator in `dispatch` automatically.”
+
+  ActionCreatorsMapObject:
+    kind: interface
+    desc: "Record<string, ActionCreator> – basis for `bindActionCreators`."
+    tips: []
+    ai_support:
+      - “Generate a map of bound creators for my `todosActions` module.”
+
+  # ──────────────────────────── 1.2 Reducer layer ────────────────────────────
+  Reducer:
+    kind: type
+    desc: "Pure function (state, action) → nextState."
+    tips:
+      - Must return initial state when `state === undefined`.
+      - Never cause side effects (no IO, no mutations, no random).
+      - Treat `UnknownAction` as default param to keep exhaustive switch.
+    example: |
+      const count: Reducer<number, Increment | Decrement> =
+        (state = 0, action) => action.type === 'inc' ? state + 1
+                           : action.type === 'dec' ? state - 1
+                           : state
+    ai_support:
+      - “Why is my reducer running twice in React Strict Mode?”
+      - “Detect a missing `default` branch in my switch.”
+
+  ReducersMapObject / combineReducers:
+    desc: "Object of child reducers -> single root reducer."
+    tips:
+      - Key names define state shape (`state.todos`, `state.user`). Choose intentionally.
+      - Each child reducer handles only its slice; unknown actions return current slice unchanged.
+    example: |
+      const rootReducer = combineReducers({count, todos})
+    ai_support:
+      - “Infer `RootState` type from `rootReducer`.”
+
+  ActionFromReducer / ActionFromReducersMapObject / StateFromReducersMapObject / PreloadedStateShapeFromReducersMapObject:
+    desc: "Conditional‑type helpers that derive unions and state shapes."
+    tips:
+      - Very powerful for library authors; rarely needed in app code.
+    ai_support:
+      - “Show how to extract the union of action types from heterogeneous slice reducers.”
+
+  # ──────────────────────────── 1.3 Store layer ────────────────────────────
+  Store:
+    kind: interface
+    desc: "Holds state, exposes `dispatch`, `getState`, `subscribe`, `replaceReducer`."
+    tips:
+      - Only one store per UI tree; compose reducers instead of creating multiple stores.
+      - Use RTK’s `configureStore` by default; falls back to core only for edge cases.
+    ai_support:
+      - “Explain lazy reducer replacement for code‑splitting.”
+
+  createStore / legacy_createStore:
+    kind: function
+    desc: "Low‑level store creator (deprecated in favour of RTK)."
+    tips:
+      - Emits deprecation warning; import as `legacy_createStore` to suppress.
+      - Always pass a root reducer; enhancers must be the third argument.
+    example: |
+      import { legacy_createStore as createStore } from 'redux'
+      const store = createStore(rootReducer, preloaded, applyMiddleware(thunk))
+    ai_support:
+      - “Why do I get ‘Enhancer must be a function’ error?” (argument position mistake)
+
+  StoreCreator / StoreEnhancer / StoreEnhancerStoreCreator:
+    desc: "Higher‑order factory chain that allows enhancers to wrap store creation."
+    tips:
+      - Conceptually identical to middleware but at store‑construction time.
+      - Use built‑in `applyMiddleware` or DevTools enhancer; writing custom enhancers is rare.
+    ai_support:
+      - “Show skeleton code for a logging store enhancer.”
+
+  # ──────────────────────────── 1.4 Dispatch & Middleware ────────────────────────────
+  Dispatch:
+    kind: interface
+    desc: "Function that sends an action through middleware → reducer."
+    tips:
+      - The return type is the *same object* you dispatched (convenient for chaining).
+      - Custom middleware may extend the dispatch signature (e.g., redux‑thunk).
+    ai_support:
+      - “Type `dispatch` so it accepts thunks and plain actions.”
+
+  Middleware / MiddlewareAPI:
+    desc: "Higher‑order `dispatch` transformer: `(api) => next => action`."
+    tips:
+      - Never mutate `state` directly inside middleware; defer to reducers.
+      - Call `next(action)` to continue chain; omit to swallow.
+      - Return value of inner function becomes dispatch’s return for that action.
+    example: |
+      const logger: Middleware = api => next => action => {
+        console.log('will dispatch', action)
+        const result = next(action)
+        console.log('state after', api.getState())
+        return result
+      }
+    ai_support:
+      - “When should I dispatch inside middleware vs returning a promise?”
+
+  applyMiddleware:
+    desc: "Store enhancer that wires middleware array."
+    tips:
+      - Must be **first** in composition (`compose(applyMiddleware(...), devTools())`).
+      - Overloaded types infer combined `dispatch` extension (`Ext1 & Ext2 & …`).
+    ai_support:
+      - “Order vs behaviour: thunk before saga? (answer: order usually doesn’t matter unless they depend on each other)”
+
+  bindActionCreators:
+    desc: "Wraps creators so calling them auto‑dispatches."
+    tips:
+      - Primary use: pass to React props to avoid `dispatch` boilerplate.
+      - Not needed with RTK slices (which already expose `actions`).
+    ai_support:
+      - “Difference between `mapDispatchToProps` forms in React‑Redux?”
+
+  # ──────────────────────────── 1.5 Functional utilities ────────────────────────────
+  compose:
+    desc: "Right‑to‑left function composition helper (variadic overloads)."
+    tips:
+      - Used internally by `applyMiddleware`+`enhancer` chains; rarely called directly in modern code.
+      - All overload signatures collapse to `<R>(...funcs: Function[]) => (...args) => R`.
+    ai_support:
+      - “Implement `compose` yourself for educational purposes.”
+
+  # ──────────────────────────── 1.6 Observable utilities ────────────────────────────
+  Observable / Observer:
+    desc: "Minimal TC39‑style observable interface provided by the store."
+    tips:
+      - `store[Symbol.observable]()` returns an object conforming to this spec.
+      - Enables libraries like RxJS to interop with Redux state stream.
+    ai_support:
+      - “Convert Redux store to RxJS `from(store)` stream.”
+
+  # ──────────────────────────── 1.7 Utility guards / constants ────────────────────────────
+  isAction:
+    desc: "Type guard utility: `unknown -> action is Action<string>`."
+    tips: []
+    ai_support:
+      - “Validate user‑supplied objects before dispatching.”
+
+  isPlainObject:
+    desc: "Robust check used internally by Redux and RTK serialization middleware."
+    tips:
+      - Similar to lodash’s implementation but avoids false positives from cross‑realm objects.
+    ai_support: []
+
+  __DO_NOT_USE__ActionTypes:
+    desc: "Internal sentinel types (`INIT`, `REPLACE`, random probe)."
+    tips:
+      - Never reference directly; could break across versions.
+    ai_support:
+      - “Why does my reducer receive `@@redux/INIT`? (Answer: internal hydration)”
+
+  Unsubscribe:
+    desc: "Function returned by `store.subscribe()`."
+    tips:
+      - Always call to avoid memory leaks (especially in component `useEffect` cleanup).
+    ai_support:
+      - “Pattern for one‑time selector subscription.”
+
+################################################################################
+# 2. COMMON WORKFLOWS + TEMPLATE CODE
+################################################################################
+workflows:
+  create_store_modern:
+    description: "Recommended path using Redux Toolkit."
+    code: |
+      import { configureStore } from '@reduxjs/toolkit'
+      import todos from './features/todos/todosSlice'
+      const store = configureStore({ reducer: { todos } })
+  migrate_legacy_store:
+    description: "How to move from `createStore` to `configureStore`."
+    steps:
+      - Replace explicit `applyMiddleware(thunk)` with `middleware: (getDefault) => getDefault().concat(thunk)`
+      - Remove manual DevTools enhancer; RTK enables it automatically in dev.
+      - Export `RootState` from `store.ts` via `ReturnType<typeof store.getState>`.
+  async_flow_thunk:
+    code: |
+      type AppDispatch = typeof store.dispatch
+      export const fetchTodos = () => async (dispatch: AppDispatch) => {
+        dispatch(todosLoading())
+        const data = await client.get('/todos')
+        dispatch(todosLoaded(data))
+      }
+  code_splitting_reducers:
+    steps:
+      - Keep `injectReducer(key, reducer)` registry.
+      - Call `store.replaceReducer(combineReducers(registry))`.
+      - Ensure injected slice returns its initial state for `undefined`.
+
+################################################################################
+# 3. FAQ SNIPPETS THE AGENT SHOULD HAVE READY
+################################################################################
+faq:
+  - q: "Why does `dispatch` return the action?"
+    a: "So middleware can pass through promises or thunks yet outer code still receives the original (or transformed) value, enabling chains like `return dispatch(myAction())`."
+  - q: "Can reducers be async?"
+    a: "No. Reducers must be pure and synchronous. Async logic belongs in middleware or thunks."
+  - q: "How do I test middleware?"
+    a: |
+      1. Create a fake store with `getState` + spy `dispatch`.
+      2. Pass it to middleware: `const next = jest.fn()`; `middleware(api)(next)(action)`.
+      3. Assert on `next`/`dispatch` calls.
+  - q: "When should I use an enhancer vs middleware?"
+    a: "Enhancers wrap store creation (one‑time setup, e.g. DevTools). Middleware wraps dispatch (per‑action logic)."
+
+################################################################################
+# 4. ADVANCED TYPE‑LEVEL INFERENCE RECIPES
+################################################################################
+ts_inference:
+  derive_root_state:
+    code: |
+      export type RootState = ReturnType<typeof store.getState>
+  extract_action_union_from_reducer_map:
+    code: |
+      type RootAction = ActionFromReducersMapObject<typeof reducers>
+  extend_dispatch_for_thunk:
+    code: |
+      import { ThunkDispatch } from '@reduxjs/toolkit'
+      type AppDispatch = ThunkDispatch<RootState, unknown, RootAction>
+  strongly_typed_bindActionCreators:
+    note: "Leverage mapped‑types so `dispatch(addTodo('x'))` is inferred."
+
+################################################################################
+# 5. PITFALLS & RECOMMENDATIONS
+################################################################################
+gotchas:
+  - "Returning `undefined` from a reducer mistakenly wipes that slice – always return previous state for unknown actions."
+  - "Dispatching non‑serialisable data (Date, Map, class instances) breaks time‑travel & persistence; use RTK serializability middleware or normalise."
+  - "`applyMiddleware` *must* be first enhancer; otherwise later enhancers wrap the un‑augmented store."
+  - "Avoid `compose` in favour of `configureStore`’s object argument – clearer and type‑safe."
+  - "Never mutate `state` directly; it breaks Redux guarantees. Use Immer (built into RTK) or immutable updates."
+
+################################################################################
+# 6. EXTERNAL RESOURCES THE AGENT MAY LINK
+################################################################################
+links:
+  docs_main: "https://redux.js.org/"
+  why_rtk:   "https://redux.js.org/introduction/why-rtk-is-redux-today"
+  faq:       "https://redux.js.org/faq/code-structure"
+  fsa:       "https://github.com/redux-utilities/flux-standard-action"
+  observable_proposal: "https://github.com/tc39/proposal-observable"
+
+################################################################################
+# END OF FILE
+################################################################################
+
