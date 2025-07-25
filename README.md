@@ -107,3 +107,189 @@ The platform becomes the authoritative registry where:
 
 Execute these, and in three months you will have a credible, buzz‑worthy AgentHub alpha in developers’ hands—positioned to own the emerging standard for API‑aware AI agents.
 
+
+Below is a streamlined, launch‑first rewrite of the original plan followed by an **`agenthub‑launch.yaml`** that encodes the entire eight‑week MVP push as a set of inter‑locking “product‑development agents.”
+Everything not needed to generate immediate buzz (community marketplace, enterprise tier, score‑cards, etc.) is deferred.
+
+---
+
+## 1 . What We’re *Not* Shipping (Yet)
+
+| Deferred Item                        | Rationale                                                                                           |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| **Community agent marketplace**      | Solves a cold‑start two‑sided problem—skip until we have traffic.                                   |
+| **Paid plans, private hubs, SOC 2**  | Pre‑revenue → no buyers; latency & cost issues are non‑blocking today.                              |
+| **Badging / lint dashboards**        | Adds friction to authoring; trust can be earned later through early adopters and “official” agents. |
+| **VS Code autocomplete playground**  | Nice‑to‑have; a simple **snippets + CLI** delivers 80 % of the wow with 10 % effort.                |
+| **Multimodal / tool‑calling agents** | Focus first on text‑only API‑calling patterns; complexity explodes otherwise.                       |
+
+---
+
+## 2 . Core Thesis for Viral Traction
+
+1. **Authoritative Pipeline Wins**
+   *One* blessed way to define, version, and publish an agent file → zero ambiguity → zero yak‑shaving for devs.
+
+2. **Zero‑to‑Demo in < 60 s**
+   If a developer can run `npx agenthub add stripe` and watch ChatGPT wire a checkout flow before coffee cools, we win Hacker News.
+
+3. **Project Team ↔ AgentHub Co‑Maintenance**
+   “Official” agent ownership sits with the upstream project *and* us. We supply the scaffolding, tests, and release hooks; they merge updates.
+   *Outcome:* agent stays fresh without our team becoming a bottleneck.
+
+---
+
+## 3 . MVP Scope (8 Weeks, Single Track)
+
+| Week | Must‑Have Deliverable                                                                                                           | Key Success Metric                                      |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| 1    | **Open Agent Spec v0.1** (+ JSONSchema & CLI validator)                                                                         | Spec merged & RFC up‑voted on HN (>50 comments).        |
+| 2‑3  | **Agent Scaffolder CLI** – `agenthub create` wizards an opinionated skeleton incl. unit‑test prompts and “happy‑path” examples. | First “hello‑world” PR from an external dev.            |
+| 3‑4  | **Mini Registry (Git‑backed)** – `agenthub publish` pushes to GitHub repo; CDN served via Cloudflare.                           | File fetched in demo <300 ms globally.                  |
+| 4‑5  | **Runtime SDK (Node + Python)** – one helper `run_agent(agent_url, goal)` with streaming callbacks.                             | Stripe checkout demo runs end‑to‑end locally first try. |
+| 5‑6  | **Flagship Agents (React, Redux, Stripe)** – co‑authored with project maintainers; stored under `official/` namespace.          | Maintainers tweet about it; 200★ on GitHub.             |
+| 6‑7  | **CI Hooks Template** – GitHub Action that agent authors copy‑paste to re‑publish on library release.                           | 90 % freshness automation for flagship agents.          |
+| 8    | **“60‑second Agent” Launch** – blog post, 2‑min terminal screencast, Product Hunt drop.                                         | 1 k GitHub stars in 48h, HN front‑page.                 |
+
+---
+
+## 4 . Org & Resourcing
+
+| Function               | Headcount        | Notes                                           |
+| ---------------------- | ---------------- | ----------------------------------------------- |
+| Product / Spec Steward | **1**            | Owns RFC, evangelism, and maintainer relations. |
+| Full‑Stack Engineer    | **1**            | CLI, registry, SDK, and launch demo.            |
+| DevRel Engineer        | **½** (contract) | Writes sample apps, produces screencasts.       |
+
+Total burn ≈ US \$60‑70 k for two months (well below typical pre‑seed).
+
+---
+
+## 5 . `agenthub‑launch.yaml`
+
+```yaml
+# AgentHub MVP – eight‑week launch plan expressed as "development agents"
+agents:
+  - id: spec_author
+    name: "Spec Author & Steward"
+    owner: product
+    goal: "Draft, iterate, and ratify Open Agent Spec v0.1."
+    timeline: "Week 1"
+    outputs:
+      - path: specs/open-agent-spec-v0.1.md
+      - path: tools/jsonschema/open-agent-spec.json
+      - path: community/rfc_hn_thread.md
+    success_criteria:
+      - "Spec merged to main."
+      - "≥50 community comments & actionable PRs."
+    dependencies: []
+
+  - id: cli_scaffolder
+    name: "Scaffolder CLI"
+    owner: engineering
+    goal: "Generate validated agent skeletons and run local tests."
+    timeline: "Weeks 2‑3"
+    uses_spec: spec_author
+    outputs:
+      - path: cli/agenthub-create.js
+      - path: docs/quickstart.md
+    success_criteria:
+      - "First external PR using CLI passes CI."
+      - "Agent file creation <10 s on fresh laptop."
+
+  - id: mini_registry
+    name: "Git‑backed Registry & CDN"
+    owner: engineering
+    goal: "Serve versioned agent files globally with sub‑200 ms latency."
+    timeline: "Weeks 3‑4"
+    uses_spec: spec_author
+    outputs:
+      - path: registry/README.md
+      - path: infra/cloudflare-worker.js
+    success_criteria:
+      - "curl https://cdn.agenthub.dev/official/stripe@1.0.yaml <300 ms world‑wide sample."
+
+  - id: runtime_sdk
+    name: "Runtime SDK (Node & Python)"
+    owner: engineering
+    goal: "Execute agent files against OpenAI/Llama‑compatible LLMs."
+    timeline: "Weeks 4‑5"
+    depends_on:
+      - mini_registry
+    outputs:
+      - path: sdk/node/index.ts
+      - path: sdk/python/agenthub.py
+      - path: examples/stripe_checkout.js
+    success_criteria:
+      - "npm install && node stripe_checkout.js succeeds first try."
+      - "pip example returns valid JSON answer."
+
+  - id: flagship_agents
+    name: "Official Flagship Agents"
+    owner: devrel
+    goal: >
+      Publish and co‑maintain React, Redux, and Stripe agents that showcase
+      best practices and test harnesses.
+    timeline: "Weeks 5‑6"
+    depends_on:
+      - cli_scaffolder
+      - mini_registry
+      - runtime_sdk
+    outputs:
+      - path: official/react@1.0.yaml
+      - path: official/redux@1.0.yaml
+      - path: official/stripe@1.0.yaml
+    success_criteria:
+      - "Tweet from each upstream maintainer."
+      - "≥200 GitHub stars on repo."
+
+  - id: ci_hooks
+    name: "Update‑on‑Release CI Hooks"
+    owner: engineering
+    goal: "Auto‑bump and publish agents when upstream releases new versions."
+    timeline: "Weeks 6‑7"
+    depends_on:
+      - flagship_agents
+    outputs:
+      - path: templates/agent-ci.yml
+    success_criteria:
+      - "CI green on new React minor release without manual intervention."
+
+  - id: launch_driver
+    name: "Public Launch Driver"
+    owner: devrel
+    goal: "Coordinate blog, screencast, and Product Hunt listing."
+    timeline: "Week 8"
+    depends_on:
+      - runtime_sdk
+      - flagship_agents
+    outputs:
+      - path: marketing/60-second-agent-demo.mp4
+      - path: marketing/product_hunt_description.md
+    success_criteria:
+      - "HN Front‑page (#1–#5)."
+      - "1 000 GitHub stars within 48 h."
+```
+
+---
+
+### How to Read the File
+
+* **agents**: atomic, owner‑assigned workstreams that behave like reusable development bots.
+* **uses\_spec/depends\_on**: soft & hard dependencies (pre‑launch DAG).
+* **success\_criteria**: crisp, externally verifiable outcomes—it’s obvious when an agent “done()”.
+* **outputs**: concrete artifacts checked into the monorepo or CDN; nothing abstract.
+
+Import this YAML into your project tracker (Linear, Jira, GitHub Projects) or feed it directly into an orchestration framework (e.g., Dendron, Baseplate) to spawn tickets automatically.
+
+---
+
+## 6 . Day‑Zero Call Sheet
+
+1. **Merge `agenthub‑launch.yaml` to repo root.**
+2. **Create Slack channel `#agenthub‑launch` with one thread per agent ID.**
+3. **Kick‑off meeting (30 min):** walk through success criteria line‑by‑line; surface blockers.
+4. **Announce public RFC URL** for Spec v0.1 and start counting down to Hacker News post.
+
+Ship the spec, light the demo, and let dev Twitter do the rest.
+
