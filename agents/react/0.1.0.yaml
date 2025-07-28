@@ -1,0 +1,358 @@
+spec\_version: "0.1.0"
+meta:
+spec\_name: react
+generated: "2025-07-28"
+purpose: >
+Provide AI assistants with senior‑developer knowledge of React’s core
+element factories and hooks API so they can guide developers in writing
+clear, idiomatic, and performant UIs with TypeScript.
+guiding\_principles:
+\- Prefer declarative composition over imperative DOM manipulation.
+\- Keep components pure; place side‑effects in effects or event handlers.
+\- Derive state; avoid redundant or deeply nested state trees.
+\- Co‑locate state, but lift it when shared by multiple children.
+\- Memoise expensive work and stable callbacks to prevent re‑renders.
+design\_notes: >
+This pack focuses on the subset of React APIs most frequently queried in
+day‑to‑day development. It omits obscure typings and rarely‑used event or
+HTML attribute helpers to keep the knowledge pack compact yet practical.
+
+groups:
+
+* name: Element Factories & Component Utilities
+  exports:
+
+  * createElement
+  * cloneElement
+  * createContext
+  * createRef
+  * forwardRef
+  * memo
+  * lazy
+  * Fragment
+  * Suspense
+    symbols:
+    createElement:
+    summary: Compile‑time overload that turns JSX into React elements.
+    guidance:
+
+    * Import from "react"; never call the overloads manually—use JSX or TSX.
+    * Keys should be stable strings; avoid array indices in production lists.
+      example: |
+      import React from "react";
+
+    const el = React.createElement("button", { type: "button" }, "Click");
+    // ⬆ equivalent to: <button type="button">Click</button>
+    ai\_support:
+
+    * "Why does React warn about missing `key`?"
+    * "How to pass refs to DOM nodes using JSX?"
+      cloneElement:
+      summary: Produces a new element by merging extra props into an existing one.
+      guidance:
+    * Use for advanced HOCs; prefer spreading props in JSX when possible.
+    * Cloned elements inherit the original `key` unless explicitly overridden.
+      example: |
+      import { cloneElement } from "react";
+
+    function WithClass(child) {
+    return cloneElement(child, { className: "highlight" });
+    }
+    createContext:
+    summary: Creates a Context object for prop‑drilling escape hatches.
+    guidance:
+
+    * Supply a sensible default for non‑provider trees to keep tests simple.
+    * Co‑locate provider near shared state; avoid global context sprawl.
+      example: |
+      import { createContext } from "react";
+
+    export const ThemeContext = createContext("light");
+    createRef:
+    summary: Returns an object whose `.current` persists across renders.
+    guidance:
+
+    * Initialise refs outside render bodies (`useRef` inside function components).
+    * Mutating `.current` does not trigger re‑renders—keep it for imperative data.
+      example: |
+      import React, { createRef } from "react";
+
+    class InputFocus extends React.Component {
+    inputRef = createRef();
+
+    ```
+    componentDidMount() {
+      this.inputRef.current?.focus();
+    }
+    render() {
+      return <input ref={this.inputRef} />;
+    }
+    ```
+
+    }
+    forwardRef:
+    summary: Enables ref forwarding through function components.
+    guidance:
+
+    * Wrap with `forwardRef` once; do not nest or wrap again inside memo.
+    * Always pass `ref` down to the DOM element or child ref receiver.
+      example: |
+      import { forwardRef } from "react";
+
+    const Input = forwardRef((props, ref) => (
+    \<input {...props} ref={ref} />
+    ));
+    memo:
+    summary: Memoises a component; skips re‑render when props are shallow‑equal.
+    guidance:
+
+    * Supply `propsAreEqual` when props are complex or derived.
+    * Combine with `useCallback` / `useMemo` for granular control.
+      example: |
+      import { memo } from "react";
+
+    const Row = memo(function Row({ item }) {
+    return <li>{item.label}</li>;
+    });
+    lazy:
+    summary: Code‑splits components by returning a promise‑loading wrapper.
+    guidance:
+
+    * Wrap lazy components with `<Suspense fallback={…}>`.
+    * Chunk names derive from file paths; use webpack magic comments to tune.
+      example: |
+      import { lazy, Suspense } from "react";
+
+    const Chart = lazy(() => import("./Chart"));
+
+    export default function Dashboard() {
+    return (
+    \<Suspense fallback={<p>Loading…</p>}> <Chart /> </Suspense>
+    );
+    }
+    Fragment:
+    summary: Groups children without creating an extra DOM node.
+    guidance:
+
+    * Shorthand `<>` syntax compiles to `React.Fragment`.
+    * Keys are supported (`<Fragment key="…">`) when mapping.
+      example: |
+      import { Fragment } from "react";
+
+    return ( <Fragment> <td>ID</td> <td>Name</td> </Fragment>
+    );
+    Suspense:
+    summary: Displays fallback UI while lazy or data‑fetching children suspend.
+    guidance:
+
+    * Keep fallbacks lightweight to minimise jank.
+    * Nest boundaries to scope loading indicators.
+      example: |
+      import { Suspense } from "react";
+
+    \<Suspense fallback={<Spinner />}> <SlowComponent /> </Suspense>
+
+* name: Hooks (State, Effects & Refs)
+  exports:
+
+  * useState
+  * useReducer
+  * useEffect
+  * useLayoutEffect
+  * useContext
+  * useRef
+  * useMemo
+  * useCallback
+  * useImperativeHandle
+  * useTransition
+    symbols:
+    useState:
+    summary: Returns stateful value plus setter function.
+    guidance:
+
+    * Initial state can be lazily computed: `useState(() => expensive())`.
+    * Call setter with updater function when next value depends on previous.
+      example: |
+      import { useState } from "react";
+
+    const Counter = () => {
+    const \[count, setCount] = useState(0);
+    return \<button onClick={() => setCount(c => c + 1)}>{count}</button>;
+    }
+    useReducer:
+    summary: Manages complex state via reducer pattern.
+    guidance:
+
+    * Keep reducer pure; avoid side‑effects inside it.
+    * Use when state shape is an object or involves multiple updates per tick.
+      example: |
+      import { useReducer } from "react";
+
+    function reducer(state, action) {
+    switch (action.type) {
+    case "inc": return { n: state.n + 1 };
+    default: return state;
+    }
+    }
+
+    const C = () => {
+    const \[state, dispatch] = useReducer(reducer, { n: 0 });
+    return \<button onClick={() => dispatch({ type: "inc" })}>{state.n}</button>;
+    };
+    useEffect:
+    summary: Runs side‑effects after render.
+    guidance:
+
+    * Declare all used values in the dependency array to avoid stale closures.
+    * Return a cleanup function for subscriptions, timers, or event listeners.
+      example: |
+      import { useEffect } from "react";
+
+    function Clock() {
+    const \[now, setNow] = useState(new Date());
+    useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+    }, \[]);
+    return <time>{now\.toLocaleTimeString()}</time>;
+    }
+    useLayoutEffect:
+    summary: Like `useEffect` but fires synchronously after DOM mutations.
+    guidance:
+
+    * Use for measurements; avoid heavy logic to prevent blocking paint.
+    * Server‑side rendering ignores layout effects—guard against null DOM.
+      example: |
+      import { useLayoutEffect, useRef } from "react";
+
+    function HeightLogger() {
+    const ref = useRef(null);
+    useLayoutEffect(() => {
+    console.log(ref.current.offsetHeight);
+    });
+    return <div ref={ref}>Measure me</div>;
+    }
+    useContext:
+    summary: Reads current context value from nearest provider.
+    guidance:
+
+    * Calling in deep trees is cheap; React memoises values.
+    * If context value is an object, memoise or split to avoid cascade renders.
+      example: |
+      import { useContext } from "react";
+      import { ThemeContext } from "./theme";
+
+    function Button(props) {
+    const theme = useContext(ThemeContext);
+    return <button className={theme}>{props.children}</button>;
+    }
+    useRef:
+    summary: Stores mutable value that persists across renders.
+    guidance:
+
+    * `useRef()` without initial value outputs `{ current: undefined }`.
+    * Reading `ref.current` does not cause re‑render; do not use for reactive data.
+      example: |
+      import { useRef } from "react";
+
+    function FocusInput() {
+    const inputRef = useRef(null);
+    return \<input ref={inputRef} onFocus={() => console.log(inputRef.current)} />;
+    }
+    useMemo:
+    summary: Memoises expensive calculation result between renders.
+    guidance:
+
+    * Dependency array must include inputs; empty array freezes value forever.
+    * Use sparingly; premature memoisation can hurt readability.
+      example: |
+      import { useMemo } from "react";
+
+    const Sorted = ({ list }) => {
+    const sorted = useMemo(() => \[...list].sort(), \[list]);
+    return <ul>{sorted.map(x => <li key={x}>{x}</li>)}</ul>;
+    };
+    useCallback:
+    summary: Stable reference to a function between renders.
+    guidance:
+
+    * Combine with `memo`ed children to avoid unnecessary re‑renders.
+    * Dependencies mirror `useMemo`; include captured props/state.
+      example: |
+      import { useCallback, useState } from "react";
+
+    const Counter = () => {
+    const \[n, setN] = useState(0);
+    const inc = useCallback(() => setN(c => c + 1), \[]);
+    return <button onClick={inc}>{n}</button>;
+    };
+    useImperativeHandle:
+    summary: Exposes imperative methods to parent via ref.
+    guidance:
+
+    * Wrap component in `forwardRef`; call inside with deps array.
+    * Return the minimal API surface; avoid exposing internal DOM nodes.
+      example: |
+      import { useImperativeHandle, forwardRef, useRef } from "react";
+
+    const Input = forwardRef((props, ref) => {
+    const innerRef = useRef(null);
+    useImperativeHandle(ref, () => ({
+    focus: () => innerRef.current?.focus()
+    }), \[]);
+    return \<input ref={innerRef} {...props} />;
+    });
+    useTransition:
+    summary: Defers non‑urgent updates to avoid UI blocking.
+    guidance:
+
+    * Wrap state updates that may suspend (e.g., data fetch) in `startTransition`.
+    * Use the pending boolean to disable buttons or show lightweight indicators.
+      example: |
+      import { useTransition } from "react";
+
+    const Search = () => {
+    const \[query, setQuery] = useState("");
+    const \[isPending, start] = useTransition();
+
+    ```
+    const onChange = e => {
+      const value = e.target.value;
+      start(() => setQuery(value));
+    };
+
+    return (
+      <>
+        <input onChange={onChange} />
+        {isPending && <Spinner />}
+      </>
+    );
+    ```
+
+    };
+
+common\_workflows:
+
+* title: Controlled Input with Context Theme
+  steps:
+
+  * Create a `ThemeContext` with `createContext`.
+  * Inside provider, manage `value` with `useState`.
+  * In child input, read context via `useContext`.
+  * Forward parent ref with `forwardRef` if imperative focus is required.
+* title: Code‑Splitting a Dashboard Tab
+  steps:
+
+  * Import component lazily using `lazy(() => import("./Chart"))`.
+  * Wrap with `<Suspense fallback={<Spinner/>}>`.
+  * Memoise tab container with `memo` to prevent re‑render churn.
+
+external\_resources:
+
+* label: React Official Docs
+  url: [https://react.dev/reference](https://react.dev/reference)
+* label: React TypeScript Cheatsheet
+  url: [https://react-typescript-cheatsheet.netlify.app/docs/basic](https://react-typescript-cheatsheet.netlify.app/docs/basic)
+* label: React 18 Working Group Discussions
+  url: [https://github.com/reactwg/react-18/discussions](https://github.com/reactwg/react-18/discussions)
+
