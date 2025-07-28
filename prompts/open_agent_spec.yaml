@@ -1,0 +1,181 @@
+# ===================================================================
+# AgentHub ‑ Open Agent Spec • Version 0.1  (formal YAML schema)
+# -------------------------------------------------------------------
+# This file defines—using JSON‑Schema vocabulary encoded as YAML—
+# the authoritative structure every “Expert Knowledge Pack” must follow.
+# ===================================================================
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://agenthub.dev/schema/open-agent-spec-0.1.json"
+title: "AgentHub ‑ Open Agent Spec v0.1"
+description: >
+  Machine‑readable schema for AgentHub “Expert Knowledge Packs”.
+  Packs are data‑only documents that teach any LLM to operate a specific
+  API/SDK at senior‑developer level.
+
+type: object
+required: [meta, groups]
+additionalProperties: false
+
+properties:
+
+  # ---------------------------------------------------------------
+  # 1. META BLOCK
+  # ---------------------------------------------------------------
+  meta:
+    type: object
+    required:
+      - spec_name
+      - spec_version
+      - generated
+      - purpose
+      - guiding_principles
+      - design_notes
+    additionalProperties: false
+    properties:
+      spec_name:
+        type: string
+        description: >
+          Unique kebab‑ or slash‑case identifier, e.g. "react" or "aws-sdk/s3".
+        pattern: "^[a-z0-9]+([-/][a-z0-9]+)*$"
+      spec_version:
+        type: string
+        description: Semantic version of this Knowledge Pack.
+        pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      generated:
+        type: string
+        description: Build date (UTC) in YYYY‑MM‑DD.
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$"
+      purpose:
+        type: string
+        description: Human‑readable mission statement.
+      guiding_principles:
+        type: array
+        description: 3‑10 rules steering AI answers.
+        minItems: 3
+        maxItems: 10
+        items: { type: string }
+      design_notes:
+        type: string
+        description: >
+          Author rationale, research references, and notable trade‑offs.
+
+  # ---------------------------------------------------------------
+  # 2. GROUPS (required array)
+  # ---------------------------------------------------------------
+  groups:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required: [name, exports, symbols]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          description: Section heading (e.g. "Hooks (State, Refs, Effects)").
+        exports:
+          type: array
+          description: Canonical symbol names covered by this group.
+          minItems: 1
+          uniqueItems: true
+          items: { type: string }
+        symbols:
+          type: object
+          description: >
+            Map of export name → Symbol Definition. Every key listed in
+            `exports` MUST exist here.
+          additionalProperties:
+            type: object
+            required: [summary, guidance, example]
+            additionalProperties: true    # Allows extra snake_case fields.
+            properties:
+              summary:
+                type: string
+                description: One‑sentence purpose of the symbol.
+              guidance:
+                type: array
+                description: Pragmatic tips, best practices, pitfalls.
+                minItems: 1
+                items: { type: string }
+              example:
+                type: string
+                description: Minimal runnable code snippet.
+              ai_support:
+                type: array
+                description: Typical developer questions the LLM should handle.
+                items: { type: string }
+
+  # ---------------------------------------------------------------
+  # 3. OPTIONAL LIBRARY‑WIDE SECTIONS
+  # ---------------------------------------------------------------
+  common_workflows:
+    type: array
+    description: Step‑by‑step guides for frequent, high‑level tasks.
+    items:
+      type: object
+      required: [title, steps]
+      additionalProperties: false
+      properties:
+        title: { type: string }
+        steps:
+          type: array
+          minItems: 1
+          items: { type: string }
+
+  troubleshooting_cheatsheet:
+    type: array
+    description: Quick‑reference symptom → cause → fix table.
+    items:
+      type: object
+      required: [symptom, cause, fix]
+      additionalProperties: false
+      properties:
+        symptom: { type: string }
+        cause:   { type: string }
+        fix:     { type: string }
+
+  faq:
+    type: array
+    description: Frequently asked questions with concise answers.
+    items:
+      type: object
+      required: [q, a]
+      additionalProperties: false
+      properties:
+        q: { type: string }
+        a: { type: string }
+
+  external_resources:
+    type: array
+    description: Authoritative links to docs, blog posts, videos, etc.
+    items:
+      type: object
+      required: [label, url]
+      additionalProperties: false
+      properties:
+        label: { type: string }
+        url:
+          type: string
+          format: uri
+          description: HTTPS URL of the resource.
+
+# ---------------------------------------------------------------
+# 4. VERSIONING RULES (informational, non‑enforced by schema)
+# ---------------------------------------------------------------
+# • Minor version bump → adding OPTIONAL keys or fields.
+# • Major version bump → breaking structural change.
+# • Knowledge Pack files must specify `spec_version` in SemVer.
+#
+# ---------------------------------------------------------------
+# 5. LOGICAL VALIDATION BEYOND SCHEMA (performed in CI)
+# ---------------------------------------------------------------
+# • Every name listed in groups[*].exports appears in groups[*].symbols.
+# • No duplicate exports across groups.
+# • Example snippets compile/run in smoke‑test harness.
+# • Guiding principles array length 3‑10.
+#
+# ---------------------------------------------------------------
+# End of schema
+# ---------------------------------------------------------------
+
