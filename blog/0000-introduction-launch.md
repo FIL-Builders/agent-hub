@@ -42,7 +42,7 @@ So we re‑plotted our course. Instead of chasing volume and splashy numbers, we
   Hand‑crafted examples for React, Stripe, Postgres, etc., each with `.yaml`, passing CI, and a candid `DESIGN_NOTES.md`.
 
 * **CI / Lint / Smoke Tests**
-  A < 90 s GitHub Action that validates spec compliance *and* proves each agent runs inside LangChain, OpenAI Assistants, and LlamaIndex.
+  A &lt; 90 s GitHub Action that validates spec compliance *and* proves each agent runs inside LangChain, OpenAI Assistants, and LlamaIndex.
 
 *Why it matters:* We won’t invite guests into a half‑built house. This is our quality guarantee.
 

@@ -1,4 +1,4 @@
-# **First Steps: Contributing a New Agent to AgentHub**
+# First Steps: Contributing a New Agent to AgentHub
 
 ---
 
@@ -84,7 +84,7 @@ You can open a **draft PR** if you’re still working—early feedback is encour
 
 ## **7. Collaborate and Iterate**
 
-* The AgentHub team aims for a review turnaround of **≤12 hours** during launch week, and <24 hours after that.
+* The AgentHub team aims for a review turnaround of **≤12 hours** during launch week, and &lt;24 hours after that.
 * Feedback is friendly, specific, and transparent.
 * Expect suggestions, discussion, and (often) a bit of collaborative iteration before merging.
 
