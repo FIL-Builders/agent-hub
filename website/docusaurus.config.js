@@ -42,17 +42,7 @@ const config = {
   },
 
   plugins: [
-
-	  [
-	    '@docusaurus/plugin-content-docs',
-	    {
-	      id: 'agents',
-	      path: 'docs/agents',
-	      routeBasePath: 'agents',
-	      sidebarPath: require.resolve('./sidebarsAgents.js'),
-	      editUrl: 'https://github.com/FIL-Builders/agent-hub/tree/main/docs/agents/',
-	    },
-	  ],
+	  require.resolve('./plugins/webpack-yaml-loader.js'),
   ],
 
   presets: [

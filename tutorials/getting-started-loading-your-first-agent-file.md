@@ -1,4 +1,4 @@
-# **Getting Started: Loading Your First Agent File**
+# Getting Started: Loading Your First Agent File
 
 ---
 

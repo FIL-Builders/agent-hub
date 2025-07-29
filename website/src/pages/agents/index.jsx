@@ -1,22 +1,21 @@
 import React from 'react';
+import Layout from '@theme/Layout';
 import CodeBlock from '@theme/CodeBlock';
 
-// ---
-// Use require.context to get all yaml files in static/agents recursively
+
+// Use require.context to get all YAML files recursively in static/agents
 const req = require.context(
-  '../../../static/agents', // relative to /website/src/pages/agents/
-  true, // recursive
+  '../../../../agents', // path relative to this file
+  true,
   /\.yaml$/
 );
 
-// Build an array of {project, file, path, raw}
 const agentSpecs = req.keys().map((filePath) => {
-  // filePath example: './react/0.1.0.yaml'
-console.log(filePath)
-  const matches = filePath.match(/.yaml/);
-  if (!matches) return null;
-  const project = matches[1];
-  const file = matches[2];
+  // filePath like './react/0.1.0.yaml'
+  const m = filePath.match(/^\.\/([^/]+)\/(.+\.yaml)$/);
+  if (!m) return null;
+  const project = m[1];
+  const file = m[2];
   return {
     project,
     file,
@@ -26,13 +25,14 @@ console.log(filePath)
 }).filter(Boolean);
 
 export default function AgentsIndex() {
-  // Optional: group by project
   const grouped = agentSpecs.reduce((acc, spec) => {
     (acc[spec.project] = acc[spec.project] || []).push(spec);
     return acc;
   }, {});
 
   return (
+<Layout title="Agent Specs" description="All registered agent specs in YAML.">
+
     <main className="container margin-vert--lg">
       <h1>All AgentHub YAML Specs</h1>
       {Object.entries(grouped).map(([project, specs]) => (
@@ -54,7 +54,8 @@ export default function AgentsIndex() {
         </section>
       ))}
     </main>
+	      </Layout>
+
   );
 }
-
 
