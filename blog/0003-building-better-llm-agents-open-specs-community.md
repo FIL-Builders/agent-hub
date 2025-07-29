@@ -1,4 +1,4 @@
-# **Building Better LLM Agents: Why Open Specs and Community Matter**
+# Building Better LLM Agents: Why Open Specs and Community Matter
 
 ---
 

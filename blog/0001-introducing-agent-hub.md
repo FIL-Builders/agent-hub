@@ -1,4 +1,4 @@
-# **Introducing AgentHub: The Open Registry for LLM Agents**
+# Introducing AgentHub: The Open Registry for LLM Agents
 
 ### *Build better LLM agents—together, in the open.*
 

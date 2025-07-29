@@ -1,4 +1,4 @@
-# **First Steps: Contributing a New Agent to AgentHub**
+# First Steps: Contributing a New Agent to AgentHub
 
 ---
 

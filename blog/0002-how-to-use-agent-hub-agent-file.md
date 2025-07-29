@@ -1,4 +1,4 @@
-# **How to Use an AgentHub Agent File With Your Local LLM Stack**
+# How to Use an AgentHub Agent File With Your Local LLM Stack
 
 *Unlock expert-level LLM coding sessions in three simple steps.*
 
