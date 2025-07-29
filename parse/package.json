@@ -11,6 +11,11 @@
   "description": "",
   "dependencies": {
     "@types/react": "^19.1.8",
+    "ethers": "^6.15.0",
+    "glob": "^11.0.3",
+    "hardhat": "^2.26.1",
+    "helia": "^5.5.0",
+    "ipfs": "^0.66.1",
     "react": "^19.1.0",
     "redux": "^5.0.1",
     "ts-morph": "^26.0.0",

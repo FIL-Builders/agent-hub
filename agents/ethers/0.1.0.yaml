@@ -1,0 +1,225 @@
+meta:
+spec\_name: ethers
+spec\_version: "0.1.0"
+generated: 2025-07-29
+purpose: >
+Provide an AI assistant with authoritative, task‑oriented knowledge for using
+the ethers.js library to build, test, and maintain Ethereum‑compatible
+applications in JavaScript and TypeScript.
+guiding\_principles:
+\- Never expose private keys or mnemonics in code; load secrets from secure storage.
+\- Prefer async/await and typed BigInt/BigNumber arithmetic for all blockchain I/O.
+\- Validate and checksum user‑supplied addresses with `getAddress` before use.
+\- Batch or throttle RPC calls to respect provider rate limits and improve throughput.
+\- Write deterministic tests by mocking providers and block numbers.
+design\_notes: >
+This pack distills ethers.js v6 TypeScript definitions and official docs into
+four conceptual groups (providers, signers, contracts, utilities). Examples are
+runnable under Node 20 ESM and highlight secure, modern patterns.
+
+groups:
+
+* name: Providers (network connections)
+  exports: \[JsonRpcProvider, WebSocketProvider, InfuraProvider, AlchemyProvider]
+  symbols:
+  JsonRpcProvider:
+  summary: Connects to any Ethereum JSON‑RPC endpoint over HTTP(S).
+  guidance:
+  \- Prefer high‑availability endpoints in production; self‑host for full archival access.
+  \- Pass an explicit `chainId` to detect accidental network mismatches.
+  example: |
+  import { JsonRpcProvider } from 'ethers';
+  const provider = new JsonRpcProvider('[https://rpc.ankr.com/eth](https://rpc.ankr.com/eth)', 1);
+  console.log(await provider.getBlockNumber());
+  ai\_support:
+  \- How do I create a provider for the Sepolia testnet?
+  \- Why am I getting "network changed" errors?
+  WebSocketProvider:
+  summary: Streams real‑time blockchain data over a persistent WebSocket.
+  guidance:
+  \- Use for event subscriptions; HTTP is cheaper for one‑off queries.
+  \- Reconnect on `close` events with exponential back‑off.
+  example: |
+  import { WebSocketProvider } from 'ethers';
+  const ws = new WebSocketProvider('wss\://eth-mainnet.g.alchemy.com/v2/\$API\_KEY');
+  ws.on('block', n => console.log('New block', n));
+  InfuraProvider:
+  summary: Convenience provider pre‑configured for Infura endpoints.
+  guidance:
+  \- Requires a project id (and secret) to avoid throttling.
+  \- Verify credentials; silent fallback to public endpoints can mask issues.
+  example: |
+  import { InfuraProvider } from 'ethers';
+  const provider = new InfuraProvider('mainnet', process.env.INFURA\_KEY);
+  console.log(await provider.getBalance('vitalik.eth'));
+  AlchemyProvider:
+  summary: Provider tailored for the Alchemy platform with enhanced APIs.
+  guidance:
+  \- Supports Alchemy‑specific NFT and debug endpoints.
+  \- Use the `batch` option to combine multiple calls per round‑trip.
+  example: |
+  import { AlchemyProvider } from 'ethers';
+  const provider = new AlchemyProvider('base', process.env.ALCHEMY\_KEY);
+  console.log((await provider.getGasPrice()).toString())
+* name: Wallets & Signers
+  exports: \[Wallet, VoidSigner]
+  symbols:
+  Wallet:
+  summary: Private‑key account capable of signing messages and transactions.
+  guidance:
+  \- Do **not** commit private keys; load from `process.env` or HSM.
+  \- Call `.connect(provider)` to combine signing with network operations.
+  example: |
+  import { Wallet, JsonRpcProvider, parseEther } from 'ethers';
+  const provider = new JsonRpcProvider('[https://rpc.ankr.com/eth](https://rpc.ankr.com/eth)');
+  const wallet = new Wallet(process.env.PRIV\_KEY).connect(provider);
+  const tx = await wallet.sendTransaction({
+  to: 'vitalik.eth',
+  value: parseEther('0.001')
+  });
+  await tx.wait();
+  console.log('Tx hash:', tx.hash);
+  VoidSigner:
+  summary: Read‑only signer that represents an address without private‑key access.
+  guidance:
+  \- Useful for simulating contract calls “as address” without signing rights.
+  \- Combine with ENS names to impersonate human‑readable accounts.
+  example: |
+  import { VoidSigner, JsonRpcProvider } from 'ethers';
+  const provider = new JsonRpcProvider();
+  const signer = new VoidSigner('vitalik.eth', provider);
+  console.log(await signer.getBalance());
+* name: Contracts
+  exports: \[Contract, ContractFactory, Interface]
+  symbols:
+  Contract:
+  summary: Runtime wrapper exposing on‑chain methods and events via an ABI.
+  guidance:
+  \- Pass a connected signer for state‑changing calls; provider alone is read‑only.
+  \- Keep bundle size small by using human‑readable ABI fragments where possible.
+  example: |
+  import { Contract, JsonRpcProvider } from 'ethers';
+  const erc20Abi = \['function balanceOf(address) view returns (uint256)'];
+  const provider = new JsonRpcProvider();
+  const dai = new Contract(
+  '0x6B175474E89094C44Da98b954EedeAC495271d0F',
+  erc20Abi,
+  provider
+  );
+  console.log(await dai.balanceOf('vitalik.eth'));
+  ContractFactory:
+  summary: Prepares deployment transactions for compiled contract bytecode + ABI.
+  guidance:
+  \- Use `ContractFactory.fromSolidity` when compiling with `solc --standard-json`.
+  \- Set explicit `gasPrice` overrides during network congestion.
+  example: |
+  import { ContractFactory, Wallet, JsonRpcProvider } from 'ethers';
+  import bytecode from './Greeter.bytecode.js';
+  import abi from './Greeter.abi.json';
+  const provider = new JsonRpcProvider('[https://rpc.ankr.com/eth](https://rpc.ankr.com/eth)');
+  const wallet = new Wallet(process.env.PRIV\_KEY, provider);
+  const factory = new ContractFactory(abi, bytecode, wallet);
+  const greeter = await factory.deploy('Hello');
+  await greeter.waitForDeployment();
+  console.log('Greeter at', greeter.target);
+  Interface:
+  summary: Parses ABIs and encodes/decodes calldata and event logs.
+  guidance:
+  \- Re‑use Interface instances to avoid repeated parsing overhead.
+  \- Call `format('minimal')` to produce slimmed ABI for front‑end bundles.
+  example: |
+  import { Interface } from 'ethers';
+  const iface = new Interface(\[
+  'event Transfer(address indexed from,address indexed to,uint amount)'
+  ]);
+  console.log(iface.getEvent('Transfer').topicHash);
+* name: Utilities
+  exports: \[parseEther, formatEther, getAddress, isAddress, BigNumber]
+  symbols:
+  parseEther:
+  summary: Converts a human‑readable ether string to wei as bigint.
+  guidance:
+  \- Throws on invalid input; wrap in `try / catch` for user‑provided values.
+  \- Use `parseUnits` for tokens with non‑18 decimals.
+  example: |
+  import { parseEther } from 'ethers';
+  console.log(parseEther('0.5').toString()); // 500000000000000000
+  formatEther:
+  summary: Converts wei (bigint or BigNumber) to a decimal ether string.
+  guidance:
+  \- Accepts an optional `numDigits` param for rounding.
+  \- Use `formatUnits` for custom decimal ERC‑20 tokens.
+  example: |
+  import { parseEther, formatEther } from 'ethers';
+  console.log(formatEther(parseEther('1.23'))); // "1.23"
+  getAddress:
+  summary: Returns a checksummed address or throws if invalid.
+  guidance:
+  \- Normalise casing immediately after user input to deduplicate addresses.
+  \- Combine with ENS resolution for safer UX.
+  example: |
+  import { getAddress } from 'ethers';
+  console.log(getAddress('0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045'));
+  isAddress:
+  summary: Fast boolean check for hexadecimal address validity.
+  guidance:
+  \- Cheaper than `try { getAddress() }` when checksum enforcement is optional.
+  \- ENS names return `false`; resolve them first if needed.
+  example: |
+  import { isAddress } from 'ethers';
+  console.log(isAddress('0x123')); // false
+  BigNumber:
+  summary: Immutable arbitrary‑precision integer used throughout ethers.js \<v6.
+  guidance:
+  \- Prefer native `bigint` in v6 when interoperable; use BigNumber for legacy code.
+  \- Create via `BigNumber.from(value)`—do **not** `new BigNumber()`.
+  example: |
+  import { BigNumber } from 'ethers';
+  const max = BigNumber.from(2).pow(256).sub(1);
+  console.log(max.toString());
+
+common\_workflows:
+
+* title: Send ERC‑20 tokens
+  steps:
+
+  * Connect a `Wallet` to a `JsonRpcProvider`.
+  * Instantiate a `Contract` with token ABI and wallet signer.
+  * Call `transfer(recipient, amount)` and await `tx.wait()` for confirmation.
+* title: Resolve ENS and fetch balance
+  steps:
+
+  * Create a mainnet `JsonRpcProvider`.
+  * Resolve the ENS name with `provider.resolveName(name)`.
+  * Call `provider.getBalance(address)` and `formatEther` for display.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "insufficient funds for gas \* price + value"
+  cause: Wallet balance too low or gas settings too high.
+  fix: Check `wallet.getBalance()` and estimate gas with `contract.estimateGas.<method>()`.
+* symptom: "invalid ENS name"
+  cause: Name not registered or provider lacks ENS support.
+  fix: Use a mainnet provider and verify spelling.
+
+faq:
+
+* q: How do I sign an arbitrary message?
+  a: >
+  Instantiate a `Wallet` and call `wallet.signMessage(message)`. The returned
+  hex string follows EIP‑191 and can be verified on‑chain or with `ethers.verifyMessage`.
+* q: How can I listen for contract events?
+  a: >
+  Use a `WebSocketProvider`, create a `Contract`, then
+  `contract.on('EventName', listener)`. Remove listeners with `contract.off`
+  or `contract.removeAllListeners` to prevent memory leaks.
+
+external\_resources:
+
+* label: Official Documentation
+  url: [https://docs.ethers.org/v6/](https://docs.ethers.org/v6/)
+* label: GitHub Repository
+  url: [https://github.com/ethers-io/ethers.js](https://github.com/ethers-io/ethers.js)
+* label: TypeScript Declarations
+  url: [https://unpkg.com/ethers@6/dist/ethers.d.ts](https://unpkg.com/ethers@6/dist/ethers.d.ts)
+
