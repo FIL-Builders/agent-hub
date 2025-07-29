@@ -19,7 +19,7 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--secondary button--lg"
-            to="/docs/getting-started-loading-your-first-agent-file">
+            to="/tutorials/getting-started-loading-your-first-agent-file">
             Agents Hub Tutorial - 5min ⏱️
           </Link>
         </div>

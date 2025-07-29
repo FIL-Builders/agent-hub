@@ -119,7 +119,7 @@ const config = {
             items: [
               {
                 label: 'Tutorial',
-                to: '/docs/intro',
+                to: '/tutorials/getting-started-loading-your-first-agent-file',
               },
             ],
           },
