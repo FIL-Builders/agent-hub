@@ -1,0 +1,417 @@
+meta:
+spec\_name: ethers
+spec\_version: 0.2.0
+generated: '2025-07-30'
+library\_version: ^6.15.0
+language: javascript
+homepage: [https://docs.ethers.org/v6/](https://docs.ethers.org/v6/)
+tags:
+\- ethereum
+\- blockchain
+\- sdk
+\- javascript
+purpose: "Provide senior‑developer‑level reference and actionable guidance for using ethers.js
+\ v6 in decentralized‑application, smart‑contract, and wallet development."
+guiding\_principles:
+\- Favor explicit providers and signers in production code.
+\- Treat private keys as secrets; never log or commit them.
+\- Prefer BigInt over number for on‑chain values.
+\- Always await network confirmations when state changes matter.
+\- Handle network errors and fallbacks gracefully.
+\- Lean on typed ABIs to avoid runtime mistakes.
+design\_notes: "Symbols and descriptions were distilled from the TypeDoc JSON export (ethers.out,
+\ v6.15.0). Exports are grouped by functional domain; examples assume modern ESM with top‑level
+\ await."
+groups:
+
+* name: Providers & Network Access
+  exports:
+
+  * JsonRpcProvider
+  * BrowserProvider
+  * AlchemyProvider
+  * InfuraProvider
+  * WebSocketProvider
+  * FallbackProvider
+  * getDefaultProvider
+    symbols:
+    JsonRpcProvider:
+    kind: class
+    summary: Connects to a JSON‑RPC HTTP endpoint.
+    guidance:
+
+    * Use in Node.js or server environments for predictable latency.
+    * Pass a second `network` argument for custom chains.
+      example:
+      lang: javascript
+      code: |
+      import { JsonRpcProvider } from "ethers";
+
+      const provider = new JsonRpcProvider("[https://rpc.ankr.com/eth](https://rpc.ankr.com/eth)");
+      console.log(await provider.getBlockNumber());
+      BrowserProvider:
+      kind: class
+      summary: Wraps an injected EIP‑1193 browser provider (e.g., MetaMask).
+      guidance:
+    * Instantiate with `window.ethereum` to access the user's wallet.
+    * Always request accounts with `provider.send("eth_requestAccounts", [])` before signing.
+      example:
+      lang: javascript
+      code: |
+      import { BrowserProvider } from "ethers";
+
+      const provider = new BrowserProvider(window\.ethereum);
+      await provider.send("eth\_requestAccounts", \[]);
+      const signer = await provider.getSigner();
+      console.log(await signer.getAddress());
+      AlchemyProvider:
+      kind: class
+      summary: Pre‑configured provider for Alchemy endpoints.
+      guidance:
+    * Requires network name and an Alchemy API key string.
+    * Exposes Alchemy‑specific RPC methods in addition to standard JSON‑RPC.
+      example:
+      lang: javascript
+      code: |
+      import { AlchemyProvider } from "ethers";
+
+      const provider = new AlchemyProvider("mainnet", process.env.ALCHEMY\_KEY);
+      console.log(await provider.getGasPrice());
+      InfuraProvider:
+      kind: class
+      summary: Provider implementation for Infura hosted nodes.
+      guidance:
+    * Pass `projectId` (and optionally `projectSecret`) to authenticate.
+    * Infura applies rate limits to anonymous requests; use keys in production.
+      example:
+      lang: javascript
+      code: |
+      import { InfuraProvider } from "ethers";
+
+      const provider = new InfuraProvider("goerli", process.env.INFURA\_PROJECT\_ID);
+      console.log(await provider.getFeeData());
+      WebSocketProvider:
+      kind: class
+      summary: Real‑time provider over WebSocket transport.
+      guidance:
+    * Subscribe to push events like `block` or `logs` with `on()`.
+    * Implement reconnect logic or pair with FallbackProvider for resiliency.
+      example:
+      lang: javascript
+      code: |
+      import { WebSocketProvider } from "ethers";
+
+      const ws = new WebSocketProvider(
+      "wss\://eth-mainnet.g.alchemy.com/v2/" + process.env.ALCHEMY\_KEY
+      );
+      ws.on("block", (n) => console.log("new block", n));
+      FallbackProvider:
+      kind: class
+      summary: Aggregates multiple providers and quorum‑checks responses.
+      guidance:
+    * Pass an array of providers optionally weighted by priority.
+    * Ideal for high‑availability production workloads.
+      example:
+      lang: javascript
+      code: |
+      import { FallbackProvider, JsonRpcProvider } from "ethers";
+
+      const provider = new FallbackProvider(\[
+      new JsonRpcProvider("[https://rpc.ankr.com/eth](https://rpc.ankr.com/eth)"),
+      new JsonRpcProvider("[https://cloudflare-eth.com](https://cloudflare-eth.com)")
+      ]);
+
+      console.log(await provider.getBlockNumber());
+      getDefaultProvider:
+      kind: function
+      summary: Returns a FallbackProvider pre‑configured with community endpoints.
+      guidance:
+    * Supply a network name and optional API keys object.
+    * Suitable for quick prototypes; replace with explicit providers for production.
+      example:
+      lang: javascript
+      code: |
+      import { getDefaultProvider } from "ethers";
+
+      const provider = getDefaultProvider("mainnet", {
+      alchemy: process.env.ALCHEMY\_KEY,
+      infura: process.env.INFURA\_PROJECT\_ID
+      });
+      console.log(await provider.getNetwork());
+* name: Contracts & ABI
+  exports:
+
+  * Contract
+  * ContractFactory
+  * Interface
+  * AbiCoder
+  * FunctionFragment
+  * EventFragment
+  * ErrorFragment
+    symbols:
+    Contract:
+    kind: class
+    summary: Runtime wrapper around a deployed smart contract.
+    guidance:
+
+    * Instantiate with `address`, ABI, and a signer or provider.
+    * Interacts with contract functions and events with auto‑generated methods.
+      example:
+      lang: javascript
+      code: |
+      import { Contract, JsonRpcProvider } from "ethers";
+      import abi from "./erc20.json" assert { type: "json" };
+
+      const provider = new JsonRpcProvider();
+      const dai = new Contract(
+      "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+      abi,
+      provider
+      );
+      console.log(await dai.totalSupply());
+      ContractFactory:
+      kind: class
+      summary: Utility for deploying smart contracts.
+      guidance:
+    * Requires ABI, bytecode, and a signer capable of sending transactions.
+    * Returned `deploy()` promise resolves to Contract instance once mined.
+      example:
+      lang: javascript
+      code: |
+      import { ContractFactory, Wallet, JsonRpcProvider } from "ethers";
+      import abi from "./MyToken.json" assert { type: "json" };
+      import bytecode from "./MyToken.bytecode.js";
+
+      const signer = new Wallet(process.env.PRIVATE\_KEY, new JsonRpcProvider());
+      const factory = new ContractFactory(abi, bytecode, signer);
+      const token = await factory.deploy("MyToken", "MTK");
+      await token.waitForDeployment();
+      console.log("Deployed at", token.target);
+      Interface:
+      kind: class
+      summary: Pure ABI parser/encoder without network access.
+      guidance:
+    * Use to encode data for low‑level calls or to inspect ABI fragments.
+    * Supports `.format()` to generate human‑, JSON‑ or sighash‑formatted strings.
+      example:
+      lang: javascript
+      code: |
+      import { Interface } from "ethers";
+      import abi from "./erc20.json" assert { type: "json" };
+
+      const iface = new Interface(abi);
+      const data = iface.encodeFunctionData("transfer", \["0x...", 1n]);
+      console.log(data);
+      AbiCoder:
+      kind: class
+      summary: Low‑level typed ABI coder.
+      guidance:
+    * Encode/decode arbitrary Solidity data types outside the context of an ABI.
+    * Prefer higher‑level Interface unless you need fine‑grained control.
+      example:
+      lang: javascript
+      code: |
+      import { AbiCoder } from "ethers";
+
+      const coder = new AbiCoder();
+      const encoded = coder.encode(\["uint256", "bool"], \[42, true]);
+      console.log(encoded);
+      FunctionFragment:
+      kind: class
+      summary: Parsed representation of a function ABI entry.
+      guidance:
+    * Access via `Interface.getFunction(nameOrSighash)`.
+    * Inspect properties such as `stateMutability` or `inputs`.
+      example:
+      lang: javascript
+      code: |
+      import { Interface } from "ethers";
+      import abi from "./erc20.json" assert { type: "json" };
+
+      const fn = new Interface(abi).getFunction("transfer");
+      console.log(fn.inputs.map((i) => i.type));
+      EventFragment:
+      kind: class
+      summary: Parsed representation of an event ABI entry.
+      guidance:
+    * Retrieve via `Interface.getEvent(nameOrTopic)`.
+    * Use `topicHash` for filter creation.
+      example:
+      lang: javascript
+      code: |
+      import { Interface } from "ethers";
+      import abi from "./erc20.json" assert { type: "json" };
+
+      const event = new Interface(abi).getEvent("Transfer");
+      console.log(event.topicHash);
+      ErrorFragment:
+      kind: class
+      summary: Parsed representation of a custom error ABI entry.
+      guidance:
+    * Use to decode `revert` data emitted by custom errors.
+    * Map error selectors to descriptions for richer developer tooling.
+      example:
+      lang: javascript
+      code: |
+      import { Interface } from "ethers";
+      import abi from "./MyContract.json" assert { type: "json" };
+
+      const err = new Interface(abi).getError("Unauthorized");
+      console.log(err.format());
+* name: Accounts & Signing
+  exports:
+
+  * Wallet
+  * JsonRpcSigner
+  * SigningKey
+  * TypedDataEncoder
+    symbols:
+    Wallet:
+    kind: class
+    summary: In‑memory private key with convenience helpers.
+    guidance:
+
+    * Call `.connect(provider)` or pass provider in constructor to enable on‑chain actions.
+    * Never expose the mnemonic or private key client‑side unless necessary.
+      example:
+      lang: javascript
+      code: |
+      import { Wallet, parseEther } from "ethers";
+
+      const wallet = Wallet.fromPhrase(process.env.MNEMONIC);
+      const tx = await wallet.sendTransaction({
+      to: "0x...",
+      value: parseEther("0.1")
+      });
+      console.log(tx.hash);
+      JsonRpcSigner:
+      kind: class
+      summary: Signer derived from a Provider that manages keys remotely (e.g., browser wallets).
+      guidance:
+    * Use `provider.getSigner()` instead of instantiating directly.
+    * Mirrors Wallet interface but lacks direct key access.
+      example:
+      lang: javascript
+      code: |
+      import { BrowserProvider } from "ethers";
+
+      const provider = new BrowserProvider(window\.ethereum);
+      const signer = await provider.getSigner();
+      console.log(await signer.signMessage("hello"));
+      SigningKey:
+      kind: class
+      summary: secp256k1 key‑pair wrapper for raw cryptographic operations.
+      guidance:
+    * Use `.sign(digest)` to produce ECDSA signatures deterministically.
+    * Compute public keys with `.computePublicKey(privateKey, compressed?)`.
+      example:
+      lang: javascript
+      code: |
+      import { SigningKey, keccak256 } from "ethers";
+
+      const sk = new SigningKey(process.env.PRIVATE\_KEY);
+      const digest = keccak256("0x1234");
+      console.log(sk.sign(digest));
+      TypedDataEncoder:
+      kind: class
+      summary: Utility for hashing and signing EIP‑712 typed data.
+      guidance:
+    * Use `.hash(domain, types, value)` to obtain a digest, then sign with Wallet/Signer.
+    * Ensures canonical sorting of structs for deterministic output.
+      example:
+      lang: javascript
+      code: |
+      import { TypedDataEncoder, Wallet } from "ethers";
+
+      const domain = { name: "Demo", chainId: 1, version: "1" };
+      const types = { Person: \[{ name: "name", type: "string" }] };
+      const value = { name: "Alice" };
+
+      const digest = TypedDataEncoder.hash(domain, types, value);
+      const wallet = new Wallet(process.env.PRIVATE\_KEY);
+      console.log(await wallet.signMessage(digest));
+* name: Utilities & Helpers
+  exports:
+
+  * parseEther
+  * formatEther
+  * keccak256
+  * hexlify
+  * looseArrayify
+  * id
+    symbols:
+    parseEther:
+    kind: function
+    summary: Converts a decimal ETH string to wei BigInt.
+    guidance:
+
+    * Throws if the string has more than 18 decimal places.
+    * Useful for CLI input parsing and contract parameter prep.
+      example:
+      lang: javascript
+      code: |
+      import { parseEther } from "ethers";
+
+      console.log(parseEther("1.2345")); // 1234500000000000000n
+      formatEther:
+      kind: function
+      summary: Formats wei BigInt or hex value as decimal ETH string.
+      guidance:
+    * Pair with `parseEther` for round‑trip conversions.
+    * Returns a string; use number‑formatting libraries for UI rounding.
+      example:
+      lang: javascript
+      code: |
+      import { formatEther } from "ethers";
+
+      console.log(formatEther(1234500000000000000n)); // "1.2345"
+      keccak256:
+      kind: function
+      summary: Computes the Keccak‑256 hash of binary or hex data.
+      guidance:
+    * Accepts Uint8Array or hex string; returns 0x‑prefixed hex.
+    * Often used to derive identifiers such as CREATE2 salt or storage slot keys.
+      example:
+      lang: javascript
+      code: |
+      import { keccak256, hexlify } from "ethers";
+
+      const hash = keccak256(hexlify(new Uint8Array(\[1, 2, 3])));
+      console.log(hash);
+      hexlify:
+      kind: function
+      summary: Converts data to minimal 0x‑prefixed hex string.
+      guidance:
+    * Supports numbers, BigInts, Uint8Arrays, and objects with `toHexString()`.
+    * Specify optional `size` to left‑pad or truncate to an exact byte length.
+      example:
+      lang: javascript
+      code: |
+      import { hexlify } from "ethers";
+
+      console.log(hexlify(255)); // "0xFF"
+      looseArrayify:
+      kind: function
+      summary: Lenient conversion of input to Uint8Array.
+      guidance:
+    * Accepts numbers, strings (with or without 0x), hex data, or ArrayLikes.
+    * Prefer for permissive parsing when source format is unknown.
+      example:
+      lang: javascript
+      code: |
+      import { looseArrayify } from "ethers";
+
+      console.log(looseArrayify("deadbeef"));
+      id:
+      kind: function
+      summary: Computes the Keccak‑256 hash of a UTF‑8 string.
+      guidance:
+    * Commonly used to derive event topic hashes from signature strings.
+    * Equivalent to `keccak256(toUtf8Bytes(str))`.
+      example:
+      lang: javascript
+      code: |
+      import { id } from "ethers";
+
+      console.log(id("Transfer(address,address,uint256)"));
+

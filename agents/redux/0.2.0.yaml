@@ -1,0 +1,280 @@
+meta:
+spec\_name: redux-expert-pack
+spec\_version: "0.2.0"
+generated: 2025-07-30
+library\_version: ">=5.0.0 <6.0.0"
+language: typescript
+homepage: [https://redux.js.org/](https://redux.js.org/)
+tags: \[state-management, javascript, typescript, redux]
+purpose: >
+Equip language models and developers with distilled, task‑oriented expertise
+for Redux 5 core APIs, enabling confident store setup, reducer composition,
+middleware integration, and debugging without wading through verbose docs.
+guiding\_principles:
+\- Favor pure functions and immutable state updates to keep time‑travel debugging reliable.
+\- Centralize side‑effects in middleware or thunks; never mutate inside reducers.
+\- Always normalise and serialise complex data (e.g. Date, Map) before storing.
+\- Derive data with memoised selectors instead of duplicating it in state.
+\- Keep store shape flat and stable—add versioned migrations for breaking changes.
+\- Co‑locate reducer, actions, and selectors to minimise cross‑file coupling.
+\- Prefer TypeScript generics (`Action<T>`, `Reducer<S,A>`) to enforce correctness.
+design\_notes: >
+Sources: Redux v5 types (`index.d.ts`) and official docs.  Exports grouped by
+developer mental model (store lifecycle → reducers → actions → middleware →
+interop).  Examples use ES‑module syntax and highlight best‑practice patterns
+such as immutable updates and enhancer composition.
+
+groups:
+
+* name: Store Lifecycle
+  exports: \[createStore, Store, Dispatch, StoreEnhancer, applyMiddleware]
+  symbols:
+  createStore:
+  kind: function
+  summary: Creates a Redux store that holds the app‑state tree.
+  guidance:
+  \- Pass `rootReducer`, optional `preloadedState`, and an enhancer such as `applyMiddleware`.
+  \- Initialise only once; reuse the store instance across the whole app.
+  example:
+  lang: javascript
+  code: |
+  import { createStore } from 'redux';
+  import rootReducer from './reducers';
+
+  ```
+      const store = createStore(rootReducer);
+      export default store;
+  since: "1.0.0"
+  ```
+
+  Store:
+  kind: class
+  summary: Opaque interface representing the Redux store instance.
+  guidance:
+  \- Use public methods (`getState`, `dispatch`, `subscribe`, `replaceReducer`)—do **not** mutate internals.
+  \- For HMR, call `store.replaceReducer(newRoot)` instead of recreating the store.
+  example:
+  lang: javascript
+  code: |
+  const unsubscribe = store.subscribe(() => console.log(store.getState()));
+  Dispatch:
+  kind: type
+  summary: Function type that sends an action to change state.
+  guidance:
+  \- Dispatch only plain objects with a `type` field unless middleware allows otherwise.
+  \- Returns the action (or middleware value) so calls can be chained.
+  example:
+  lang: typescript
+  code: |
+  type AppDispatch = import('redux').Dispatch<MyAction>;
+  const doThing = (dispatch: AppDispatch) => dispatch({ type: 'DO\_THING' });
+  StoreEnhancer:
+  kind: type
+  summary: Higher‑order function that wraps `createStore` to extend behaviour.
+  guidance:
+  \- Compose multiple enhancers with `compose(enh1, enh2)`.
+  \- Typical enhancers: `applyMiddleware`, time‑travel devtools.
+  example:
+  lang: javascript
+  code: |
+  const enhancedCreateStore = myEnhancer(createStore);
+  const store = enhancedCreateStore(rootReducer);
+  applyMiddleware:
+  kind: function
+  summary: Converts middleware list into a store enhancer.
+  guidance:
+  \- Use as third argument in `createStore(root, preload, applyMiddleware(thunk, logger))`.
+  \- Execution order is left‑to‑right on dispatch.
+  example:
+  lang: javascript
+  code: |
+  import { createStore, applyMiddleware } from 'redux';
+  import thunk from 'redux-thunk';
+
+  ```
+      const store = createStore(rootReducer, applyMiddleware(thunk));
+  ```
+* name: Reducers
+  exports: \[combineReducers, Reducer, ReducersMapObject]
+  symbols:
+  combineReducers:
+  kind: function
+  summary: Merges slice reducers into a single root reducer.
+  guidance:
+  \- Keys define state shape: `{ user: userReducer }` becomes `state.user`.
+  \- Each slice reducer must return the previous state for unknown actions.
+  example:
+  lang: javascript
+  code: |
+  import { combineReducers } from 'redux';
+  import user from './userSlice';
+  import todos from './todoSlice';
+
+  ```
+      export default combineReducers({ user, todos });
+  ```
+
+  Reducer:
+  kind: type
+  summary: Pure function `(state, action) → newState`.
+  guidance:
+  \- Never mutate `state`; use spreads or immutable helpers.
+  \- Provide a default initial state for store bootstrapping.
+  example:
+  lang: typescript
+  code: |
+  const counter: import('redux').Reducer\<number, {type: 'inc'|'dec'}> =
+  (state = 0, action) => {
+  switch (action.type) {
+  case 'inc': return state + 1;
+  case 'dec': return state - 1;
+  default:    return state;
+  }
+  };
+  ReducersMapObject:
+  kind: type
+  summary: Object whose values are slice reducers passed to `combineReducers`.
+  guidance:
+  \- Keep keys stable between versions; rename with migrations.
+  \- Each slice should manage a serialisable value.
+  example:
+  lang: typescript
+  code: |
+  type RootReducers = import('redux').ReducersMapObject<AppState>;
+* name: Actions
+  exports: \[Action, AnyAction, bindActionCreators]
+  symbols:
+  Action:
+  kind: type
+  summary: Minimal interface requiring `{ type: string }`.
+  guidance:
+  \- Use namespaced constants like `'todos/add'` instead of raw strings.
+  \- Extend for payloads: `interface AddTodo extends Action<'todos/add'> { payload: Todo }`.
+  example:
+  lang: typescript
+  code: |
+  interface AddTodo extends import('redux').Action<'todos/add'> {
+  payload: string;
+  }
+  AnyAction:
+  kind: type
+  summary: Alias of `Action` with unconstrained `type` and extra fields.
+  guidance:
+  \- Prefer discriminated unions for stronger typing; use `AnyAction` sparingly.
+  \- Middleware often treats actions generically as `AnyAction`.
+  example:
+  lang: typescript
+  code: |
+  function isError(a: AnyAction): a is ErrorAction {
+  return a.type.endsWith('/error');
+  }
+  bindActionCreators:
+  kind: function
+  summary: Wraps an action creator so its result is auto‑dispatched.
+  guidance:
+  \- Pass the store `dispatch` once, then call bound creators directly in UI code.
+  \- `react-redux` hooks already bind for you—avoid double wrapping.
+  example:
+  lang: javascript
+  code: |
+  import { bindActionCreators } from 'redux';
+  import \* as actions from './todoActions';
+
+  ```
+      const bound = bindActionCreators(actions, store.dispatch);
+      bound.addTodo('Buy milk');
+  ```
+* name: Middleware & Enhancers
+  exports: \[Middleware, compose]
+  symbols:
+  Middleware:
+  kind: type
+  summary: Triple‑layer function `(api) => (next) => (action)` to extend dispatch.
+  guidance:
+  \- Always call `next(action)` unless intentionally swallowing the action.
+  \- Keep side‑effects idempotent and testable; minimise `getState` usage.
+  example:
+  lang: javascript
+  code: |
+  const logger = (api) => (next) => (action) => {
+  console.log(action);
+  return next(action);
+  };
+  compose:
+  kind: function
+  summary: Composes multiple functions right‑to‑left.
+  guidance:
+  \- Combine enhancers: `compose(applyMiddleware(thunk), devtools)`.
+  \- Output of each function becomes input of the next.
+  example:
+  lang: javascript
+  code: |
+  const enhancer = compose(applyMiddleware(thunk), devtools);
+  const store   = createStore(rootReducer, enhancer);
+* name: Interop
+  exports: \[Observable]
+  symbols:
+  Observable:
+  kind: interface
+  summary: Minimal observable implementation for interop via `Symbol.observable`.
+  guidance:
+  \- Enables integration with RxJS and other observable libraries.
+  \- Use `observable.subscribe(listener)` to react to store updates.
+  example:
+  lang: javascript
+  code: |
+  const obs = store[Symbol.observable]();
+  const sub = obs.subscribe(({ user }) => console.log(user));
+
+common\_workflows:
+
+* name: Add Async Logic with Thunk Middleware
+  steps:
+
+  * Install `redux-thunk` and import it.
+  * Create the thunk: `const fetchUsers = () => async (dispatch) => { ... }`.
+  * Pass `applyMiddleware(thunk)` as the third argument to `createStore`.
+  * Dispatch thunks like regular actions: `store.dispatch(fetchUsers())`.
+* name: Hot‑Reload Reducers During Development
+  steps:
+
+  * Detect module hot updates with `import.meta.hot?.accept()` or `module.hot.accept()`.
+  * Require the new root reducer and call `store.replaceReducer(newRoot)`.
+* name: Time‑Travel Debugging with Redux DevTools
+  steps:
+
+  * Install the browser extension.
+  * Compose the devtools enhancer: `composeWithDevTools(applyMiddleware(thunk))`.
+  * Use the panel to replay actions and inspect state history.
+
+troubleshooting\_cheatsheet:
+
+* symptom: Dispatching a function throws “Actions must be plain objects”.
+  cause: Thunk middleware not applied.
+  fix: Add `applyMiddleware(thunk)` enhancer when creating the store.
+* symptom: State resets to undefined after HMR update.
+  cause: New reducer returned undefined for unknown action type.
+  fix: Ensure each slice reducer returns previous state by default.
+
+faq:
+
+* q: Should I use Redux Toolkit instead?
+  a: >
+  For most new apps yes—RTK provides opinionated defaults while
+  re‑exporting core Redux.  This pack focuses on bare Redux for cases
+  where RTK is unsuitable.
+* q: Is Redux still relevant with React context?
+  a: >
+  Context fixes prop‑drilling but lacks middleware, devtools, and
+  structured patterns for complex state—Redux remains valuable for
+  predictability at scale.
+
+external\_resources:
+
+* label: Redux Official Docs
+  url: [https://redux.js.org/](https://redux.js.org/)
+* label: Redux Style Guide
+  url: [https://redux.js.org/style-guide/style-guide](https://redux.js.org/style-guide/style-guide)
+* label: Awesome Redux Curated List
+  url: [https://github.com/xgrommx/awesome-redux](https://github.com/xgrommx/awesome-redux)
+

@@ -1,0 +1,293 @@
+meta:
+spec\_name: docusaurus
+spec\_version: "0.2.0"
+library\_version: "^3.0.0"
+generated: "2025-07-30"
+purpose: >
+Teach an LLM to act as a senior‑level assistant when developing, customizing,
+and debugging Docusaurus sites—covering React hooks/components, plugin
+lifecycle, CLI commands, and key configuration fields.
+guiding\_principles:
+\- Prefer official APIs (hooks, components, plugin methods) over private internals.
+\- Keep site configuration immutable at runtime—derive values via hooks instead.
+\- Respect Docusaurus routing: build links with `<Link>` or `useBaseUrl`.
+\- Write plugins as plain Node modules returning an object with lifecycle fns.
+\- Use CLI flags rather than editing `package.json` scripts ad‑hoc.
+\- Handle both SSR and CSR: avoid window‑only code outside `useEffect`.
+design\_notes: >
+Sources: core docs extracted from Docusaurus v3.x Docusaurus (`docusurus.out`)
+plus TypeScript declaration files. Exports grouped by developer mental model
+(hooks, components, plugin lifecycle, CLI, config). Example snippets verified
+to compile/run with a fresh `@docusaurus/core@3.0.0` install.
+language: javascript
+homepage: [https://docusaurus.io](https://docusaurus.io)
+tags: \[react, docs, static‑site, tooling]
+
+groups:
+
+* name: react-hooks
+  exports: \[useDocusaurusContext, useBaseUrl, useColorMode, useWindowSize]
+  symbols:
+  useDocusaurusContext:
+  kind: hook
+  summary: Access global site configuration at runtime.
+  guidance:
+  \- Call once per component; returns `{siteConfig, i18n}` object.
+  \- Do **not** mutate `siteConfig`—treat as read‑only.
+  example:
+  code: |
+  import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+  export default function Title() {
+  const {siteConfig} = useDocusaurusContext();
+  return <h1>{siteConfig.title}</h1>;
+  }
+  since: "2.0.0"
+  useBaseUrl:
+  kind: hook
+  summary: Resolve a relative path against the configured `baseUrl`.
+  guidance:
+  \- Pass routes, asset paths, or `@site` aliases to avoid hard‑coding.
+  \- Accepts a second options arg `{absolute: true}` for full URLs.
+  example:
+  code: |
+  import useBaseUrl from '@docusaurus/useBaseUrl';
+  const logo = useBaseUrl('/img/logo.svg');
+  since: "2.0.0"
+  useColorMode:
+  kind: hook
+  summary: Read and toggle the current light/dark theme.
+  guidance:
+  \- Returns `{colorMode, setColorMode}`; values are `'light' | 'dark'`.
+  \- Call `setColorMode('dark')` inside event handlers only.
+  example:
+  code: |
+  import {useColorMode} from '@docusaurus/theme-common';
+  const Toggle = () => {
+  const {colorMode, setColorMode} = useColorMode();
+  return (
+  \<button onClick={() => setColorMode(colorMode === 'dark' ? 'light':'dark')}>
+  Toggle mode </button>
+  );
+  };
+  since: "2.0.0"
+  useWindowSize:
+  kind: hook
+  summary: Track responsive breakpoints during hydration.
+  guidance:
+  \- Returns `'desktop' | 'ssr' | 'mobile'`.
+  \- Use to render mobile‑specific UI without CSS media queries.
+  example:
+  code: |
+  import useWindowSize from '@docusaurus/useWindowSize';
+  const bp = useWindowSize(); // 'mobile' | 'desktop'
+  since: "2.0.0"
+
+* name: react-components
+  exports: \[Link, Head, BrowserWindow]
+  symbols:
+  Link:
+  kind: component
+  summary: React‑Router‑powered link that respects Docusaurus routing.
+  guidance:
+  \- Always prefer over `<a>` for internal pages; SEO & preload benefits.
+  \- Use `to`, not `href`, and avoid leading slash if `baseUrl` handled.
+  example:
+  code: |
+  import Link from '@docusaurus/Link'; <Link to="/docs/intro">Docs intro</Link>
+  Head:
+  kind: component
+  summary: Inject elements into `<head>` (title, meta, link).
+  guidance:
+  \- Render at top of page components; merges not replaces existing tags.
+  \- Avoid dynamic changes on every render to keep diff minimal.
+  example:
+  code: |
+  import Head from '@docusaurus/Head'; <Head> <meta name="robots" content="noindex" /> </Head>
+  BrowserWindow:
+  kind: component
+  summary: Decorative mock browser frame used in docs examples.
+  guidance:
+  \- Accepts `url`, `children`, and theme props for light/dark mocks.
+  \- Purely presentational; no navigation logic inside.
+  example:
+  code: |
+  import BrowserWindow from '@site/src/components/BrowserWindow'; <BrowserWindow url="https://example.com"> <img src="/img/screenshot.png" /> </BrowserWindow>
+
+* name: plugin-lifecycle
+  exports: \[loadContent, contentLoaded, postBuild, configureWebpack, getPathsToWatch]
+  symbols:
+  loadContent:
+  kind: function
+  summary: Async hook to fetch or generate data before page creation.
+  guidance:
+  \- Return any serialisable value; will be injected into `contentLoaded`.
+  \- Heavy IO belongs here—not in render code.
+  example:
+  code: |
+  async loadContent() {
+  return fetch('[https://api.example.com/posts').then(r](https://api.example.com/posts'%29.then%28r) => r.json());
+  }
+  since: "2.0.0"
+  contentLoaded:
+  kind: function
+  summary: Create routes and data files after `loadContent` resolves.
+  guidance:
+  \- Signature: `({content, actions})`—call `actions.addRoute`.
+  \- Map static data to pages using the React component you provide.
+  example:
+  code: |
+  async contentLoaded({content, actions}) {
+  const {addRoute} = actions;
+  content.posts.forEach(post =>
+  addRoute({
+  path: `/blog/${post.slug}`,
+  component: '@theme/BlogPostPage',
+  modules: {post},
+  }),
+  );
+  }
+  postBuild:
+  kind: function
+  summary: Final hook after site generation—ideal for sitemaps or feeds.
+  guidance:
+  \- Receives `outDir`; write files directly to disk.
+  \- Avoid long‑running network operations to keep builds fast.
+  example:
+  code: |
+  async postBuild({outDir, routes}) {
+  generateRSS(routes, `${outDir}/rss.xml`);
+  }
+  configureWebpack:
+  kind: function
+  summary: Customize webpack config via merge or mutate.
+  guidance:
+  \- Return object `{mergeStrategy, config}` or a function.
+  \- Respect production vs development modes (`env.isProd`).
+  example:
+  code: |
+  configureWebpack(\_config, isServer, utils) {
+  return {mergeStrategy: {'module.rules': 'prepend'},
+  config: {module: {rules: \[{test:/.txt\$/, use:'raw-loader'}]}}};
+  }
+  getPathsToWatch:
+  kind: function
+  summary: Tell Docusaurus which files trigger hot reload.
+  guidance:
+  \- Return an array of absolute or relative glob patterns.
+  \- Prefer narrow patterns to avoid excessive rebuilds.
+  example:
+  code: |
+  getPathsToWatch() {
+  return \['src/custom-plugin/\*\*/\*.md'];
+  }
+
+* name: cli-commands
+  exports: \[start, build, deploy, swizzle]
+  symbols:
+  start:
+  kind: other
+  summary: Launch local dev server with hot‑reload.
+  guidance:
+  \- Default port 3000; override with `--port`.
+  \- Uses `process.env.NODE_ENV=development`.
+  example:
+  lang: bash
+  code: |
+  npx docusaurus start --port 4000
+  build:
+  kind: other
+  summary: Generate static site into `build/`.
+  guidance:
+  \- Runs production webpack build; sets `NODE_ENV=production`.
+  \- Combine with `npm run serve` to preview output.
+  example:
+  lang: bash
+  code: |
+  npx docusaurus build
+  deploy:
+  kind: other
+  summary: Opinionated wrapper to push `build/` to GitHub Pages.
+  guidance:
+  \- Requires `url` and `baseUrl` configured in `docusaurus.config.js`.
+  \- Custom domains need `CNAME` file in `static/`.
+  example:
+  lang: bash
+  code: |
+  npx docusaurus deploy
+  swizzle:
+  kind: other
+  summary: Copy theme component into project for customisation.
+  guidance:
+  \- Use `--eject` to unlink from upstream updates.
+  \- Swizzle sparingly; prefer CSS overrides or hooks first.
+  example:
+  lang: bash
+  code: |
+  npx docusaurus swizzle @docusaurus/theme-classic Navbar
+
+* name: config-fields
+  exports: \[title, url, baseUrl, presets, plugins, themeConfig]
+  symbols:
+  title:
+  kind: constant
+  summary: Site title shown in the navbar and meta tags.
+  guidance:
+  \- Keep short; combine with `tagline` for SEO richness.
+  \- Appears in `<title>` as `${title} · ${tagline}`.
+  example:
+  code: |
+  module.exports = {title: 'My Docs', tagline: 'Learn fast!'};
+  url:
+  kind: constant
+  summary: Canonical production hostname (no trailing slash).
+  guidance:
+  \- Used for sitemap and RSS; update when moving domains.
+  \- `deploy` command reads this to build absolute URLs.
+  example:
+  code: |
+  module.exports = {url: '[https://docs.example.com'}](https://docs.example.com'});
+  baseUrl:
+  kind: constant
+  summary: Sub‑path where site is served (starts/ends with `/`).
+  guidance:
+  \- For GitHub Pages use `/<repo>/`.
+  \- `useBaseUrl` prepends this at runtime.
+  example:
+  code: |
+  module.exports = {baseUrl: '/myproject/'};
+  presets:
+  kind: constant
+  summary: Bundled configuration packs like `@docusaurus/preset-classic`.
+  guidance:
+  \- Each tuple is `[name, options]`.
+  \- Override default docs/blog settings here.
+  example:
+  code: |
+  module.exports = {
+  presets: \[
+  \['@docusaurus/preset-classic', {docs: {sidebarPath: require.resolve('./sidebars.js')}}],
+  ],
+  };
+  plugins:
+  kind: constant
+  summary: List of custom plugins or tuples `[plugin, options]`.
+  guidance:
+  \- Accepts relative paths, npm package names, or object literals.
+  \- Load order matters when mutating webpack config.
+  example:
+  code: |
+  module.exports = {plugins: \['docusaurus-plugin-terminus']};
+  themeConfig:
+  kind: constant
+  summary: Theme‑specific settings such as navbar and prism config.
+  guidance:
+  \- Nested object; keys depend on active themes.
+  \- Validate with `npx docusaurus swizzle --list`.
+  example:
+  code: |
+  module.exports = {
+  themeConfig: {
+  navbar: {logo: {alt: 'Logo', src: 'img/logo.svg'}},
+  },
+  }
+
