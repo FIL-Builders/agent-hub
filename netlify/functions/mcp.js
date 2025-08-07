@@ -1,7 +1,7 @@
 const fs = require("fs/promises");
 const path = require("path");
 
-const AGENTS_DIR = path.resolve(__dirname, "../../agents");
+const AGENTS_DIR = path.join(process.cwd(), "agents");
 
 exports.handler = async function (event) {
   if (event.httpMethod !== "POST") {
