@@ -1,0 +1,14 @@
+{
+  "name": "agents-hub",
+  "version": "1.0.0",
+  "description": "> **The open registry & spec for API‑savvy LLM agents — built in public, one thoughtful file at a time.**",
+  "main": "index.js",
+  "scripts": {
+    "gen-mcp": "node scripts/gen-mcp-manifest.js",
+    "build:site": "cd website && npm install && npm run build",
+    "build": "npm run gen-mcp && npm run build:site"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
