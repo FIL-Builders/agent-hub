@@ -1,0 +1,1060 @@
+{
+  "exports": [
+    {
+      "name": "createHelia",
+      "kind": "FunctionDeclaration",
+      "signature": "export declare function createHelia<T extends Libp2p>(init: Partial<HeliaInit<T>>): Promise<Helia<T>>;",
+      "doc": "Create and return a Helia node",
+      "tags": []
+    },
+    {
+      "name": "createHelia.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia",
+      "kind": "FunctionDeclaration",
+      "signature": "export declare function createHelia(init?: Partial<HeliaInit<Libp2p<DefaultLibp2pServices>>>): Promise<Helia<Libp2p<DefaultLibp2pServices>>>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HeliaInit",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface HeliaInit<T extends Libp2p = Libp2p> {\n    /**\n     * A libp2p node is required to perform network operations. Either a\n     * pre-configured node or options to configure a node can be passed\n     * here.\n     *\n     * If node options are passed, they will be merged with the default",
+      "doc": "Options used to create a Helia node.",
+      "tags": []
+    },
+    {
+      "name": "DefaultLibp2pServices",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DefaultLibp2pServices extends Record<string, unknown> {\n    autoNAT: unknown;\n    autoTLS: AutoTLS;\n    dcutr: unknown;\n    delegatedRouting: unknown;\n    dht: KadDHT;\n    identify: Identify;\n    keychain: Keychain;\n    ping: Ping;\n    relay: CircuitRelayService;\n    upnp: unknown;\n",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Libp2pDefaultsOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Libp2pDefaultsOptions {\n    privateKey?: PrivateKey;\n    keychain?: KeychainInit;\n    dns?: DNS;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "libp2pDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export declare function libp2pDefaults(options?: Libp2pDefaultsOptions): Libp2pOptions<DefaultLibp2pServices> & Required<Pick<Libp2pOptions<DefaultLibp2pServices>, 'services'>>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export declare function heliaDefaults<T extends Libp2p>(init?: Partial<HeliaInit<T>>): Promise<Omit<HeliaInit<T>, 'libp2p'> & {\n    libp2p: T;\n}>;",
+      "doc": "Create and return the default options used to create a Helia node",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DAGWalker",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DAGWalker {\n    codec: number;\n    walk(block: Uint8Array): Generator<CID, void, undefined>;\n}",
+      "doc": "DAGWalkers take a block and yield CIDs encoded in that block",
+      "tags": []
+    },
+    {
+      "name": "HeliaLibp2p",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type HeliaLibp2p = Helia;",
+      "doc": "Helia with a libp2p node",
+      "tags": [
+        {
+          "tagName": "deprecated",
+          "text": "Use the `Helia` type instead. This will be removed in the next major version."
+        }
+      ]
+    },
+    {
+      "name": "Await",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type Await<T> = Promise<T> | T;",
+      "doc": "A value or a promise of a value",
+      "tags": []
+    },
+    {
+      "name": "AwaitIterable",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type AwaitIterable<T> = Iterable<T> | AsyncIterable<T>;",
+      "doc": "An iterable or async iterable of values",
+      "tags": [
+        {
+          "tagName": "packageDocumentation",
+          "text": "An abstraction of the Datastore/Blockstore codebases."
+        }
+      ]
+    },
+    {
+      "name": "CodecLoader",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface CodecLoader {\n    <T = any, Code extends number = any>(code: Code): Await<BlockCodec<Code, T>>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HasherLoader",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface HasherLoader {\n    (code: number): Await<MultihashHasher>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Helia",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Helia<T extends Libp2p = Libp2p> {\n    /**\n     * The libp2p instance\n     */\n    libp2p: T;\n    /**\n     * Where the blocks are stored\n     */\n    blockstore: Blocks;\n    /**\n     * A key/value store\n     */\n    datastore: Datastore;\n    /**\n     * Pinning operations for blocks in ",
+      "doc": "The API presented by a Helia node",
+      "tags": []
+    },
+    {
+      "name": "GcEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GcEvents = ProgressEvent<'helia:gc:deleted', CID> | ProgressEvent<'helia:gc:error', Error>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GCOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface GCOptions extends AbortOptions, ProgressOptions<GcEvents> {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pair",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pair {\n    cid: CID;\n    block: Uint8Array;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "ProviderOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface ProviderOptions {\n    /**\n     * An optional list of peers known to host at least the root block of the DAG\n     * that will be fetched.\n     *\n     * If this list is omitted, or if the peers cannot supply the root or any\n     * child blocks, a `findProviders` routing query will be ",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HasBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type HasBlockProgressEvents = ProgressEvent<'blocks:put:duplicate', CID> | ProgressEvent<'blocks:put:providers:notify', CID> | ProgressEvent<'blocks:put:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PutBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PutBlockProgressEvents = ProgressEvent<'blocks:put:duplicate', CID> | ProgressEvent<'blocks:put:providers:notify', CID> | ProgressEvent<'blocks:put:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PutManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PutManyBlocksProgressEvents = ProgressEvent<'blocks:put-many:duplicate', CID> | ProgressEvent<'blocks:put-many:providers:notify', CID> | ProgressEvent<'blocks:put-many:blockstore:put-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetBlockProgressEvents = ProgressEvent<'blocks:get:providers:want', CID> | ProgressEvent<'blocks:get:blockstore:get', CID> | ProgressEvent<'blocks:get:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetManyBlocksProgressEvents = ProgressEvent<'blocks:get-many:blockstore:get-many'> | ProgressEvent<'blocks:get-many:providers:want', CID> | ProgressEvent<'blocks:get-many:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetAllBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetAllBlocksProgressEvents = ProgressEvent<'blocks:get-all:blockstore:get-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DeleteBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type DeleteBlockProgressEvents = ProgressEvent<'blocks:delete:blockstore:delete', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DeleteManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type DeleteManyBlocksProgressEvents = ProgressEvent<'blocks:delete-many:blockstore:delete-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetOfflineOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface GetOfflineOptions {\n    /**\n     * If true, do not attempt to fetch any missing blocks from the network\n     *\n     * @default false\n     */\n    offline?: boolean;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Blocks",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Blocks extends Blockstore<ProgressOptions<HasBlockProgressEvents>, ProgressOptions<PutBlockProgressEvents>, ProgressOptions<PutManyBlocksProgressEvents>, GetOfflineOptions & ProviderOptions & ProgressOptions<GetBlockProgressEvents>, GetOfflineOptions & ProviderOptions & ProgressOpti",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "SessionBlockstore",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface SessionBlockstore extends Blockstore<ProgressOptions<HasBlockProgressEvents>, ProgressOptions<PutBlockProgressEvents>, ProgressOptions<PutManyBlocksProgressEvents>, GetOfflineOptions & ProgressOptions<GetBlockProgressEvents>, GetOfflineOptions & ProgressOptions<GetManyBlocksProgress",
+      "doc": "A session blockstore is a special blockstore that only pulls content from a\nsubset of network peers which respond as having the block for the initial\nroot CID.\n\nAny blocks written to the blockstore as part of the session will propagate\nto the blockstore the session was created from.",
+      "tags": []
+    },
+    {
+      "name": "BlockRetrievalOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockRetrievalOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents>, ProviderOptions {\n    /**\n     * A function that blockBrokers should call prior to returning a block to ensure it can maintain contr",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "BlockAnnounceOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockAnnounceOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents> {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "CreateSessionOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface CreateSessionOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents>, ProviderOptions {\n    /**\n     * The minimum number of providers for the root CID that are required for\n     * successful session cre",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "BlockBroker",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockBroker<RetrieveProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>, AnnounceProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> {\n    /**\n     * Retrieve a block from a source\n     */\n    retrieve?(cid: CID, options?: BlockRetrievalOpt",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DEFAULT_SESSION_MIN_PROVIDERS",
+      "kind": "VariableDeclaration",
+      "signature": "DEFAULT_SESSION_MIN_PROVIDERS = 1",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DEFAULT_SESSION_MAX_PROVIDERS",
+      "kind": "VariableDeclaration",
+      "signature": "DEFAULT_SESSION_MAX_PROVIDERS = 5",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "InsufficientProvidersError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class InsufficientProvidersError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "NoRoutersAvailableError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class NoRoutersAvailableError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "UnknownHashAlgorithmError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class UnknownHashAlgorithmError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "UnknownCodecError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class UnknownCodecError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PinType",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PinType = 'recursive' | 'direct' | 'indirect';",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pin",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pin {\n    cid: CID;\n    depth: number;\n    metadata: Record<string, string | number | boolean>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "AddPinEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type AddPinEvents = ProgressEvent<'helia:pin:add', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "AddOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface AddOptions extends AbortOptions, ProgressOptions<AddPinEvents | GetBlockProgressEvents> {\n    /**\n     * How deeply to pin the DAG, defaults to Infinity\n     */\n    depth?: number;\n    /**\n     * Optional user-defined metadata to store with the pin\n     */\n    metadata?: Record<stri",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "RmOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface RmOptions extends AbortOptions {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "LsOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface LsOptions extends AbortOptions {\n    cid?: CID;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "IsPinnedOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface IsPinnedOptions extends AbortOptions {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pins",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pins {\n    /**\n     * Pin a block in the blockstore. It will not be deleted when garbage\n     * collection is run.\n     */\n    add(cid: CID, options?: AddOptions): AsyncGenerator<CID, void, undefined>;\n    /**\n     * Unpin the block that corresponds to the passed CID. The block will",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "RoutingOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface RoutingOptions extends AbortOptions, ProgressOptions, TraceOptions {\n    /**\n     * Pass `false` to not use the network\n     *\n     * @default true\n     */\n    useNetwork?: boolean;\n    /**\n     * Pass `false` to not use cached values\n     *\n     * @default true\n     */\n    useCache",
+      "doc": "When a routing operation involves reading values, these options allow\ncontrolling where the values are read from. Some implementations support a\nlocal cache that may be used in preference over network calls, for example\nwhen a record has a TTL.",
+      "tags": []
+    },
+    {
+      "name": "Provider",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Provider extends PeerInfo {\n    /**\n     * If present these are the methods that the peer can supply the content via.\n     *\n     * If not present the caller should attempt to dial the remote peer and run\n     * the identify protocol to discover how to retrieve the content.\n     *\n ",
+      "doc": "A provider can supply the content for a CID",
+      "tags": []
+    },
+    {
+      "name": "Routing",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Routing {\n    /**\n     * The implementation of this method should ensure that network peers know the\n     * caller can provide content that corresponds to the passed CID.\n     *\n     * @example\n     *\n     * ```js\n     * // ...\n     * await contentRouting.provide(cid)\n     * ```\n   ",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "version",
+      "kind": "VariableDeclaration",
+      "signature": "version = '5.5.0'",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "name",
+      "kind": "VariableDeclaration",
+      "signature": "name = 'helia'",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function createHelia <T extends Libp2p> (init: Partial<HeliaInit<T>>): Promise<Helia<T>>",
+      "doc": "Create and return a Helia node",
+      "tags": []
+    },
+    {
+      "name": "createHelia.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function createHelia (init?: Partial<HeliaInit<Libp2p<DefaultLibp2pServices>>>): Promise<Helia<Libp2p<DefaultLibp2pServices>>>",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function createHelia (init: Partial<HeliaInit> = {}): Promise<Helia> {\n  const options = await heliaDefaults(init)\n  const helia = new HeliaClass(options)\n\n  if (options.start !== false) {\n    await helia.start()\n  }\n\n  return helia\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createHelia.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HeliaInit",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface HeliaInit<T extends Libp2p = Libp2p> {\n    /**\n     * A libp2p node is required to perform network operations. Either a\n     * pre-configured node or options to configure a node can be passed\n     * here.\n     *\n     * If node options are passed, they will be merged with the default",
+      "doc": "Options used to create a Helia node.",
+      "tags": []
+    },
+    {
+      "name": "DefaultLibp2pServices",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DefaultLibp2pServices extends Record<string, unknown> {\n  autoNAT: unknown\n  autoTLS: AutoTLS\n  dcutr: unknown\n  delegatedRouting: unknown\n  dht: KadDHT\n  identify: Identify\n  keychain: Keychain\n  ping: Ping\n  relay: CircuitRelayService\n  upnp: unknown\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Libp2pDefaultsOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Libp2pDefaultsOptions {\n  privateKey?: PrivateKey\n  keychain?: KeychainInit\n  dns?: DNS\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "libp2pDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export function libp2pDefaults (options: Libp2pDefaultsOptions = {}): Libp2pOptions<DefaultLibp2pServices> & Required<Pick<Libp2pOptions<DefaultLibp2pServices>, 'services'>> {\n  const agentVersion = `${name}/${version} ${userAgent()}`\n\n  return {\n    privateKey: options.privateKey,\n    dns: options.",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function heliaDefaults <T extends Libp2p> (init: Partial<HeliaInit<T>> = {}): Promise<Omit<HeliaInit<T>, 'libp2p'> & { libp2p: T }> {\n  const datastore = init.datastore ?? new MemoryDatastore()\n  const blockstore = init.blockstore ?? new MemoryBlockstore()\n\n  let libp2p: any\n\n  if (isLi",
+      "doc": "Create and return the default options used to create a Helia node",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DAGWalker",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DAGWalker {\n  codec: number\n  walk(block: Uint8Array): Generator<CID, void, undefined>\n}",
+      "doc": "DAGWalkers take a block and yield CIDs encoded in that block",
+      "tags": []
+    },
+    {
+      "name": "HeliaLibp2p",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type HeliaLibp2p = Helia",
+      "doc": "Helia with a libp2p node",
+      "tags": [
+        {
+          "tagName": "deprecated",
+          "text": "Use the `Helia` type instead. This will be removed in the next major version."
+        }
+      ]
+    },
+    {
+      "name": "Await",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type Await<T> = Promise<T> | T;",
+      "doc": "A value or a promise of a value",
+      "tags": []
+    },
+    {
+      "name": "AwaitIterable",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type AwaitIterable<T> = Iterable<T> | AsyncIterable<T>;",
+      "doc": "An iterable or async iterable of values",
+      "tags": [
+        {
+          "tagName": "packageDocumentation",
+          "text": "An abstraction of the Datastore/Blockstore codebases."
+        }
+      ]
+    },
+    {
+      "name": "CodecLoader",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface CodecLoader {\n    <T = any, Code extends number = any>(code: Code): Await<BlockCodec<Code, T>>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HasherLoader",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface HasherLoader {\n    (code: number): Await<MultihashHasher>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Helia",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Helia<T extends Libp2p = Libp2p> {\n    /**\n     * The libp2p instance\n     */\n    libp2p: T;\n    /**\n     * Where the blocks are stored\n     */\n    blockstore: Blocks;\n    /**\n     * A key/value store\n     */\n    datastore: Datastore;\n    /**\n     * Pinning operations for blocks in ",
+      "doc": "The API presented by a Helia node",
+      "tags": []
+    },
+    {
+      "name": "GcEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GcEvents = ProgressEvent<'helia:gc:deleted', CID> | ProgressEvent<'helia:gc:error', Error>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GCOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface GCOptions extends AbortOptions, ProgressOptions<GcEvents> {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pair",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pair {\n    cid: CID;\n    block: Uint8Array;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "ProviderOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface ProviderOptions {\n    /**\n     * An optional list of peers known to host at least the root block of the DAG\n     * that will be fetched.\n     *\n     * If this list is omitted, or if the peers cannot supply the root or any\n     * child blocks, a `findProviders` routing query will be ",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "HasBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type HasBlockProgressEvents = ProgressEvent<'blocks:put:duplicate', CID> | ProgressEvent<'blocks:put:providers:notify', CID> | ProgressEvent<'blocks:put:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PutBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PutBlockProgressEvents = ProgressEvent<'blocks:put:duplicate', CID> | ProgressEvent<'blocks:put:providers:notify', CID> | ProgressEvent<'blocks:put:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PutManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PutManyBlocksProgressEvents = ProgressEvent<'blocks:put-many:duplicate', CID> | ProgressEvent<'blocks:put-many:providers:notify', CID> | ProgressEvent<'blocks:put-many:blockstore:put-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetBlockProgressEvents = ProgressEvent<'blocks:get:providers:want', CID> | ProgressEvent<'blocks:get:blockstore:get', CID> | ProgressEvent<'blocks:get:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetManyBlocksProgressEvents = ProgressEvent<'blocks:get-many:blockstore:get-many'> | ProgressEvent<'blocks:get-many:providers:want', CID> | ProgressEvent<'blocks:get-many:blockstore:put', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetAllBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type GetAllBlocksProgressEvents = ProgressEvent<'blocks:get-all:blockstore:get-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DeleteBlockProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type DeleteBlockProgressEvents = ProgressEvent<'blocks:delete:blockstore:delete', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DeleteManyBlocksProgressEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type DeleteManyBlocksProgressEvents = ProgressEvent<'blocks:delete-many:blockstore:delete-many'>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "GetOfflineOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface GetOfflineOptions {\n    /**\n     * If true, do not attempt to fetch any missing blocks from the network\n     *\n     * @default false\n     */\n    offline?: boolean;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Blocks",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Blocks extends Blockstore<ProgressOptions<HasBlockProgressEvents>, ProgressOptions<PutBlockProgressEvents>, ProgressOptions<PutManyBlocksProgressEvents>, GetOfflineOptions & ProviderOptions & ProgressOptions<GetBlockProgressEvents>, GetOfflineOptions & ProviderOptions & ProgressOpti",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "SessionBlockstore",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface SessionBlockstore extends Blockstore<ProgressOptions<HasBlockProgressEvents>, ProgressOptions<PutBlockProgressEvents>, ProgressOptions<PutManyBlocksProgressEvents>, GetOfflineOptions & ProgressOptions<GetBlockProgressEvents>, GetOfflineOptions & ProgressOptions<GetManyBlocksProgress",
+      "doc": "A session blockstore is a special blockstore that only pulls content from a\nsubset of network peers which respond as having the block for the initial\nroot CID.\n\nAny blocks written to the blockstore as part of the session will propagate\nto the blockstore the session was created from.",
+      "tags": []
+    },
+    {
+      "name": "BlockRetrievalOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockRetrievalOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents>, ProviderOptions {\n    /**\n     * A function that blockBrokers should call prior to returning a block to ensure it can maintain contr",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "BlockAnnounceOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockAnnounceOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents> {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "CreateSessionOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface CreateSessionOptions<ProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> extends AbortOptions, ProgressOptions<ProgressEvents>, ProviderOptions {\n    /**\n     * The minimum number of providers for the root CID that are required for\n     * successful session cre",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "BlockBroker",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface BlockBroker<RetrieveProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>, AnnounceProgressEvents extends ProgressEvent<any, any> = ProgressEvent<any, any>> {\n    /**\n     * Retrieve a block from a source\n     */\n    retrieve?(cid: CID, options?: BlockRetrievalOpt",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DEFAULT_SESSION_MIN_PROVIDERS",
+      "kind": "VariableDeclaration",
+      "signature": "DEFAULT_SESSION_MIN_PROVIDERS = 1",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DEFAULT_SESSION_MAX_PROVIDERS",
+      "kind": "VariableDeclaration",
+      "signature": "DEFAULT_SESSION_MAX_PROVIDERS = 5",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "InsufficientProvidersError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class InsufficientProvidersError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "NoRoutersAvailableError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class NoRoutersAvailableError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "UnknownHashAlgorithmError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class UnknownHashAlgorithmError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "UnknownCodecError",
+      "kind": "ClassDeclaration",
+      "signature": "export declare class UnknownCodecError extends Error {\n    static name: string;\n    constructor(message?: string);\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "PinType",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type PinType = 'recursive' | 'direct' | 'indirect';",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pin",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pin {\n    cid: CID;\n    depth: number;\n    metadata: Record<string, string | number | boolean>;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "AddPinEvents",
+      "kind": "TypeAliasDeclaration",
+      "signature": "export type AddPinEvents = ProgressEvent<'helia:pin:add', CID>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "AddOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface AddOptions extends AbortOptions, ProgressOptions<AddPinEvents | GetBlockProgressEvents> {\n    /**\n     * How deeply to pin the DAG, defaults to Infinity\n     */\n    depth?: number;\n    /**\n     * Optional user-defined metadata to store with the pin\n     */\n    metadata?: Record<stri",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "RmOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface RmOptions extends AbortOptions {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "LsOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface LsOptions extends AbortOptions {\n    cid?: CID;\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "IsPinnedOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface IsPinnedOptions extends AbortOptions {\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Pins",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Pins {\n    /**\n     * Pin a block in the blockstore. It will not be deleted when garbage\n     * collection is run.\n     */\n    add(cid: CID, options?: AddOptions): AsyncGenerator<CID, void, undefined>;\n    /**\n     * Unpin the block that corresponds to the passed CID. The block will",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "RoutingOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface RoutingOptions extends AbortOptions, ProgressOptions, TraceOptions {\n    /**\n     * Pass `false` to not use the network\n     *\n     * @default true\n     */\n    useNetwork?: boolean;\n    /**\n     * Pass `false` to not use cached values\n     *\n     * @default true\n     */\n    useCache",
+      "doc": "When a routing operation involves reading values, these options allow\ncontrolling where the values are read from. Some implementations support a\nlocal cache that may be used in preference over network calls, for example\nwhen a record has a TTL.",
+      "tags": []
+    },
+    {
+      "name": "Provider",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Provider extends PeerInfo {\n    /**\n     * If present these are the methods that the peer can supply the content via.\n     *\n     * If not present the caller should attempt to dial the remote peer and run\n     * the identify protocol to discover how to retrieve the content.\n     *\n ",
+      "doc": "A provider can supply the content for a CID",
+      "tags": []
+    },
+    {
+      "name": "Routing",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Routing {\n    /**\n     * The implementation of this method should ensure that network peers know the\n     * caller can provide content that corresponds to the passed CID.\n     *\n     * @example\n     *\n     * ```js\n     * // ...\n     * await contentRouting.provide(cid)\n     * ```\n   ",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createLibp2p",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function createLibp2p <T extends Record<string, unknown>> (options: CreateLibp2pOptions<T>): Promise<Libp2p<T>> {\n  const libp2pOptions = options.libp2p ?? {}\n\n  // if no peer id was passed, try to load it from the keychain\n  if (libp2pOptions.privateKey == null && options.datastore != ",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createLibp2p.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createLibp2p.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createLibp2p.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "createLibp2p.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "CreateLibp2pOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface CreateLibp2pOptions<T extends Record<string, unknown>> {\n  datastore: Datastore\n  libp2p?: Libp2pOptions<T>\n  logger?: ComponentLogger\n  keychain?: KeychainInit\n  start?: boolean\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "Libp2pDefaultsOptions",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface Libp2pDefaultsOptions {\n  privateKey?: PrivateKey\n  keychain?: KeychainInit\n  dns?: DNS\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "libp2pDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export function libp2pDefaults (options: Libp2pDefaultsOptions = {}): Libp2pOptions<DefaultLibp2pServices> & Required<Pick<Libp2pOptions<DefaultLibp2pServices>, 'services'>> {\n  const agentVersion = `${name}/${version} ${userAgent()}`\n\n  return {\n    privateKey: options.privateKey,\n    dns: options.",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DefaultLibp2pServices",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DefaultLibp2pServices extends Record<string, unknown> {\n  autoNAT: unknown\n  autoTLS: AutoTLS\n  dcutr: unknown\n  delegatedRouting: unknown\n  dht: KadDHT\n  identify: Identify\n  keychain: Keychain\n  ping: Ping\n  relay: CircuitRelayService\n  upnp: unknown\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "libp2pDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export function libp2pDefaults (options: Libp2pDefaultsOptions = {}): Libp2pOptions<DefaultLibp2pServices> & Required<Pick<Libp2pOptions<DefaultLibp2pServices>, 'services'>> {\n  const agentVersion = `${name}/${version} ${userAgent()}`\n\n  return {\n    privateKey: options.privateKey,\n    dns: options.",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "DefaultLibp2pServices",
+      "kind": "InterfaceDeclaration",
+      "signature": "export interface DefaultLibp2pServices extends Record<string, unknown> {\n  autoNAT: unknown\n  dcutr: unknown\n  delegatedRouting: unknown\n  dht: KadDHT\n  identify: Identify\n  keychain: Keychain\n  ping: Ping\n}",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults",
+      "kind": "FunctionDeclaration",
+      "signature": "export async function heliaDefaults <T extends Libp2p> (init: Partial<HeliaInit<T>> = {}): Promise<Omit<HeliaInit<T>, 'libp2p'> & { libp2p: T }> {\n  const datastore = init.datastore ?? new MemoryDatastore()\n  const blockstore = init.blockstore ?? new MemoryBlockstore()\n\n  let libp2p: any\n\n  if (isLi",
+      "doc": "Create and return the default options used to create a Helia node",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.then",
+      "kind": "MethodSignature",
+      "signature": "then<TResult1=T,TResult2=never>(onfulfilled?:((value:T)=>TResult1|PromiseLike<TResult1>)|undefined|null,onrejected?:((reason:any)=>TResult2|PromiseLike<TResult2>)|undefined|null):Promise<TResult1|TResult2>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.catch",
+      "kind": "MethodSignature",
+      "signature": "catch<TResult=never>(onrejected?:((reason:any)=>TResult|PromiseLike<TResult>)|undefined|null):Promise<T|TResult>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.finally",
+      "kind": "MethodSignature",
+      "signature": "finally(onfinally?:(()=>void)|undefined|null):Promise<T>;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "heliaDefaults.__@toStringTag@34",
+      "kind": "PropertySignature",
+      "signature": "readonly[Symbol.toStringTag]:string;",
+      "doc": "",
+      "tags": []
+    },
+    {
+      "name": "bootstrapConfig",
+      "kind": "VariableDeclaration",
+      "signature": "bootstrapConfig = {\n  list: [\n    '/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN',\n    '/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb',\n    '/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt',\n    // va",
+      "doc": "",
+      "tags": []
+    }
+  ]
+}

@@ -1,0 +1,1106 @@
+
+Impulse AI Documentation (Unabridged Copy)
+==========================================
+
+This markdown file presents an unabridged copy of the documentation hosted at **docs.impulselabs.ai**. Each section corresponds to a page in the Impulse AI docs, and the contents are reproduced verbatim to preserve all details and context. Navigation menus and ancillary links are omitted for brevity, but every heading, paragraph, list, table and code block from the original site is included.
+
+* * *
+
+Getting Started
+---------------
+
+### Introduction
+
+Welcome to Impulse AI! We’re a cutting‑edge fine‑tuning platform specifically designed for open‑source large language models (LLMs). We empower you to customize these models to meet your unique requirements, making the fine‑tuning process efficient, scalable, and user‑friendly[docs.impulselabs.ai](https://docs.impulselabs.ai/introduction#:~:text=Introduction).
+
+#### Create an Account
+
+**Impulse Web App**
+
+1. Visit the Impulse app & sign up.
+    
+2. Choose your preferred method to sign up (Email, Google or GitHub)[docs.impulselabs.ai](https://docs.impulselabs.ai/introduction#:~:text=1,and%20Github%20to%20sign%20up).
+    
+
+**Website**
+
+1. Visit the Impulse website & click on the **Log In** or **Try Impulse For Free** button.
+    
+2. Choose your preferred method to sign up (Email, Google or GitHub)[docs.impulselabs.ai](https://docs.impulselabs.ai/introduction#:~:text=1,and%20Github%20to%20sign%20up).
+    
+
+#### Generate an API Key
+
+Navigate to **API Keys** to create an API key:
+
+1. Provide a name for your API key.
+    
+2. Select an expiration date and click **Create**.
+    
+3. Save the API key. To use it with the SDK, set it in your environment:
+    
+
+```bash
+export IMPSDK_API_KEY=xxxxx
+```
+
+* * *
+
+### Quickstart[docs.impulselabs.ai](https://docs.impulselabs.ai/quickstart#:~:text=Quickstart)
+
+This quickstart guide walks you through the essential steps to begin using Impulse AI:
+
+1. Sign Up on the Impulse platform.
+    
+2. Generate an API key.
+    
+3. Begin fine‑tuning open‑source models.
+    
+
+#### Account Setup – Step 1: Sign Up
+
+* **Visit the website:** Navigate to the Impulse AI site and click **Sign Up**.
+    
+* **Select sign‑in method:** Email (enter address and create a secure password), Google or Microsoft.
+    
+* **Verify your account:** After registration you will receive a confirmation email; click the link to verify[docs.impulselabs.ai](https://docs.impulselabs.ai/quickstart#:~:text=Step%201%3A%20Sign%20Up%20on,Impulse%20Platform).
+    
+
+#### Account Setup – Step 2: Generate an API Key
+
+* Navigate to **Settings → API Keys**.
+    
+* Provide a name/description.
+    
+* Select expiration date & time and create the key.
+    
+* Save the API key[docs.impulselabs.ai](https://docs.impulselabs.ai/quickstart#:~:text=Step%202%3A%20Generate%20an%20API,Key).
+    
+
+* * *
+
+Fine‑Tuning
+-----------
+
+### Overview[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Overview)
+
+Fine‑tuning Large Language Models (LLMs) adapts a pre‑trained model to a specific task or domain. With rapid AI advancements, fine‑tuning has become the go‑to strategy for extracting top‑tier performance from open‑source models such as Llama and Gemma. A foundational LLM is versatile, but fine‑tuning molds it into a specialist by training it with your data, resulting in more accurate, context‑aware outputs[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Overview).
+
+#### Why Fine‑Tune with Impulse AI?
+
+* **Spot‑on accuracy:** Outputs are more precise than what you’d get with basic prompting.
+    
+* **Deeper learning:** Train on large datasets, moving beyond single‑prompt limitations.
+    
+* **Cost savings:** Shorter prompts use fewer tokens, reducing costs.
+    
+* **Fast responses:** Optimized requests yield quicker inference[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Why%20Fine).
+    
+
+Fine‑tuning leverages larger sets of examples to train the model, drastically cutting down the need for extensive prompt examples while improving performance[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Ultimately%2C%20fine,you%20both%20time%20and%20cash).
+
+#### How Fine‑Tuning Works Here[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=How%20Fine)
+
+1. **Prep your data:** Prepare and upload training data.
+    
+2. **Train your model:** Use the platform to train open‑source models.
+    
+3. **Evaluate & tweak:** Assess results and adjust parameters.
+    
+4. **Deploy your model:** Use your fine‑tuned model for production.
+    
+
+#### Models Supported on Impulse for Fine‑Tuning[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Models%20Supported%20on%20Impulse%20for,Tuning)
+
+* Llama 3.1 8B
+    
+* Llama 3.2 – 1B and 3B
+    
+* Llama 3.3 70B
+    
+
+#### When Fine‑Tuning Makes Sense[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=When%20Fine)
+
+Fine‑tuning is useful when you need models to excel at highly specific tasks or work within certain constraints. Before fine‑tuning, try prompt engineering and modular prompt chaining to see whether your goals can be achieved without training. Smart prompting often yields quick wins and sets the stage for better fine‑tuning results[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=When%20Fine).
+
+#### Common Ways to Use Fine‑Tuning[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Common%20Ways%20to%20Use%20Fine)
+
+* **Task‑specific experts:** Adapt general models like Llama or BERT for question answering, classification or summarization.
+    
+* **Industry specialists:** Train models on domain‑specific language and facts (legal, medical, scientific).
+    
+* **Language & dialect mastery:** Improve performance on under‑represented languages or dialects.
+    
+* **Integrate company knowledge:** Inject proprietary information and internal expertise into your model.
+    
+* **Low‑resource scenarios:** Adapt models for domains with limited data.
+    
+* **Smarter few‑shot learning:** Enhance the model’s ability to learn from a handful of examples.
+    
+* **Multimodal magic:** Fine‑tune models to handle text, images and other data types.
+    
+* **Custom outputs:** Match the tone, format or style to your brand.
+    
+* **Consistent complex tasks:** Ensure reliability for intricate, multi‑step processes.
+    
+* **Handling edge cases:** Teach the model to manage rare or new tasks that generic prompts can’t handle[docs.impulselabs.ai](https://docs.impulselabs.ai/fine-tuning#:~:text=Common%20Ways%20to%20Use%20Fine).
+    
+
+* * *
+
+### Dataset Preparation[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=Dataset%20Preparation)
+
+Effective dataset curation requires **diverse samples** that cover a wide range of scenarios relevant to the target task. Diversity improves training speed, reduces costs and helps models generalize better[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=%E2%80%9CLess%20is%20More%E2%80%9D,tuned).
+
+#### Dataset Curation[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=Dataset%20Curation)
+
+To build agents, each question–answer pair forms a training sample. Questions should provide enough context for accurate responses, and answers should be unambiguous and concise. Example dataset:
+
+```json
+[
+  {
+    "question": "What is the capital of France?",
+    "answer": "The capital of France is Paris."
+  },
+  {
+    "question": "Who wrote the novel '1984'?",
+    "answer": "The novel '1984' was written by George Orwell."
+  },
+  {
+    "question": "What is the speed of light?",
+    "answer": "The speed of light is approximately 299,792 kilometers per second."
+  }
+]
+```
+
+Impulse currently supports datasets in **JSONL** format. Each sample should follow this structure[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=We%20only%20support%20data%20in,jsonl):
+
+```json
+{
+  "messages": [
+    { "role": "system", "content": "<system-prompt>" },
+    { "role": "user",   "content": "<question>" },
+    { "role": "assistant", "content": "<answer>" }
+  ]
+}
+```
+
+Example JSONL entries:
+
+```json
+{"messages": [{"role": "system", "content": "You are an assistant that accurately answers general knowledge questions."}, {"role": "user", "content": "What is the capital of France?"}, {"role": "assistant", "content": "The capital of France is Paris."}]}
+{"messages": [{"role": "system", "content": "You are an assistant that accurately answers general knowledge questions."}, {"role": "user", "content": "Who wrote the novel '1984'?"}, {"role": "assistant", "content": "The novel '1984' was written by George Orwell."}]}
+{"messages": [{"role": "system", "content": "You are an assistant that accurately answers general knowledge questions."}, {"role": "user", "content": "What is the speed of light?"}, {"role": "assistant", "content": "The speed of light is approximately 299,792 kilometers per second."}]}
+```
+
+_Notes:_
+
+* Only JSONL is currently supported; additional formats will be added later[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=,be%20added%20in%20the%20future).
+    
+* A formatting tool is available at [https://impulseai-json-to-jsonl.vercel.app/](https://impulseai-json-to-jsonl.vercel.app/) for converting JSON to JSONL[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=,jsonl.vercel.app).
+    
+
+#### Upload Dataset[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=Upload%20Dataset)
+
+You can upload your curated JSONL dataset via the **Impulse SDK** or **Web App**.
+
+**Method 1: Upload via SDK**
+
+```python
+import os
+import asyncio
+from impulse.api_sdk.sdk import ImpulseSDK
+from impulse.api_sdk.models import DatasetCreate
+
+async def main():
+    async with ImpulseSDK(os.environ.get("IMPSDK_API_KEY")) as client:
+        files = await client.dataset.list_datasets()
+        await client.dataset.upload_dataset("<file-path>/<filename>.jsonl", DatasetCreate(name="<dataset name>", description="<dataset description>"))
+        print(files)
+
+asyncio.run(main())
+```
+
+**Method 2: Upload via Web App**
+
+1. Login to the Impulse dashboard.
+    
+2. Navigate to **Datasets** in the left panel.
+    
+3. Click **Upload Dataset**.
+    
+4. Enter a dataset name.
+    
+5. Upload the JSONL file. Once uploaded, the dataset appears on the **Datasets** page[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=Method%202%3A%20Upload%20via%20,App).
+    
+
+#### Structured Format for Conversations[docs.impulselabs.ai](https://docs.impulselabs.ai/dataset#:~:text=Structured%20Format%20for%20Conversations)
+
+For conversational models, each dataset entry should contain messages with a `role` (e.g., `user` or `assistant`) and `content` (the text of the message).
+
+* * *
+
+### Fine‑Tune Llama 3.1 8B[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Fine)[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=,0%5D%2C%20skip_special_tokens%3DTrue)
+
+The AI landscape is shifting. Open‑source models like **Llama 3.1** show that smaller, strategically fine‑tuned models can match or outperform expensive closed‑source solutions. With Impulse AI you can fine‑tune Llama 3.1 8B on your own data to build custom models that are powerful and yours[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=The%20AI%20landscape%20is%20shifting,orchestrates%20everything%20else%20for%20you).
+
+#### Key Takeaways
+
+* Prepare your dataset and upload it to the platform.
+    
+* Submit a fine‑tuning job with custom parameters using the SDK or web app.
+    
+* Download and evaluate the fine‑tuned model[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Key%20Takeaways).
+    
+
+#### Prerequisites[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Prerequisites)
+
+* Install the Impulse SDK via `pip install impulse-api-sdk-python`.
+    
+* Obtain an API key from the Impulse dashboard and set it as an environment variable:
+    
+
+```bash
+export IMPSDK_API_KEY=your_api_key
+```
+
+#### Dataset Preparation[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Dataset%20Preparation)
+
+Dataset preparation is critical. See the detailed **Dataset Preparation** guide for supported formats and methods.
+
+#### Fine Tune[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Fine%20Tune)
+
+Fine‑tuning parameters are flexible—batch size, learning rate, epochs, seed, shuffle, etc. Impulse supports **LoRA**, **QLoRA** and **Full** fine‑tuning.
+
+_Method 1: Fine‑Tune via SDK_
+
+```python
+import os
+import asyncio
+from impulse.api_sdk.sdk import ImpulseSDK
+from impluse.api_sdk.models import FineTuningJobCreate, FineTuningJobParameters
+
+async def main():
+    async with ImpulseSDK(os.environ.get("IMPSDK_API_KEY")) as client:
+        job = await client.fine_tuning.create_fine_tuning_job(FineTuningJobCreate(
+            base_model_name="llm_llama3_1_8b",
+            dataset_name="<dataset-name>",
+            name="<job-name>",
+            type="<fine-tune mode>",
+            parameters=FineTuningJobParameters(
+                batch_size=2,
+                shuffle=True,
+                num_epochs=1,
+                lr=2e-5,
+                seed=42
+            )
+        ))
+        print(f"Fine-tuning job started: {job}")
+
+asyncio.run(main())
+```
+
+_Method 2: Fine‑Tune via Web App_
+
+1. Login to the Impulse dashboard.
+    
+2. Navigate to **Fine‑Tuning**.
+    
+3. Click **Create Job**.
+    
+4. Provide job details and submit. The platform handles training and provides the fine‑tuned model once done[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Method%202%3A%20Fine%20Tune%20via,Web%20App).
+    
+
+#### Monitoring Jobs[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Monitoring%20Jobs)
+
+Check job status via:
+
+* **SDK:**
+    
+
+```python
+import os
+import asyncio
+from impulse.api_sdk.sdk import ImpulseSDK
+
+async def main():
+    async with ImpulseSDK(os.environ.get("IMPSDK_API_KEY")) as client:
+        jobs = await client.fine_tuning.list_fine_tuning_jobs()
+        print("Fine-tuning jobs:", jobs)
+
+asyncio.run(main())
+```
+
+* **Web App:** job status appears in the **Fine‑Tuning** section of the dashboard.
+    
+
+#### Post Training[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Post%20Training)
+
+Fine‑tuned model weights can be downloaded from the dashboard. In‑house evaluation and inference will be available soon.
+
+#### Quick Guide to Inference[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Quick%20Guide%20to%20Inference)
+
+You can run inference on the downloaded weights using **Hugging Face Transformers**. Sample script:
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+import sys
+
+# Usage: python predict.py "What is the capital of Japan?"
+
+query = sys.argv[1]
+
+# Load your fine-tuned model and tokenizer
+model_path = "<path_to_your_finetuned_model>"
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path)
+
+def generate_answer(prompt):
+    inputs = tokenizer(prompt, return_tensors="pt")
+    outputs = model.generate(inputs['input_ids'], max_length=50)
+    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+print(generate_answer(query))
+```
+
+Example invocation:
+
+```bash
+python predict.py "What is the capital of Japan?"
+```
+
+#### Conclusion[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Conclusion)
+
+Using the Impulse SDK you can fine‑tune models like Llama 3.1 8B quickly, achieving accurate custom models at a fraction of the cost of closed‑source alternatives. The flexible API lets you control dataset management and model deployment[docs.impulselabs.ai](https://docs.impulselabs.ai/llama_3.1_8b#:~:text=Conclusion).
+
+* * *
+
+### Fine‑Tuning Pricing[docs.impulselabs.ai](https://docs.impulselabs.ai/pricing#:~:text=Fine)
+
+Prices are based on a 1M‑token dataset per epoch. Costs per model and fine‑tuning method are as follows:
+
+| Model | Method | Price |
+| --- | --- | --- |
+| Llama 3.1 8B | qLoRA | $2 |
+| Llama 3.1 8B | LoRA | $2 |
+| Llama 3.1 8B | Full Fine‑Tuning | $2 |
+| Llama 3.2 1B | qLoRA | $2 |
+| Llama 3.2 1B | LoRA | $2 |
+| Llama 3.2 1B | Full Fine‑Tuning | $2 |
+| Llama 3.2 3B | qLoRA | $2 |
+| Llama 3.2 3B | LoRA | $2 |
+| Llama 3.2 3B | Full Fine‑Tuning | $2 |
+| Llama 3.3 70B | qLoRA | $10 |
+| Llama 3.3 70B | LoRA | $10 |
+| Llama 3.3 70B | Full Fine‑Tuning | $10 |
+
+* * *
+
+### Error Codes[docs.impulselabs.ai](https://docs.impulselabs.ai/error-codes#:~:text=Error%20Codes)
+
+| HTTP Code | Cause |
+| --- | --- |
+| **400** | Invalid request (misconfigured request) |
+| **401** | Authentication error (missing or invalid API key) |
+| **403** | Forbidden |
+| **404** | Not found (invalid endpoint URL) |
+| **422** | Validation errors (e.g., expiration date must be in the future) |
+| **500** | Server error |
+
+* * *
+
+API Reference
+-------------
+
+The Impulse API is organized around resources such as API keys, base models, users, datasets, fine‑tuning jobs, fine‑tuned models, usage and billing. Each endpoint description below includes request method, path, parameters, example request/response and notes.
+
+### API Keys
+
+#### Create a New API Key[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/api-keys/create-a-new-api-key#:~:text=201)
+
+* **Endpoint:** `POST /v1/api-keys`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `201` (created), `400` (bad request), `401` (unauthorized).
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "last_used_at": "2023-11-07T05:31:56Z",
+  "expires_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "prefix": "<string>",
+  "secret": "<string>"
+}
+```
+
+#### List all API Keys[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/api-keys/list-all-api-keys-for-the-current-user#:~:text=%7B%20,123%20%7D)
+
+* **Endpoint:** `GET /v1/api-keys`
+    
+* **Query parameters:** `page` (integer ≥ 1, default 1), `items_per_page` (integer ≥ 1, default 20).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`.
+    
+* **Response body:** paginated list of keys:
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "last_used_at": "2023-11-07T05:31:56Z",
+      "expires_at": "2023-11-07T05:31:56Z",
+      "status": "ACTIVE",
+      "name": "<string>",
+      "prefix": "<string>"
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get details of a Specific API Key[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/api-keys/get-details-of-a-specific-api-key#:~:text=%7B%20%22id%22%3A%20%223c90c3cc,)
+
+* **Endpoint:** `GET /v1/api-keys/{key_name}`
+    
+* **Path parameter:** `key_name` (required).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "last_used_at": "2023-11-07T05:31:56Z",
+  "expires_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "prefix": "<string>"
+}
+```
+
+#### Update a Specific API Key[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/api-keys/update-a-specific-api-key#:~:text=%7B%20%22id%22%3A%20%223c90c3cc,)
+
+* **Endpoint:** `PATCH /v1/api-keys/{key_name}`
+    
+* **Body:** JSON with fields to update (e.g., `expires_at`, `name`).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `400`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "last_used_at": "2023-11-07T05:31:56Z",
+  "expires_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "prefix": "<string>"
+}
+```
+
+#### Revoke a Specific API Key[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/api-keys/revoke-a-specific-api-key#:~:text=Copy)
+
+* **Endpoint:** `DELETE /v1/api-keys/{key_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "last_used_at": "2023-11-07T05:31:56Z",
+  "expires_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "prefix": "<string>"
+}
+```
+
+### Base Models
+
+#### List All Available Base LLM Models[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/base-models/list-all-available-base-llm-models#:~:text=200)
+
+* **Endpoint:** `GET /v1/models/base`
+    
+* **Query parameters:** `page`, `items_per_page` (as described above).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "description": "<string>",
+      "hf_url": "<string>",
+      "status": "ACTIVE",
+      "name": "<string>",
+      "meta": {}
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get Detailed Information about a Specific Base Model[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/base-models/get-detailed-information-about-a-specific-base-model#:~:text=Copy)
+
+* **Endpoint:** `GET /v1/models/base/{model_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "description": "<string>",
+  "hf_url": "<string>",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "meta": {}
+}
+```
+
+### Users
+
+#### Get Current User Information[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/users/get-current-user-information#:~:text=200)
+
+* **Endpoint:** `GET /v1/users/me`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "email": "jsmith@example.com",
+  "credits_balance": 123
+}
+```
+
+#### Update Current User Information[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/users/update-current-user-information#:~:text=200)
+
+* **Endpoint:** `PATCH /v1/users/me`
+    
+* **Body:** JSON with fields to update (e.g., `name`, `email`).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `400`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "ACTIVE",
+  "name": "<string>",
+  "email": "jsmith@example.com",
+  "credits_balance": 123
+}
+```
+
+#### Delete User Account (Internal API)
+
+* This internal endpoint allows account deletion. The page provides navigation links but no further details[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/users/delete-user-account-internal-api#:~:text=Delete%20user%20account%20internal%20api).
+    
+
+### Datasets
+
+#### Upload a New Dataset File[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/upload-a-new-dataset-file#:~:text=201)
+
+* **Endpoint:** `POST /v1/datasets`
+    
+* **Body:** multipart/form‑data containing the JSONL file along with a name and description.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `201`, `400`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "UPLOADED",
+  "name": "<string>",
+  "description": "<string>",
+  "file_name": "<string>",
+  "file_size": 123,
+  "errors": {}
+}
+```
+
+#### List All Datasets Uploaded by the User[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/list-all-datasets-uploaded-by-the-user#:~:text=%7B%20,123%20%7D)
+
+* **Endpoint:** `GET /v1/datasets`
+    
+* **Query parameters:** `page`, `items_per_page`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "updated_at": "2023-11-07T05:31:56Z",
+      "status": "UPLOADED",
+      "name": "<string>",
+      "description": "<string>",
+      "file_name": "<string>",
+      "file_size": 123,
+      "errors": {}
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get Information about a Specific Dataset[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/get-information-about-a-specific-dataset#:~:text=Copy)
+
+* **Endpoint:** `GET /v1/datasets/{dataset_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "UPLOADED",
+  "name": "<string>",
+  "description": "<string>",
+  "file_name": "<string>",
+  "file_size": 123,
+  "errors": {}
+}
+```
+
+#### Update a Specific Dataset’s Information[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/update-a-specific-datasets-information#:~:text=200)
+
+* **Endpoint:** `PATCH /v1/datasets/{dataset_name}`
+    
+* **Body:** JSON with fields to update.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `400`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "UPLOADED",
+  "name": "<string>",
+  "description": "<string>",
+  "file_name": "<string>",
+  "file_size": 123,
+  "errors": {}
+}
+```
+
+#### Delete a Specific Dataset File[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/delete-a-specific-dataset-file#:~:text=204)
+
+* **Endpoint:** `DELETE /v1/datasets/{dataset_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `204`, `401`, `404`.
+    
+* **Response body:** no JSON body; success indicated by HTTP 204[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/datasets/delete-a-specific-dataset-file#:~:text=204).
+    
+
+### Fine‑Tuning Jobs
+
+#### Create a New Fine‑Tuning Job[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuning-jobs/create-a-new-fine-tuning-job#:~:text=201)
+
+* **Endpoint:** `POST /v1/fine-tuning`
+    
+* **Body:** JSON containing `base_model_name`, `dataset_name`, `name`, `type` (e.g., `LORA`, `QLORA`, `FULL`), and optional `parameters` (batch size, shuffle, epochs, learning rate, seed).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `201`, `400`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "NEW",
+  "base_model_name": "<string>",
+  "dataset_name": "<string>",
+  "name": "<string>",
+  "type": "LORA",
+  "current_step": 123,
+  "total_steps": 123,
+  "current_epoch": 123,
+  "total_epochs": 123,
+  "num_tokens": 123
+}
+```
+
+#### List All Fine‑Tuning Jobs[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuning-jobs/list-all-fine-tuning-jobs#:~:text=%7B%20,123%20%7D)
+
+* **Endpoint:** `GET /v1/fine-tuning`
+    
+* **Query parameters:** `page`, `items_per_page`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "updated_at": "2023-11-07T05:31:56Z",
+      "status": "NEW",
+      "base_model_name": "<string>",
+      "dataset_name": "<string>",
+      "name": "<string>",
+      "type": "LORA",
+      "current_step": 123,
+      "total_steps": 123,
+      "current_epoch": 123,
+      "total_epochs": 123,
+      "num_tokens": 123
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get Details of a Specific Fine‑Tuning Job[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuning-jobs/get-details-of-a-specific-fine-tuning-job#:~:text=%7B%20%22id%22%3A%20%223c90c3cc,%7B%7D)
+
+* **Endpoint:** `GET /v1/fine-tuning/{job_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "NEW",
+  "base_model_name": "<string>",
+  "dataset_name": "<string>",
+  "name": "<string>",
+  "type": "LORA",
+  "current_step": 123,
+  "total_steps": 123,
+  "current_epoch": 123,
+  "total_epochs": 123,
+  "num_tokens": 123,
+  "parameters": {
+    "batch_size": 8,
+    "num_epochs": 3,
+    "shuffle": true,
+    "lr": 0.0003,
+    "seed": 42
+  },
+  "metrics": {}
+}
+```
+
+#### Cancel a Fine‑Tuning Job[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuning-jobs/cancel-a-fine-tuning-job#:~:text=Copy)
+
+* **Endpoint:** `POST /v1/fine-tuning/{job_name}/cancel`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "updated_at": "2023-11-07T05:31:56Z",
+  "status": "NEW",
+  "base_model_name": "<string>",
+  "dataset_name": "<string>",
+  "name": "<string>",
+  "type": "LORA",
+  "current_step": 123,
+  "total_steps": 123,
+  "current_epoch": 123,
+  "total_epochs": 123,
+  "num_tokens": 123,
+  "parameters": {
+    "batch_size": 8,
+    "num_epochs": 3,
+    "shuffle": true,
+    "lr": 0.0003,
+    "seed": 42
+  },
+  "metrics": {}
+}
+```
+
+### Fine‑Tuned Models
+
+#### List All Fine‑Tuned Models for the Current User[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuned-models/list-all-fine-tuned-models-for-the-current-user#:~:text=%7B%20,123%20%7D)
+
+* **Endpoint:** `GET /v1/models/fine-tuned`
+    
+* **Query parameters:** `page`, `items_per_page`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "fine_tuning_job_name": "<string>",
+      "name": "<string>",
+      "artifacts": {}
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get Detailed Information about a Specific Fine‑Tuned Model[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/fine-tuned-models/get-detailed-information-about-a-specific-fine-tuned-model#:~:text=Copy)
+
+* **Endpoint:** `GET /v1/models/fine-tuned/{model_name}`
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`, `404`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+  "created_at": "2023-11-07T05:31:56Z",
+  "fine_tuning_job_name": "<string>",
+  "name": "<string>",
+  "artifacts": {}
+}
+```
+
+### Usage
+
+#### Get a List of Usage Records for a Given Period[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/usage/get-a-list-of-usage-records-for-a-given-period#:~:text=Copy)
+
+* **Endpoint:** `GET /v1/usage/records`
+    
+* **Query parameters (required):** `start_date`, `end_date`. Optional pagination parameters: `page`, `items_per_page`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `400`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "service_name": "FINE_TUNING_JOB",
+      "usage_amount": 123,
+      "usage_unit": "TOKEN",
+      "cost": 123,
+      "fine_tuning_job_name": "<string>"
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Get Total Cost for a Given Period[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/usage/get-total-cost-for-a-given-period#:~:text=Copy)
+
+* **Endpoint:** `GET /v1/usage/total-cost`
+    
+* **Query parameters (required):** `start_date`, `end_date`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `400`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "start_date": "2023-12-25",
+  "end_date": "2023-12-25",
+  "total_cost": 123
+}
+```
+
+### Billing
+
+#### Get Credit History for the Current User[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/billing/get-credit-history-for-the-current-user#:~:text=%7B%20,123%20%7D)
+
+* **Endpoint:** `GET /v1/billing/credit-history`
+    
+* **Query parameters (required):** `start_date`, `end_date`. Optional: `page`, `items_per_page`.
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response codes:** `200`, `401`.
+    
+* **Response body:**
+    
+
+```json
+{
+  "data": [
+    {
+      "id": "3c90c3cc-0d44-4b50-8888-8dd25736052a",
+      "created_at": "2023-11-07T05:31:56Z",
+      "credits": 123,
+      "transaction_id": "<string>",
+      "transaction_type": "NEW_USER_CREDIT"
+    }
+  ],
+  "pagination": {
+    "total_pages": 123,
+    "current_page": 123,
+    "items_per_page": 123
+  }
+}
+```
+
+#### Redirect to Stripe for Adding Credits[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/billing/redirect-to-stripe-for-adding-credits#:~:text=Billing)
+
+* **Endpoint:** `GET /v1/billing/credits-add`
+    
+* **Query parameter:** `amount_dollars` (integer, required).
+    
+* **Authorization:** `x-api-key` header required.
+    
+* **Response code:** `302` (redirect to Stripe payment page)[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/billing/redirect-to-stripe-for-adding-credits#:~:text=Billing).
+    
+
+#### Check if User Has Enough Credits (Internal API)
+
+* An internal endpoint exists to check whether a user has sufficient credits for a job. The documentation page provides navigation but no further details[docs.impulselabs.ai](https://docs.impulselabs.ai/api-reference/billing/check-if-user-has-enough-credits-for-a-job-internal-endpoint#:~:text=Billing).
+    
+
+* * *
+
+Notes
+-----
+
+* All endpoints require an `x-api-key` header. Generate your key via the dashboard and keep it secure.
+    
+* Pagination parameters (`page`, `items_per_page`) apply to most list endpoints and default to 1 and 20 respectively.
+    
+* Dates in usage and billing queries use ISO 8601 format (YYYY‑MM‑DD).
+    
+* Internal endpoints for deleting user accounts and checking credits have minimal publicly available documentation; contact Impulse AI support for guidance.
