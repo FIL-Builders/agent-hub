@@ -7,8 +7,12 @@
 [functions]
   directory = "netlify/functions"
 
+[functions."mcp"]
+  included_files = ["agents/**"]
+
 [[redirects]]
   from = "/mcp"
   to = "/.netlify/functions/mcp"
   status = 200
+
 
