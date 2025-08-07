@@ -19,8 +19,23 @@ exports.handler = async function (event) {
 
     if (method === "runTool") {
       const { tool_id, parameters } = params;
-      const content = await readAgentFile(tool_id, parameters.version);
+      let version = parameters.version;
+
+      if (version === "latest") {
+        const allVersions = await listVersions(tool_id);
+        if (allVersions.length === 0) throw new Error(`No versions found for tool: ${tool_id}`);
+
+        // Sort descending using semver if your versions are semantic, else lexicographically
+        version = allVersions.sort().reverse()[0];
+      }
+
+      const content = await readAgentFile(tool_id, version);
       return jsonrpc(id, { content });
+    }
+
+    if (method === "listTools") {
+      const tools = await listAllTools();
+      return jsonrpc(id, tools);
     }
 
     return jsonrpcError(id, "Unknown method");
@@ -60,6 +75,14 @@ function jsonrpc(id, result) {
   };
 }
 
+async function listVersions(tool_id) {
+  const dir = path.join(AGENTS_DIR, tool_id);
+  const files = await fs.readdir(dir);
+  return files
+    .filter(f => f.endsWith(".yaml"))
+    .map(f => f.replace(".yaml", ""));
+}
+
 function jsonrpcError(id, message) {
   return {
     statusCode: 500,
@@ -70,5 +93,20 @@ function jsonrpcError(id, message) {
     }),
     headers: { "Content-Type": "application/json" }
   };
+}
+
+async function listAllTools() {
+  const toolDirs = await fs.readdir(AGENTS_DIR, { withFileTypes: true });
+  const tools = [];
+
+  for (const dirent of toolDirs) {
+    if (!dirent.isDirectory()) continue;
+
+    const tool_id = dirent.name;
+    const versions = await listVersions(tool_id);
+    tools.push({ tool_id, versions });
+  }
+
+  return tools;
 }
 
