@@ -1,28 +1,33 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import CodeBlock from '@theme/CodeBlock';
+import YamlSpecCard from '@site/src/components/YamlSpecCard';
 
-
-// Use require.context to get all YAML files recursively in static/agents
+// Dynamically require all YAML files from the agents directory.  This uses
+// webpack's require.context API, which is supported by Docusaurus.  The
+// files are grouped by project so they can be presented under separate
+// headings.
 const req = require.context(
-  '../../../../agents', // path relative to this file
+  '../../../../agents',
   true,
   /\.yaml$/
 );
 
-const agentSpecs = req.keys().map((filePath) => {
-  // filePath like './react/0.1.0.yaml'
-  const m = filePath.match(/^\.\/([^/]+)\/(.+\.yaml)$/);
-  if (!m) return null;
-  const project = m[1];
-  const file = m[2];
-  return {
-    project,
-    file,
-    path: `/agents/${project}/${file}`,
-    raw: req(filePath).default,
-  };
-}).filter(Boolean);
+const agentSpecs = req
+  .keys()
+  .map((filePath) => {
+    // filePath is like './react/0.1.0.yaml'
+    const m = filePath.match(/^\.\/([^/]+)\/(.+\.yaml)$/);
+    if (!m) return null;
+    const project = m[1];
+    const file = m[2];
+    return {
+      project,
+      file,
+      path: `/agents/${project}/${file}`,
+      raw: req(filePath).default,
+    };
+  })
+  .filter(Boolean);
 
 export default function AgentsIndex() {
   const grouped = agentSpecs.reduce((acc, spec) => {
@@ -30,32 +35,78 @@ export default function AgentsIndex() {
     return acc;
   }, {});
 
+  // Helper to parse a semantic version from a file name (e.g. "0.2.0.yaml").
+  const parseVersion = (filename) => {
+    const base = filename.replace(/\.yaml$/, '');
+    return base.split('.').map((n) => parseInt(n, 10) || 0);
+  };
+  // Compare two versions arrays.  Returns positive if a > b.
+  const compareVersions = (aParts, bParts) => {
+    for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+      const aVal = aParts[i] || 0;
+      const bVal = bParts[i] || 0;
+      if (aVal !== bVal) return aVal - bVal;
+    }
+    return 0;
+  };
+
+  // State for toggling all versions per project.
+  const [showAll, setShowAll] = React.useState({});
+  const toggleShowAll = (project) => {
+    setShowAll((prev) => ({ ...prev, [project]: !prev[project] }));
+  };
+
   return (
-<Layout title="Agent Specs" description="All registered agent specs in YAML.">
-
-    <main className="container margin-vert--lg">
-      <h1>All AgentHub YAML Specs</h1>
-      {Object.entries(grouped).map(([project, specs]) => (
-        <section key={project} style={{ marginBottom: 32 }}>
-          <h2>{project}</h2>
-          {specs.map((spec) => (
-            <div key={spec.file} style={{ marginBottom: 24 }}>
-              <a href={spec.path} download>
-                Download {spec.file}
-              </a>
-              <details style={{ marginTop: 8 }}>
-                <summary>Preview: {spec.file}</summary>
-                <CodeBlock language="yaml" showLineNumbers>
-                  {spec.raw}
-                </CodeBlock>
-              </details>
-            </div>
-          ))}
-        </section>
-      ))}
-    </main>
-	      </Layout>
-
+    <Layout title="All Agent Specs">
+      <main className="container" style={{ padding: '2rem 0' }}>
+        <h1 style={{ color: 'var(--ifm-color-primary)', marginBottom: '1.5rem' }}>
+          All AgentHub YAML Specs
+        </h1>
+        {Object.entries(grouped).map(([project, specs]) => {
+          // Sort specs descending by version.
+          const sorted = specs
+            .slice()
+            .sort((a, b) => {
+              const av = parseVersion(a.file);
+              const bv = parseVersion(b.file);
+              return compareVersions(bv, av);
+            });
+          const latestSpec = sorted[0];
+          const displaySpecs = showAll[project] ? sorted : [latestSpec];
+          return (
+            <section key={project} style={{ marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <h2
+                  style={{
+                    color: 'var(--ifm-color-primary)',
+                    fontSize: '1.25rem',
+                    marginBottom: '0.5rem',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {project}
+                </h2>
+                {sorted.length > 1 && (
+                  <button
+                    className="yaml-spec-toggle"
+                    onClick={() => toggleShowAll(project)}
+                    style={{ marginBottom: '0.5rem' }}
+                  >
+                    {showAll[project] ? 'Hide Older Versions' : 'Show All Versions'}
+                  </button>
+                )}
+              </div>
+              {displaySpecs.map((spec) => (
+                <YamlSpecCard
+                  key={spec.path}
+                  spec={spec.raw}
+                  downloadUrl={spec.path}
+                />
+              ))}
+            </section>
+          );
+        })}
+      </main>
+    </Layout>
   );
 }
-

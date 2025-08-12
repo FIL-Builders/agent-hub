@@ -1,30 +1,177 @@
-/**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
- */
+/*
+  Custom theme overrides for the Agent Hub Docusaurus site.
+  These styles align the site’s colour palette and typography with the
+  bespoke AI Templates design system. Colours are defined for both
+  light and dark themes using Docusaurus/Infima variables.  You may
+  extend this file with additional classes if you want to reuse card
+  layouts from the demo component library.
 
-/* You can override the default Infima variables here. */
+  Original Infima variables are documented here:
+  https://docusaurus.io/docs/styling-layout#styling-your-site-with-infima
+*/
+
+/* Light theme variables */
 :root {
-  --ifm-color-primary: #2e8555;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
-  --ifm-color-primary-light: #33925d;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  /* Primary colour palette based on the AI Templates accent orange */
+  --ifm-color-primary: #f97316;
+  --ifm-color-primary-dark: #ea580c;
+  --ifm-color-primary-darker: #c2410c;
+  --ifm-color-primary-darkest: #9a3412;
+  --ifm-color-primary-light: #fb923c;
+  --ifm-color-primary-lighter: #fdba74;
+  --ifm-color-primary-lightest: #fef3c7;
+
+  /* Background colours */
+  --ifm-background-color: #f8fafc;
+  --ifm-background-surface-color: #f1f5f9;
+
+  /* Typography */
+  --ifm-font-family-base: 'Inter', sans-serif;
+  --ifm-font-family-monospace: 'Courier New', monospace;
 }
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
+/* Dark theme variables override the light ones when [data-theme='dark'] is present. */
 [data-theme='dark'] {
-  --ifm-color-primary: #25c2a0;
-  --ifm-color-primary-dark: #21af90;
-  --ifm-color-primary-darker: #1fa588;
-  --ifm-color-primary-darkest: #1a8870;
-  --ifm-color-primary-light: #29d5b0;
-  --ifm-color-primary-lighter: #32d8b4;
-  --ifm-color-primary-lightest: #4fddbf;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-color-primary: #fb923c;
+  --ifm-color-primary-dark: #f97316;
+  --ifm-color-primary-darker: #ea580c;
+  --ifm-color-primary-darkest: #c2410c;
+  --ifm-color-primary-light: #fdba74;
+  --ifm-color-primary-lighter: #fed7aa;
+  --ifm-color-primary-lightest: #fff7ed;
+
+  --ifm-background-color: #09090b;
+  --ifm-background-surface-color: #1e1b1e;
+  --ifm-color-content: #f5f5f5;
+
+  --ifm-font-family-base: 'Inter', sans-serif;
+  --ifm-font-family-monospace: 'Courier New', monospace;
+}
+
+/* Example utility classes for cards and grids inspired by the AI Templates clone. */
+.ai-card {
+  background-color: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+.ai-card h3 {
+  margin-top: 0;
+  color: var(--ifm-color-primary);
+}
+.ai-card p {
+  margin-bottom: 0;
+  color: var(--ifm-color-content-secondary, #334155);
+}
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+}
+
+/* YAML specification card styles */
+.yaml-spec-card {
+  /* Inherit base ai-card styles for border, padding and background */
+  position: relative;
+  margin-top: 1rem;
+}
+.yaml-spec-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.yaml-spec-toggle,
+.yaml-spec-download {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  background-color: var(--ifm-background-surface-color);
+  color: var(--ifm-color-primary);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-decoration: none;
+}
+.yaml-spec-toggle:hover,
+.yaml-spec-download:hover {
+  background-color: var(--ifm-color-emphasis-100, #f3f4f6);
+}
+.yaml-spec-toggle:focus,
+.yaml-spec-download:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
+}
+.yaml-spec-content {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.85rem;
+  color: var(--ifm-color-content);
+  background-color: var(--ifm-background-color);
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* Blog list and tutorial styling */
+/* Wrap each article in a subtle card to improve visual separation. */
+.blogHome__posts article,
+.blog-list-page article,
+.docs-wrapper main article {
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 0.5rem;
+  background-color: var(--ifm-background-surface-color);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Headings within articles use the primary colour for emphasis. */
+.blogHome__posts article h2 a,
+.blog-list-page article h2 a,
+.docs-wrapper h1,
+.docs-wrapper h2 {
+  color: var(--ifm-color-primary);
+}
+
+/* Code blocks within docs and blog posts are contained within our spec styling for consistency. */
+.markdown pre {
+  background-color: var(--ifm-background-color);
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+/* Buttons override: match our palette instead of the default blue. */
+.button--primary {
+  background-color: var(--ifm-color-primary);
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-background-color);
+}
+.button--primary:hover {
+  background-color: var(--ifm-color-primary-dark);
+  border-color: var(--ifm-color-primary-dark);
+}
+.button--secondary {
+  background-color: transparent;
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+.button--secondary:hover {
+  background-color: var(--ifm-color-primary-light);
+  border-color: var(--ifm-color-primary-light);
+  color: var(--ifm-background-color);
+}
+
+/* Adjust navbar and footer backgrounds to blend with the dark/light backgrounds */
+.navbar {
+  background-color: var(--ifm-background-surface-color) !important;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+}
+.footer {
+  background-color: var(--ifm-background-surface-color) !important;
+  border-top: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
 }

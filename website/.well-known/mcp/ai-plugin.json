@@ -1,0 +1,28 @@
+{
+  "schema_version": "v1",
+  "name": "Framework Agent Server",
+  "description": "MCP server providing versioned agent files for common dev frameworks.",
+  "tools": [
+    {
+      "tool_id": "docusaurus"
+    },
+    {
+      "tool_id": "ethers"
+    },
+    {
+      "tool_id": "hardhat"
+    },
+    {
+      "tool_id": "helia"
+    },
+    {
+      "tool_id": "impulseai"
+    },
+    {
+      "tool_id": "react"
+    },
+    {
+      "tool_id": "redux"
+    }
+  ]
+}
