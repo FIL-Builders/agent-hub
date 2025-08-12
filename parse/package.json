@@ -11,6 +11,7 @@
   "description": "",
   "dependencies": {
     "@types/react": "^19.1.8",
+    "docusaurus": "^1.14.7",
     "ethers": "^6.15.0",
     "glob": "^11.0.3",
     "hardhat": "^2.26.1",
