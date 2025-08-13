@@ -214,3 +214,35 @@ footer, footer p, footer a {
   background-color: var(--ifm-background-surface-color) !important;
   border-top: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
 }
+
+/*
+ * Custom overrides to make the navbar logo much larger and ensure it is
+ * vertically centered within the navbar.  Setting a taller navbar height
+ * allows us to increase the logo size significantly without crowding
+ * adjacent items.  We also use flexbox on the logo container so the
+ * image aligns perfectly in the center of the navbar’s height.
+ */
+
+:root {
+  /* Raise the navbar height to accommodate a substantially larger logo */
+  --ifm-navbar-height: 6rem;
+}
+
+/* Center the logo vertically by turning its parent into a flex container */
+.navbar__brand {
+  display: flex;
+  align-items: center;
+}
+
+.navbar__logo {
+    flex: 0 0 auto;
+    height: auto;
+    margin-right: 0.5rem;
+}
+
+/* Enlarge the logo image itself */
+.navbar__logo img {
+  height: 5rem;
+  width: auto;
+  margin: 0;
+}

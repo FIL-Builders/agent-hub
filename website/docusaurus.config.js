@@ -73,6 +73,9 @@ const config = {
       logo: {
         alt: 'Agent Hub Logo',
         src: 'img/agent-hub-logo.png',
+        // Explicitly set width/height to make the logo much larger in the navbar
+        width: 80,
+        height: 80,
       },
       items: [
         { to: '/agents/', label: 'Agent Specs', position: 'left' },
