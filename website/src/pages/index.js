@@ -22,7 +22,7 @@ export default function Home() {
       title: 'Step‑By‑Step Tutorials',
       description:
         'Follow concise tutorials that guide you through agent setup and usage.',
-      link: '/tutorials',
+      link: '/tutorials/getting-started-loading-your-first-agent-file',
     },
     {
       title: 'Insights & Updates',
