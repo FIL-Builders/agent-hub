@@ -3,8 +3,13 @@
   publish = "website/build"
   command = "npm run build"
 
+[[edge_functions]]
+  path = "/mcp/sse"
+  function = "mcp-sse"
+
 
 [functions]
+  node_bundler = "esbuild"
   directory = "netlify/functions"
 
 [functions."mcp"]
