@@ -249,14 +249,14 @@
 .yaml-action-btn {
   border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
   background: transparent;
-  color: #00BFFF;
+  color: #ffffff; /* white text on buttons */
   border-radius: 0.5rem;
   padding: 0.35rem 0.55rem;
   cursor: pointer;
   text-decoration: none;
 }
-.yaml-action-btn:hover { background-color: rgba(0,191,255,0.08); }
-.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,191,255,0.35); }
+.yaml-action-btn:hover { background-color: rgba(255,255,255,0.08); }
+.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
 
 /* Show icon bar on >= 640px; mobile shows kebab */
 @media (min-width: 640px) {
