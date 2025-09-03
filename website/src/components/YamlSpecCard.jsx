@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
 /**
  * YamlSpecCard displays YAML content in a styled card with a toggle to show
@@ -32,20 +33,24 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
   // Split the YAML into lines for line numbering.  Use empty array when hidden to avoid unnecessary work.
   const lines = visible ? spec.trimEnd().split('\n') : [];
 
-  // Build absolute URL for the YAML spec so external tools can fetch it.
-  const getAbsoluteUrl = (path) => {
-    if (!path) return '';
-    try {
-      if (typeof window !== 'undefined') {
-        return new URL(path, window.location.origin).toString();
-      }
-      return path; // SSR fallback; will be resolved client-side
-    } catch (e) {
-      return path;
-    }
-  };
+  const { siteConfig } = useDocusaurusContext();
 
-  const specUrl = getAbsoluteUrl(downloadUrl);
+  // Build absolute URL for the YAML spec so external tools can fetch it.
+  const specUrl = useMemo(() => {
+    if (!downloadUrl) return '';
+    try {
+      // Prefer the live origin in the browser for correctness on custom domains
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return new URL(downloadUrl, window.location.origin).toString();
+      }
+      // SSR fallback to configured site URL
+      const base = siteConfig?.url || 'https://example.com';
+      return new URL(downloadUrl, base).toString();
+    } catch (e) {
+      return downloadUrl;
+    }
+  }, [downloadUrl, siteConfig]);
+
   const promptText = specUrl
     ? `Fetch this YAML agent spec: ${specUrl}\nUse your browsing/tool agent to download it, then parse and process it. Confirm once loaded.`
     : '';

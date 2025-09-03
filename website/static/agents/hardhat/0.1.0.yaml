@@ -1,0 +1,267 @@
+meta:
+spec\_name: hardhat
+spec\_version: 0.1.0
+generated: 2025-07-29
+purpose: |
+Provide an LLM with expert‑level knowledge to build, test, and automate Ethereum smart‑contract workflows using the Hardhat development environment.
+guiding\_principles:
+\- Prefer TypeScript examples with `import` syntax and async/await.
+\- Emphasize deterministic builds by pinning compiler versions and artifact paths.
+\- Fail fast; surface `HardhatPluginError` on misconfiguration or missing dependencies.
+\- Use network forks and fixtures for reproducible tests.
+\- Keep secrets (RPC URLs, private keys) in environment variables or `.env` files—never hard‑code.
+design\_notes: |
+The pack distills the most‑used public APIs from the user‑supplied `hardhat.out` JSON export and Hardhat’s official documentation. Only core symbols needed for everyday plugin and script development are included, keeping the file concise while satisfying the Open Agent Spec schema.
+
+groups:
+
+* name: Task DSL
+  exports: \[task, subtask, extendConfig, extendEnvironment]
+  symbols:
+  task:
+  summary: Define a top‑level CLI task executable via `npx hardhat <name>`.
+  guidance:
+  \- Task names must be unique; re‑using a name overwrites the previous definition.
+  \- Always `await` async calls inside the action to avoid dangling promises.
+  example: |
+  import { task } from "hardhat/config";
+
+  ```
+    task("accounts", "Print account addresses", async (_, hre) => {
+      const accounts = await hre.ethers.getSigners();
+      for (const acc of accounts) console.log(acc.address);
+    });
+  ai_support:
+    - "How do I pass parameters to a custom task?"
+    - "Why is my task missing from `npx hardhat --help`?"
+  ```
+
+  subtask:
+  summary: Declare a reusable building block invoked from other tasks.
+  guidance:
+  \- Subtasks are hidden from CLI help; invoke them with `hre.run("subtaskName")`.
+  \- Use subtasks to override built‑in task behavior (e.g., `compile`) non‑destructively.
+  example: |
+  import { subtask, task } from "hardhat/config";
+
+  ```
+    subtask("log-network", "Show active network", async (_, hre) => {
+      console.log(`Running on ${hre.network.name}`);
+    });
+
+    task("hello").setAction(async (_, hre) => {
+      await hre.run("log-network");
+    });
+  ```
+
+  extendConfig:
+  summary: Hook that mutates the resolved Hardhat config before `hre` is created.
+  guidance:
+  \- Use to add or tweak fields; avoid deleting existing keys.
+  \- Runs once per Hardhat invocation, before environment extenders.
+  example: |
+  import { extendConfig } from "hardhat/config";
+
+  ```
+    extendConfig((config, userConfig) => {
+      config.custom = userConfig.custom ?? { gasPriceMultiplier: 1.1 };
+    });
+  ```
+
+  extendEnvironment:
+  summary: Inject helpers or globals into the Hardhat Runtime Environment (`hre`).
+  guidance:
+  \- Keep additions immutable to prevent collisions across plugins.
+  \- Throw `HardhatPluginError` if prerequisite packages are missing.
+  example: |
+  import { extendEnvironment } from "hardhat/config";
+  import { utils } from "ethers";
+
+  ```
+    extendEnvironment((hre) => {
+      hre.toWei = (value: string) => utils.parseEther(value);
+    });
+  ```
+
+* name: Runtime Environment
+  exports: \[HardhatRuntimeEnvironment, run, network, ethers, config]
+  symbols:
+  HardhatRuntimeEnvironment:
+  summary: The context object passed to every task/script, exposing utilities, network, and config.
+  guidance:
+  \- Access implicitly via `import hre from "hardhat"` or as a task parameter.
+  \- Do not cache across network switches; recreate for each run to ensure fresh state.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    async function main() {
+      console.log(`Connected to ${hre.network.name}`);
+      const [deployer] = await hre.ethers.getSigners();
+      console.log(`Deployer: ${deployer.address}`);
+    }
+
+    main().catch(console.error);
+  ```
+
+  run:
+  summary: Programmatically execute another Hardhat task or subtask.
+  guidance:
+  \- Always `await hre.run("<task>", {...args})` inside async functions.
+  \- Returns whatever value the called task’s action resolves to.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    await hre.run("compile");
+  ```
+
+  network:
+  summary: Metadata for the currently selected network (name, chainId, config, provider).
+  guidance:
+  \- Use `network.config.url` for the RPC endpoint; pass to `hre.ethers.provider` if needed.
+  \- Changes to `network.config.gas` affect subsequent transactions—adjust cautiously.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    console.log(hre.network.name, hre.network.chainId);
+  ```
+
+  ethers:
+  summary: Pre‑configured `ethers.js` instance bound to the active provider and signers.
+  guidance:
+  \- Prefer `hre.ethers.getContractFactory` to respect Hardhat compiler settings.
+  \- Fetch signers once per script to stay consistent after snapshots or resets.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    const Token = await hre.ethers.getContractFactory("Token");
+    const token = await Token.deploy();
+    await token.deployed();
+  ```
+
+  config:
+  summary: Final resolved `HardhatConfig` object, including plugin extensions.
+  guidance:
+  \- Treat as read‑only in scripts—mutate via `extendConfig` instead.
+  \- Use `config.paths` to locate artifacts, cache, and sources.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    console.log(hre.config.solidity.compilers);
+  ```
+
+* name: Configuration Types
+  exports: \[HardhatUserConfig, HardhatConfig, HardhatNetworkUserConfig]
+  symbols:
+  HardhatUserConfig:
+  summary: Shape of the object exported from `hardhat.config.ts`.
+  guidance:
+  \- Omit unspecified fields; Hardhat supplies sensible defaults.
+  \- Store sensitive data in environment variables accessed via `process.env`.
+  example: |
+  import { HardhatUserConfig } from "hardhat/config";
+
+  ```
+    const config: HardhatUserConfig = {
+      solidity: "0.8.24",
+      networks: {
+        sepolia: {
+          url: process.env.SEPO_RPC!,
+          accounts: [process.env.PRIVATE_KEY!],
+        },
+      },
+    };
+
+    export default config;
+  ```
+
+  HardhatConfig:
+  summary: Fully merged configuration after defaults, plugins, and extenders.
+  guidance:
+  \- Access inside `extendConfig` or via `hre.config` for introspection.
+  \- Avoid mutating directly in runtime scripts.
+  example: |
+  import hre from "hardhat";
+
+  ```
+    console.log("Contract size limit:", hre.config.contractSizer?.runOnCompile);
+  ```
+
+  HardhatNetworkUserConfig:
+  summary: Per‑network settings such as `url`, `chainId`, and `accounts`.
+  guidance:
+  \- Set `gasPrice` to `"auto"` on EIP‑1559 chains; Hardhat will obtain the base fee.
+  \- Provide HD‑wallet mnemonic via `{ mnemonic: process.env.MNEMONIC! }` to auto‑generate accounts.
+  example: |
+  import { HardhatUserConfig } from "hardhat/config";
+
+  ```
+    const config: HardhatUserConfig = {
+      networks: {
+        localhost: { chainId: 31337 },
+        mainnet: {
+          url: process.env.MAINNET_RPC!,
+          accounts: [process.env.PRIVATE_KEY!],
+          gasMultiplier: 1.2,
+        },
+      },
+    };
+
+    export default config;
+  ```
+
+* name: Errors & Utilities
+  exports: \[HardhatPluginError]
+  symbols:
+  HardhatPluginError:
+  summary: Specialized `Error` class for third‑party plugins, producing Hardhat‑styled messages.
+  guidance:
+  \- Pass the plugin name so CLI output prefixes errors with `[pluginName]`.
+  \- Use `{ numberedError: true }` to map errors to documentation URLs.
+  example: |
+  import { HardhatPluginError } from "hardhat/plugins";
+
+  ```
+    throw new HardhatPluginError("my-plugin", "Unsupported Solidity version");
+  ```
+
+common\_workflows:
+
+* title: Compile & Deploy a Contract
+  steps:
+
+  * Run `npx hardhat compile` to build artifacts.
+  * Execute `npx hardhat run scripts/deploy.ts --network sepolia`.
+  * Verify deployment logs for the contract address.
+* title: Run Tests with a Mainnet Fork
+  steps:
+
+  * Add `networks.fork.url = process.env.MAINNET_RPC` to your config.
+  * Execute `npx hardhat test --network fork`.
+  * Use `evm_setNextBlockTimestamp` to time‑travel within tests.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "HH1: Hardhat is not installed locally"
+  cause: "Running `npx hardhat` without adding it to devDependencies"
+  fix: "Execute `npm install --save-dev hardhat` and retry."
+* symptom: "Transactions revert with gas estimation error"
+  cause: "Provider cannot estimate gas; call would revert or signer has insufficient balance"
+  fix: "Confirm contract constructor logic and ensure the signer’s balance covers deployment cost."
+
+faq:
+
+* q: "Why does Hardhat recompile my contracts every run?"
+  a: "Hardhat recompiles when any source or config file changes; use the `--incremental` flag or disable watch mode to control behaviour."
+
+external\_resources:
+
+* label: Hardhat Official Documentation
+  url: [https://hardhat.org/docs](https://hardhat.org/docs)
+* label: Hardhat Plugin Boilerplate
+  url: [https://github.com/NomicFoundation/hardhat-ts-plugin-boilerplate](https://github.com/NomicFoundation/hardhat-ts-plugin-boilerplate)
+

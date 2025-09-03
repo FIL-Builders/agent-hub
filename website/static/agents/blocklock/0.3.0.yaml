@@ -1,0 +1,246 @@
+meta:
+spec\_name: agenthub/blocklock-frontend-kit
+spec\_version: 0.3.0
+generated: '2025-08-12'
+library\_version: 0.0.0
+language: typescript
+homepage: [https://github.com/rk-rishikesh/blocklock-frontend-kit](https://github.com/rk-rishikesh/blocklock-frontend-kit)
+tags:
+\- nextjs
+\- react
+\- typescript
+\- wagmi
+\- ethers
+\- blocklock-js
+\- encryption
+purpose: Teach LLMs and engineers how to use the Blocklock timelock‑encryption demo app (Next.js App Router) with wallet connectivity (wagmi), client‑side encryption, and contract calls, including accurate component/constant contracts and best practices.
+guiding\_principles:
+\- Prefer client components only where required (wallet, encryption); keep heavy logic isolated to avoid unnecessary re‑renders.
+\- Use a single React QueryClient instance via useState to maintain cache identity across renders.
+\- Ensure chain ID, Blocklock contract address, and ABI match your target network before calling writeContract.
+\- Serialize BigInt values explicitly (BigInt.prototype.toJSON shim) when emitting JSON, logs, or query caches.
+\- Keep contracts and addresses centralized in lib/contract.ts to avoid drift between pages and hooks.
+\- Validate user inputs (plaintext/time) and handle errors surfaced by wagmi writeContract and transaction receipts.
+\- Pin dependency versions and test with the target wallet connectors to prevent connector drift.
+design\_notes: Pack derived from the project’s technical doc and code excerpts; HEAD commit af7de612 (2025‑07‑30). Primary sources: documentation.md (repo summary) and its embedded code blocks.&#x20;
+
+groups:
+
+* name: Providers & Setup
+  exports: \[ReactQueryProvider]
+  symbols:
+  ReactQueryProvider:
+  kind: component
+  summary: Bootstraps TanStack Query and installs a BigInt→JSON shim for client components.
+  definition:
+  lang: typescript
+  source: app/ReactQueryProvider.tsx
+  code: |
+  "use client"
+  import { QueryClientProvider, QueryClient } from "@tanstack/react-query"
+  import { useState } from "react"
+
+  ```
+      declare global {
+        interface BigInt { toJSON(): string }
+      }
+
+      const ReactQueryProvider = ({ children }: { children: React.ReactNode }) => {
+        const [queryClient] = useState(() => new QueryClient())
+        BigInt.prototype['toJSON'] = function () { return this.toString() }
+        return (<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>)
+      }
+      export default ReactQueryProvider
+  guidance:
+    - Create the QueryClient with useState to preserve identity across renders.
+    - Install the BigInt toJSON shim once in a client environment to ensure safe serialization; avoid redefining it in multiple components.
+    - Wrap app/providers.tsx (or root layout) with this provider to enable caching globally.
+  example:
+    lang: tsx
+    description: Register the provider once under app/layout.tsx.
+    code: |
+      // app/providers.tsx
+      import React from 'react'
+      import ReactQueryProvider from './ReactQueryProvider'
+      export default function Providers({children}:{children:React.ReactNode}){
+        return <ReactQueryProvider>{children}</ReactQueryProvider>
+      }
+  since: HEAD-af7de61 (2025-07-30)
+  ```
+
+* name: Blocklock Route UI
+  exports: \[BlockLockPage, Header]
+  symbols:
+  BlockLockPage:
+  kind: component
+  summary: Client page that encrypts input with blocklock-js and submits a timelock request via wagmi.
+  definition:
+  lang: typescript
+  source: app/blocklock/page.tsx (signature; body omitted)
+  code: |
+  // app/blocklock/page.tsx
+  export default function BlockLockPage(): JSX.Element;
+  guidance:
+  \- Gate actions on wallet connection and network; surface clear errors for unsupported chains.
+  \- Compute a future block height (e.g., current + N) for the decryption condition; keep N configurable.
+  \- Use encodeCondition and encodeCiphertextToSolidity from blocklock-js to build on‑chain‑ready bytes.
+  \- Avoid re‑created providers/signers on every render; derive them from wagmi’s wallet client when needed.
+  example:
+  lang: tsx
+  description: Minimal flow adapted from repo doc; adjust gas/chain for your network.
+  code: |
+  "use client";
+  import { useAccount, useWriteContract } from 'wagmi'
+  import { encodeCondition, encodeCiphertextToSolidity, Blocklock, SolidityEncoder } from 'blocklock-js'
+  import { ethers, getBytes, parseEther } from 'ethers'
+  import { CONTRACT\_ABI, CONTRACT\_ADDRESS } from '@/lib/contract'
+
+  ```
+      export default function BlockLockPage(){
+        const { isConnected } = useAccount()
+        const { writeContract } = useWriteContract()
+        async function onEncryptAndSend(){
+          if(!isConnected) return
+          const provider = new ethers.BrowserProvider((window as any).ethereum)
+          const signer = await provider.getSigner()
+          const blocklock = new Blocklock(signer, CONTRACT_ADDRESS, BigInt(84532))
+          const encoder = new SolidityEncoder()
+          const encoded = getBytes(encoder.encodeUint256(parseEther("4")))
+          const block = BigInt((await provider.getBlockNumber()) + 20)
+          const ct = blocklock.encrypt(encoded, block)
+          const cond = encodeCondition(block)
+          await writeContract({
+            address: CONTRACT_ADDRESS as `0x${string}`,
+            abi: CONTRACT_ABI as any,
+            functionName: 'createTimelockRequestWithDirectFunding',
+            args: [50_000n, cond, encodeCiphertextToSolidity(ct)]
+          })
+        }
+        return <button onClick={onEncryptAndSend}>Encrypt & Submit</button>
+      }
+  since: HEAD-af7de61 (2025-07-30)
+  ```
+
+  Header:
+  kind: component
+  summary: Fixed top header with logo linking to home; no props.
+  definition:
+  lang: typescript
+  source: app/blocklock/header.tsx (signature)
+  code: |
+  // app/blocklock/header.tsx
+  export default function Header(): JSX.Element;
+  guidance:
+  \- Keep it as a pure presentational component; avoid wallet or query state here.
+  \- Use next/link & next/image for automatic prefetching and image optimization.
+  example:
+  lang: tsx
+  code: |
+  import Header from '@/app/blocklock/header'
+  export default function Page(){
+  return (
+  <> <Header /> <main className="p-6">Hello Blocklock</main>
+  \</>
+  )
+  }
+  since: HEAD-af7de61 (2025-07-30)
+
+* name: Contract Constants
+  exports: \[CONTRACT\_ABI, CONTRACT\_ADDRESS]
+  symbols:
+  CONTRACT\_ABI:
+  kind: constant
+  summary: ABI for the timelock‑request contract used by the /blocklock flow.
+  definition:
+  lang: typescript
+  source: lib/contract.ts (shape omitted in docs)
+  code: |
+  // lib/contract.ts
+  export const CONTRACT\_ABI: readonly unknown\[];
+  guidance:
+  \- Keep ABI in a single source of truth; re‑export to hooks/pages to prevent drift.
+  \- If using wagmi v2, prefer viem‑typed ABIs (type Abi) for compile‑time checks.
+  example:
+  lang: ts
+  code: |
+  import { useReadContract } from 'wagmi'
+  import { CONTRACT\_ABI, CONTRACT\_ADDRESS } from '@/lib/contract'
+  export function useRequests(){
+  return useReadContract({
+  address: CONTRACT\_ADDRESS as `0x${string}`,
+  abi: CONTRACT\_ABI as any,
+  functionName: 'requests'
+  })
+  }
+  since: HEAD-af7de61 (2025-07-30)
+
+  CONTRACT\_ADDRESS:
+  kind: constant
+  summary: Deployed contract address for creating timelock requests.
+  definition:
+  lang: typescript
+  source: lib/contract.ts
+  code: |
+  // lib/contract.ts
+  export const CONTRACT\_ADDRESS: string;
+  guidance:
+  \- Parameterize by environment if you target multiple chains; avoid hard‑coding in pages.
+  \- Validate chain ID at runtime and block interactions on mismatch to reduce user failures.
+  example:
+  lang: ts
+  code: |
+  import { CONTRACT\_ADDRESS } from '@/lib/contract'
+  console.log('Using contract at', CONTRACT\_ADDRESS)
+  since: HEAD-af7de61 (2025-07-30)
+
+common\_workflows:
+
+* title: Encrypt a value and submit a timelock request
+  steps:
+
+  * Connect a wallet on the target chain (e.g., Base Sepolia, chainId 84532).
+  * Instantiate Blocklock with signer, contract address, and chain ID.
+  * Encode your payload with SolidityEncoder and get bytes.
+  * Choose a future block height; build condition bytes via encodeCondition.
+  * Encrypt with blocklock.encrypt(message, blockHeight).
+  * Call writeContract(functionName='createTimelockRequestWithDirectFunding', args=\[callbackGasLimit, conditionBytes, encodeCiphertextToSolidity(ciphertext)]).
+  * Wait for the receipt and render feedback to the user.
+* title: Add React Query globally
+  steps:
+
+  * Place ReactQueryProvider under app/providers.tsx.
+  * Wrap children with <ReactQueryProvider>.
+  * Use hooks that rely on QueryClient without re‑creating clients per render.
+* title: Switch contract/network
+  steps:
+
+  * Update CONTRACT\_ADDRESS and CONTRACT\_ABI in lib/contract.ts.
+  * Change the chain ID passed to new Blocklock(signer, address, chainId).
+  * Gate the UI on useAccount() and network checks; prompt for network switch if mismatched.
+
+troubleshooting\_cheatsheet:
+
+* symptom: JSON serialization fails with BigInt values.
+  cause: BigInt is not serializable by default in JSON.stringify.
+  fix: Install a toJSON shim for BigInt (see ReactQueryProvider) or manually convert to string before serialization.
+* symptom: writeContract throws due to wrong network or address.
+  cause: Chain ID or CONTRACT\_ADDRESS does not match the connected network.
+  fix: Check active chain and validate constants; block the action until networks match.
+* symptom: Ciphertext rejected on‑chain.
+  cause: Condition bytes or ciphertext encoding is not produced by encodeCondition/encodeCiphertextToSolidity.
+  fix: Use the helpers from blocklock-js and pass the exact byte arrays returned by the SDK.
+
+faq:
+
+* q: Which network does the sample target?
+  a: The docs show Base Sepolia (chainId 84532) and a demo address in examples. Replace with your deployment details.
+* q: Where do I set WalletConnect configuration?
+  a: Copy .env.sample to .env.local and set NEXT\_PUBLIC\_WALLET\_CONNECT\_PROJECT\_ID.
+* q: Where should I store contract address/ABI?
+  a: Keep them in lib/contract.ts and import from there across pages and hooks.
+
+external\_resources:
+
+* label: Repository — blocklock-frontend-kit
+  url: [https://github.com/rk-rishikesh/blocklock-frontend-kit](https://github.com/rk-rishikesh/blocklock-frontend-kit)
+

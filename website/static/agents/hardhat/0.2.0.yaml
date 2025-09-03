@@ -1,0 +1,307 @@
+meta:
+spec\_name: hardhat
+spec\_version: "0.2.0"
+generated: "2025-07-30"
+library\_version: "^2.22.0"
+language: javascript
+homepage: [https://hardhat.org/](https://hardhat.org/)
+tags:
+\- ethereum
+\- smart-contracts
+\- development
+\- cli
+\- javascript
+purpose: >
+This pack teaches LLMs how to use Hardhat—a flexible Ethereum development
+environment, task runner, and runtime—so they can compile, test, deploy,
+and interact with Solidity contracts at a senior‑developer level.
+guiding\_principles:
+\- Prefer built‑in tasks before reaching for plugins.
+\- Keep secrets (RPC URLs, keys) in env vars, not source code.
+\- Treat the Hardhat Runtime Environment (`hre`) as the primary API surface.
+\- Always “compile → test → deploy” in that order for deterministic builds.
+\- Clean caches when switching compiler versions or git branches.
+design\_notes: >
+Symbols were selected from Hardhat’s official CLI and programmatic APIs
+(README, TypeDoc, and guide) and grouped by developer workflow: CLI tasks,
+runtime helpers, and configuration keys.  Examples are runnable with
+`node` or `npx hardhat` and avoid plugin‑specific features to stay core.
+
+groups:
+
+* name: CLI Tasks
+  exports:
+
+  * compile
+  * test
+  * run
+  * clean
+  * node
+  * console
+    symbols:
+    compile:
+    kind: function
+    summary: Compiles all Solidity contracts in the project.
+    guidance:
+
+    * Run before deploying or testing to ensure bytecode is up to date.
+    * Use the `--force` flag to recompile even unchanged sources.
+      example:
+      code: |
+      import { run } from "hardhat";
+
+      async function main() {
+      await run("compile");       // same as `npx hardhat compile`
+      }
+
+      main().catch(console.error);
+      lang: javascript
+      since: "2.0.0"
+      test:
+      kind: function
+      summary: Executes Mocha/Chai test suites under the `test/` folder.
+      guidance:
+    * Filter suites with `--grep` and speed them up with `--parallel`.
+    * `hre` is auto‑injected into tests imported with `require("hardhat")`.
+      example:
+      code: |
+      import { run } from "hardhat";
+
+      await run("test", { testFiles: \["test/MyToken.js"] });
+      lang: javascript
+      since: "2.0.0"
+      run:
+      kind: function
+      summary: Runs a script within the Hardhat Runtime Environment.
+      guidance:
+    * Pass the path to the script (e.g. `scripts/deploy.ts`).
+    * Combine with `--network <name>` to target remote chains.
+      example:
+      code: |
+      // CLI
+      // npx hardhat run scripts/deploy.ts --network goerli
+      // Programmatic
+      import { run } from "hardhat";
+      await run("run", { script: "scripts/deploy.ts", network: "goerli" });
+      lang: javascript
+      since: "2.0.0"
+      clean:
+      kind: function
+      summary: Removes `artifacts/` and `cache/` build folders.
+      guidance:
+    * Clean when upgrading Solidity or plugin versions to avoid conflicts.
+    * Supports a `--global` flag to wipe Hardhat’s global cache.
+      example:
+      code: |
+      import { run } from "hardhat";
+      await run("clean");
+      lang: javascript
+      since: "2.0.0"
+      node:
+      kind: function
+      summary: Launches an in‑process JSON‑RPC node with forking & mining.
+      guidance:
+    * Ideal for local integration tests requiring mainnet state.
+    * Use `--fork <rpcUrl>` to pin to an archive node.
+      example:
+      code: |
+      // CLI
+      // npx hardhat node --fork [https://mainnet.infura.io/v3/\$INFURA\_KEY](https://mainnet.infura.io/v3/$INFURA_KEY)
+      lang: bash
+      since: "2.0.0"
+      console:
+      kind: function
+      summary: Opens an interactive REPL preloaded with the HRE.
+      guidance:
+    * Useful for ad‑hoc chain queries and contract interaction.
+    * Accepts `--network` to connect to live or forked networks.
+      example:
+      code: |
+
+      # Start a Hardhat console on Sepolia
+
+      npx hardhat console --network sepolia
+      lang: bash
+      since: "2.0.0"
+
+* name: Runtime Helpers
+  exports:
+
+  * ethers
+  * network
+  * artifacts
+  * config
+    symbols:
+    ethers:
+    kind: object
+    summary: Ethers.js v6 adapter providing providers, signers, and factories.
+    guidance:
+
+    * Deploy via `ethers.getContractFactory("Name").deploy(args)`.
+    * Use `ethers.provider` for raw JSON‑RPC calls and event filters.
+      example:
+      code: |
+      import { ethers } from "hardhat";
+
+      const \[deployer] = await ethers.getSigners();
+      const Greeter = await ethers.getContractFactory("Greeter");
+      const greeter = await Greeter.deploy("Hello");
+      await greeter.waitForDeployment();
+      console.log(await greeter.greet());
+      lang: javascript
+      since: "2.0.0"
+      network:
+      kind: object
+      summary: Info and helpers for the currently selected network.
+      guidance:
+    * Inspect `network.name`, `chainId`, and `config` at runtime.
+    * Switch networks from the CLI with `--network <name>`.
+      example:
+      code: |
+      import { network } from "hardhat";
+      console.log(`Running on ${network.name} (chainId = ${network.config.chainId})`);
+      lang: javascript
+      since: "2.0.0"
+      artifacts:
+      kind: object
+      summary: Utility for reading and saving contract build artifacts.
+      guidance:
+    * Use `readArtifact("Greeter")` to obtain ABI/bytecode in scripts.
+    * Combine with `ethers.getContractFactory` to attach contracts.
+      example:
+      code: |
+      import { artifacts } from "hardhat";
+      const { abi } = await artifacts.readArtifact("Greeter");
+      console.log(abi.length);
+      lang: javascript
+      since: "2.0.0"
+      config:
+      kind: object
+      summary: Fully‑resolved HardhatConfig for the current project.
+      guidance:
+    * Treat as read‑only; mutate only during config loading.
+    * Log values (e.g. compiler version) for debugging CI environments.
+      example:
+      code: |
+      import { config } from "hardhat";
+      console.log(`Solidity compiler: ${config.solidity.compilers[0].version}`);
+      lang: javascript
+      since: "2.0.0"
+
+* name: Config Keys
+  exports:
+
+  * defaultNetwork
+  * networks
+  * solidity
+  * paths
+    symbols:
+    defaultNetwork:
+    kind: constant
+    summary: Name of the network Hardhat uses when none is specified.
+    guidance:
+
+    * Keep `"hardhat"` for local tests; override in staging/CI.
+    * Also configurable via `HARDHAT_NETWORK` env variable.
+      example:
+      code: |
+      export default {
+      defaultNetwork: "sepolia",
+      networks: {
+      sepolia: { url: process.env.SEPOLIA\_URL, accounts: \[process.env.PK] }
+      }
+      };
+      lang: javascript
+      networks:
+      kind: constant
+      summary: Map of named network configurations.
+      guidance:
+    * Each network needs at least `url`; add `accounts` for private keys.
+    * Use `forking.url` inside the `hardhat` network for mainnet forking.
+      example:
+      code: |
+      export default {
+      networks: {
+      mainnet: { url: process.env.MAINNET\_URL, accounts: \[process.env.PK] },
+      hardhat: { forking: { url: process.env.MAINNET\_URL } }
+      }
+      };
+      lang: javascript
+      solidity:
+      kind: constant
+      summary: Solidity compiler settings block or version string.
+      guidance:
+    * Use `compilers` array to support multiple versions.
+    * Enable the optimizer for production deployments.
+      example:
+      code: |
+      export default {
+      solidity: {
+      version: "0.8.25",
+      settings: { optimizer: { enabled: true, runs: 200 } }
+      }
+      };
+      lang: javascript
+      paths:
+      kind: constant
+      summary: Allows overriding default folder locations.
+      guidance:
+    * Common overrides: `sources`, `tests`, `artifacts`, `cache`.
+    * Keep paths relative to the project root for portability.
+      example:
+      code: |
+      export default {
+      paths: { sources: "./contracts", tests: "./spec" }
+      };
+      lang: javascript
+
+common\_workflows:
+
+* title: Deploy a contract to a testnet
+  steps:
+
+  * Ensure `PRIVATE_KEY` and `GOERLI_URL` env vars are set.
+  * Add a `goerli` entry under `networks` in `hardhat.config.js`.
+  * Write `scripts/deploy.ts` using `hre.ethers`.
+  * Run `npx hardhat run scripts/deploy.ts --network goerli`.
+* title: Fork mainnet and run tests
+  steps:
+
+  * Start a node: `npx hardhat node --fork $MAINNET_URL`.
+  * In another terminal run `npx hardhat test --network localhost`.
+  * Use `hre.ethers.provider.getBalance` to inspect state.
+* title: Verify a contract on Etherscan
+  steps:
+
+  * Install `@nomicfoundation/hardhat-verify`.
+  * Add `etherscan.apiKey` to `hardhat.config.js`.
+  * After deployment, execute `npx hardhat verify --network mainnet <address> <constructor args>`.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "HH8: Cannot infer 'from' address"
+  cause: No accounts configured for the selected network.
+  fix: Add `accounts: [PRIVATE_KEY]` to that network in `hardhat.config.js`.
+* symptom: "stack too deep" Solidity error
+  cause: Function exceeds 16 local stack variables.
+  fix: Break logic into smaller functions or pack variables into a struct.
+* symptom: Node runs out of memory during compilation
+  cause: Large contracts with optimizer enabled.
+  fix: Set `NODE_OPTIONS=--max_old_space_size=4096` or disable optimizer.
+
+faq:
+
+* q: How do I migrate a Truffle project?
+  a: Run `npx hardhat init --template @nomicfoundation/hardhat-truffle5`, copy contracts/tests, and update scripts—Hardhat understands Truffle artifacts.
+* q: Why are gas estimates higher on localhost?
+  a: The Hardhat network’s base fee defaults to zero; for realistic numbers fork a live chain or set `initialBaseFeePerGas` in the network config.
+
+external\_resources:
+
+* label: Official Documentation
+  url: [https://hardhat.org/getting-started/](https://hardhat.org/getting-started/)
+* label: Plugin Directory
+  url: [https://hardhat.org/plugins/](https://hardhat.org/plugins/)
+* label: Hardhat Discord
+  url: [https://discord.gg/n8v7F36](https://discord.gg/n8v7F36)
+

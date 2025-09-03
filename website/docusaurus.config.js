@@ -12,7 +12,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 const config = {
   title: 'Agent Hub',
   tagline: 'LLMs are cool, smart LLMs are even cooler!',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/favicon-agent-hub.png',
 
   future: {
     v4: true,
@@ -87,7 +87,7 @@ const config = {
         },
         { to: '/blog', label: 'Blog', position: 'left' },
         {
-          href: 'https://github.com/facebook/docusaurus',
+          href: 'https://github.com/FIL-Builders/agent-hub',
           label: 'GitHub',
           position: 'right',
         },
@@ -131,7 +131,7 @@ const config = {
             },
             {
               label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
+              href: 'https://github.com/FIL-Builders/agent-hub',
             },
           ],
         },
