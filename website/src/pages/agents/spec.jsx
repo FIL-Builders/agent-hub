@@ -148,13 +148,66 @@ export default function AgentSpecPage() {
 }
 
 function ActionSheet({ open, onClose, project, file }) {
+  const sheetRef = React.useRef(null);
+  const startYRef = React.useRef(0);
+  const currentYRef = React.useRef(0);
+  const draggingRef = React.useRef(false);
+  const [dragY, setDragY] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const onTouchStart = (e) => {
+      if (!sheetRef.current) return;
+      draggingRef.current = true;
+      startYRef.current = e.touches[0].clientY;
+      currentYRef.current = startYRef.current;
+      setDragY(0);
+    };
+    const onTouchMove = (e) => {
+      if (!draggingRef.current) return;
+      currentYRef.current = e.touches[0].clientY;
+      const dy = Math.max(0, currentYRef.current - startYRef.current);
+      setDragY(dy);
+    };
+    const onTouchEnd = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      if (dragY > 80) {
+        onClose();
+      } else {
+        setDragY(0);
+      }
+    };
+    const el = sheetRef.current;
+    el.addEventListener('touchstart', onTouchStart, { passive: true });
+    el.addEventListener('touchmove', onTouchMove, { passive: true });
+    el.addEventListener('touchend', onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [open, dragY, onClose]);
+
   if (!open) return null;
   const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${file}`;
   const promptText = `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`;
   const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
+
+  const sheetStyle = dragY
+    ? { transform: `translateY(${dragY}px)` }
+    : undefined;
+
   return (
     <div className="action-sheet-overlay" onClick={onClose}>
-      <div className="action-sheet" role="dialog" aria-label="Available Actions" onClick={(e) => e.stopPropagation()}>
+      <div
+        ref={sheetRef}
+        className="action-sheet"
+        style={sheetStyle}
+        role="dialog"
+        aria-label="Available Actions"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="action-sheet-header">Available Actions</div>
         <a className="action-sheet-item" href={rawUrl} download onClick={onClose}>⬇️ Download</a>
         <a className="action-sheet-item" href={viewUrl} onClick={onClose}>🔍 View Spec</a>
