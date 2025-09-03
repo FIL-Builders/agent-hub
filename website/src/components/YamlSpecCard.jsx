@@ -13,7 +13,7 @@ import React, { useRef, useState, useEffect } from 'react';
  * <YamlSpecCard spec={require('!!raw-loader!./my-spec.yaml').default} downloadUrl={'/agents/my-spec.yaml'} />
  * ```
  */
-const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = false }) => {
+const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = false, disableMobileActions = false }) => {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -129,6 +129,7 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = 
           )}
           <button className="yaml-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
         </div>
+        {!disableMobileActions && (
         <div className="yaml-actions-mobile" ref={menuRef}>
           <button className="yaml-action-btn" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} title="Actions">⋯</button>
           {menuOpen && (
@@ -141,6 +142,7 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = 
             </div>
           )}
         </div>
+        )}
       </div>
       <div className="yaml-spec-controls" />
       <pre className="yaml-spec-content">

@@ -23,11 +23,14 @@ export default function AgentSpecPage() {
   const [status, setStatus] = React.useState('loading'); // loading | ready | error
   const [error, setError] = React.useState('');
 
+  const [sheetOpen, setSheetOpen] = React.useState(false);
+
   React.useEffect(() => {
     let cancelled = false;
     setStatus('loading');
     setError('');
     setSpecRaw('');
+    setSheetOpen(false);
     try {
       if (!project || !file) throw new Error('Missing project or file parameter');
       const path = `./${project}/${file}`;
@@ -79,8 +82,9 @@ export default function AgentSpecPage() {
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
       <main className="container spec-page" style={{ padding: '3rem 2rem' }}>
-        <div style={{ marginBottom: '1rem' }}>
-          <a href="/agents/" className="spec-breadcrumb">← All Agent Specs</a>
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Specs</a>
+          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
         {status === 'loading' && (
           <div className="ai-card" aria-busy="true">
@@ -99,6 +103,12 @@ export default function AgentSpecPage() {
         {status === 'ready' ? (
           <>
             <h1 className="spec-page-title">{project} / {file}</h1>
+            {/* Mobile actions button under title */}
+            <div className="mobile-actions-container">
+              <button className="mobile-actions-btn" onClick={() => setSheetOpen(true)}>
+                Actions ▼
+              </button>
+            </div>
             {purpose && (
               <div className="spec-subtitle-card">
                 {purpose}
@@ -109,6 +119,14 @@ export default function AgentSpecPage() {
               downloadUrl={`agents/${project}/${file}`}
               initialVisible={true}
               hideHeader={true}
+              disableMobileActions={true}
+            />
+            {/* Action sheet for mobile */}
+            <ActionSheet
+              open={sheetOpen}
+              onClose={() => setSheetOpen(false)}
+              project={project}
+              file={file}
             />
           </>
         ) : null}
@@ -126,5 +144,25 @@ export default function AgentSpecPage() {
         )}
       </main>
     </Layout>
+  );
+}
+
+function ActionSheet({ open, onClose, project, file }) {
+  if (!open) return null;
+  const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${file}`;
+  const promptText = `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`;
+  const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
+  return (
+    <div className="action-sheet-overlay" onClick={onClose}>
+      <div className="action-sheet" role="dialog" aria-label="Available Actions" onClick={(e) => e.stopPropagation()}>
+        <div className="action-sheet-header">Available Actions</div>
+        <a className="action-sheet-item" href={rawUrl} download onClick={onClose}>⬇️ Download</a>
+        <a className="action-sheet-item" href={viewUrl} onClick={onClose}>🔍 View Spec</a>
+        <a className="action-sheet-item" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={onClose}>🤖 Open in ChatGPT</a>
+        <a className="action-sheet-item" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={onClose}>✨ Open in Claude</a>
+        <button className="action-sheet-item" onClick={() => { navigator.clipboard.writeText(rawUrl).finally(onClose); }}>📋 Copy</button>
+        <button className="action-sheet-cancel" onClick={onClose}>Cancel</button>
+      </div>
+    </div>
   );
 }
