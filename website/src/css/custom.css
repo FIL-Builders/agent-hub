@@ -71,11 +71,31 @@
   gap: 1rem;
 }
 
+/* Agents index grid: enforce four columns per row */
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
 /* YAML specification card styles */
 .yaml-spec-card {
   /* Inherit base ai-card styles for border, padding and background */
   position: relative;
   margin-top: 1rem;
+}
+.yaml-spec-header {
+  margin-bottom: 0.5rem;
+}
+.yaml-spec-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: var(--ifm-color-primary);
+}
+.yaml-spec-purpose {
+  margin: 0;
+  color: var(--ifm-color-content-secondary, #334155);
+  font-size: 0.9rem;
 }
 .yaml-spec-controls {
   display: flex;

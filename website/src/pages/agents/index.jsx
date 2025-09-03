@@ -96,13 +96,15 @@ export default function AgentsIndex() {
                   </button>
                 )}
               </div>
-              {displaySpecs.map((spec) => (
-                <YamlSpecCard
-                  key={spec.path}
-                  spec={spec.raw}
-                  downloadUrl={spec.path}
-                />
-              ))}
+              <div className="agents-grid">
+                {displaySpecs.map((spec) => (
+                  <YamlSpecCard
+                    key={spec.path}
+                    spec={spec.raw}
+                    downloadUrl={spec.path}
+                  />
+                ))}
+              </div>
             </section>
           );
         })}

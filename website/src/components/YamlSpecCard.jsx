@@ -52,11 +52,74 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
     ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}`
     : '';
   const promptText = rawUrl
-    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.\n\nTASK:\n\n`
+    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
     : '';
+
+  // Extract simple metadata from the YAML (meta.spec_name or meta.library_name, and meta.purpose)
+  const parseMeta = (yaml) => {
+    try {
+      const lines = (yaml || '').split('\n');
+      const idx = lines.findIndex((l) => /^\s*meta:\s*$/.test(l));
+      if (idx === -1) return {};
+      const metaIndent = (lines[idx].match(/^\s*/)?.[0] || '').length;
+      const meta = [];
+      for (let i = idx + 1; i < lines.length; i++) {
+        const line = lines[i];
+        const indent = (line.match(/^\s*/)?.[0] || '').length;
+        if (line.trim() === '') { meta.push(line); continue; }
+        if (indent <= metaIndent) break;
+        meta.push(line);
+      }
+      const scalar = (key) => {
+        const re = new RegExp('^\\s*' + key + '\\s*:\\s*(.*)$');
+        for (const l of meta) {
+          const m = l.match(re);
+          if (m) {
+            let v = (m[1] || '').trim();
+            if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
+            if (v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
+            return v;
+          }
+        }
+        return '';
+      };
+      // purpose: may be inline, '|' block, or '>' folded
+      let purpose = '';
+      for (let i = 0; i < meta.length; i++) {
+        const l = meta[i];
+        const m = l.match(/^\s*purpose\s*:\s*(.*)$/);
+        if (!m) continue;
+        const after = (m[1] || '').trim();
+        const baseIndent = (l.match(/^\s*/)?.[0] || '').length;
+        if (after && after !== '|' && after !== '>') {
+          purpose = after;
+        } else {
+          const block = [];
+          for (let j = i + 1; j < meta.length; j++) {
+            const ln = meta[j];
+            const ind = (ln.match(/^\s*/)?.[0] || '').length;
+            if (ind <= baseIndent) break;
+            // strip common indent (assume +2 under key)
+            block.push(ln.slice(baseIndent + 2));
+          }
+          purpose = (after === '|' ? block.join('\n') : block.join(' ')).trim();
+        }
+        break;
+      }
+      const specName = scalar('spec_name') || scalar('library_name');
+      return { specName, purpose };
+    } catch {
+      return {};
+    }
+  };
+  const { specName, purpose } = parseMeta(spec);
 
   return (
     <div className="yaml-spec-card ai-card">
+      <div className="yaml-spec-header">
+        <h3 className="yaml-spec-title">{specName || repoPath || 'Spec'}</h3>
+        {purpose && <p className="yaml-spec-purpose">{purpose}</p>}
+      </div>
       <div className="yaml-spec-controls" ref={menuRef}>
         <button
           className="yaml-spec-toggle"
