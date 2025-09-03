@@ -32,6 +32,24 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
   // Split the YAML into lines for line numbering.  Use empty array when hidden to avoid unnecessary work.
   const lines = visible ? spec.trimEnd().split('\n') : [];
 
+  // Build absolute URL for the YAML spec so external tools can fetch it.
+  const getAbsoluteUrl = (path) => {
+    if (!path) return '';
+    try {
+      if (typeof window !== 'undefined') {
+        return new URL(path, window.location.origin).toString();
+      }
+      return path; // SSR fallback; will be resolved client-side
+    } catch (e) {
+      return path;
+    }
+  };
+
+  const specUrl = getAbsoluteUrl(downloadUrl);
+  const promptText = specUrl
+    ? `Fetch this YAML agent spec: ${specUrl}\nUse your browsing/tool agent to download it, then parse and process it. Confirm once loaded.`
+    : '';
+
   return (
     <div className="yaml-spec-card ai-card">
       <div className="yaml-spec-controls">
@@ -46,6 +64,30 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
           <a className="yaml-spec-download" href={downloadUrl} download>
             Download
           </a>
+        )}
+        {downloadUrl && (
+          <>
+            <a
+              className="yaml-spec-chatgpt"
+              href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open prompt in ChatGPT"
+              title="Open in ChatGPT"
+            >
+              ChatGPT
+            </a>
+            <a
+              className="yaml-spec-claude"
+              href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Open prompt in Claude"
+              title="Open in Claude"
+            >
+              Claude
+            </a>
+          </>
         )}
         <button
           className="yaml-spec-copy"

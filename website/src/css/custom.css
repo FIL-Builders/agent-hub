@@ -84,7 +84,9 @@
   margin-bottom: 0.5rem;
 }
 .yaml-spec-toggle,
-.yaml-spec-download {
+.yaml-spec-download,
+.yaml-spec-chatgpt,
+.yaml-spec-claude {
   font-size: 0.875rem;
   padding: 0.375rem 0.75rem;
   border-radius: 0.375rem;
@@ -96,11 +98,15 @@
   text-decoration: none;
 }
 .yaml-spec-toggle:hover,
-.yaml-spec-download:hover {
+.yaml-spec-download:hover,
+.yaml-spec-chatgpt:hover,
+.yaml-spec-claude:hover {
   background-color: var(--ifm-color-emphasis-100, #f3f4f6);
 }
 .yaml-spec-toggle:focus,
-.yaml-spec-download:focus {
+.yaml-spec-download:focus,
+.yaml-spec-chatgpt:focus,
+.yaml-spec-claude:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
 }
