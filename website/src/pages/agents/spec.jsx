@@ -33,15 +33,13 @@ export default function AgentSpecPage() {
 
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
-      <main className="container" style={{ padding: '2rem 0' }}>
+      <main className="container spec-page" style={{ padding: '3rem 2rem' }}>
         <div style={{ marginBottom: '1rem' }}>
-          <a href="/agents/" className="yaml-spec-toggle">← All Agent Specs</a>
+          <a href="/agents/" className="spec-breadcrumb">← All Agent Specs</a>
         </div>
         {!error ? (
           <>
-            <h1 style={{ color: 'var(--ifm-color-primary)', marginBottom: '1rem' }}>
-              {project} / {file}
-            </h1>
+            <h1 className="spec-page-title">{project} / {file}</h1>
             <YamlSpecCard
               spec={specRaw}
               downloadUrl={`agents/${project}/${file}`}
@@ -64,4 +62,3 @@ export default function AgentSpecPage() {
     </Layout>
   );
 }
-

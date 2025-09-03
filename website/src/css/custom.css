@@ -95,23 +95,25 @@
 }
 .yaml-spec-header {
   margin-bottom: 0.5rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
 }
 .yaml-spec-title {
-  margin: 0 0 0.25rem 0;
-  font-size: 1rem;
-  color: var(--ifm-color-primary);
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: #00BFFF; /* accent */
+  border-bottom: 2px solid rgba(0,191,255,0.25);
+  display: inline-block;
 }
 .yaml-spec-purpose {
   margin: 0;
   color: var(--ifm-color-content-secondary, #334155);
   font-size: 0.9rem;
 }
+.yaml-spec-headings { max-width: 75%; }
 .yaml-spec-controls {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  position: relative;
+  min-height: 0.5rem; /* spacer to preserve layout after moving actions */
 }
 .yaml-spec-toggle,
 .yaml-spec-download,
@@ -190,6 +192,88 @@
   background-color: var(--ifm-color-emphasis-100, #f3f4f6);
   outline: none;
 }
+
+/* Ghost icon buttons (actions) */
+.yaml-actions { display: none; gap: 0.5rem; }
+.yaml-action-btn {
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  background: transparent;
+  color: #00BFFF;
+  border-radius: 0.5rem;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.yaml-action-btn:hover { background-color: rgba(0,191,255,0.08); }
+.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(0,191,255,0.35); }
+
+/* Show icon bar on >= 640px; mobile shows kebab */
+@media (min-width: 640px) {
+  .yaml-actions { display: inline-flex; }
+  .yaml-actions-mobile { display: none; }
+}
+@media (max-width: 639.98px) {
+  .yaml-actions { display: none; }
+  .yaml-actions-mobile { position: relative; }
+}
+
+/* YAML content visual polish */
+.yaml-spec-content {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 15.5px;
+  line-height: 1.75;
+  color: var(--ifm-color-content);
+  background-color: #f8f8f8;
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.75rem;
+  white-space: pre;
+  overflow-x: auto;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+[data-theme='dark'] .yaml-spec-content {
+  background-color: #1e1e1e; /* lighter dark */
+}
+
+.yaml-spec-line { display: flex; align-items: flex-start; }
+.yaml-line-number {
+  position: sticky; left: 0; z-index: 1;
+  width: 3rem; text-align: right; margin-right: 0.5rem;
+  color: var(--ifm-color-muted, #94a3b8);
+  user-select: none; cursor: pointer;
+  background: inherit; /* for sticky overlap */
+}
+.yaml-line-number:hover { color: #00BFFF; }
+.yaml-line-number:hover::after { content: ' ⎘'; color: #00BFFF; }
+.yaml-line-content { flex: 1; white-space: pre; }
+
+/* Simple token colors */
+.yaml-key { color: #1d4ed8; /* blue */ font-weight: 500; }
+.yaml-string { color: #15803d; /* green */ }
+.yaml-comment { color: #6b7280; /* gray */ }
+.yaml-colon, .yaml-value, .yaml-plain { color: inherit; }
+
+/* Section divider */
+.yaml-section-divider {
+  height: 1px;
+  background: currentColor;
+  opacity: 0.1;
+  margin: 0.5rem 0;
+}
+
+/* Spec page typography */
+.spec-page-title {
+  color: var(--ifm-color-primary);
+  font-weight: 700;
+  font-size: 22px;
+  margin-bottom: 1rem;
+}
+.spec-breadcrumb {
+  color: var(--ifm-color-content-secondary, #6b7280);
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.spec-breadcrumb:hover { text-decoration: underline; }
 
 .yaml-spec-line {
   display: flex;
