@@ -31,6 +31,36 @@ export default function AgentSpecPage() {
     error = e?.message || String(e);
   }
 
+  // Lightweight purpose extraction for subtitle
+  const purpose = React.useMemo(() => {
+    try {
+      const lines = (specRaw || '').split('\n');
+      const iMeta = lines.findIndex((l) => /^\s*meta:\s*$/.test(l));
+      if (iMeta === -1) return '';
+      const metaIndent = (lines[iMeta].match(/^\s*/)?.[0] || '').length;
+      for (let i = iMeta + 1; i < lines.length; i++) {
+        const l = lines[i];
+        const ind = (l.match(/^\s*/)?.[0] || '').length;
+        if (ind <= metaIndent) break;
+        const m = l.match(/^\s*purpose\s*:\s*(.*)$/);
+        if (m) {
+          const after = (m[1] || '').trim();
+          if (after && after !== '|' && after !== '>') return after;
+          const baseIndent = ind;
+          const block = [];
+          for (let j = i + 1; j < lines.length; j++) {
+            const ln = lines[j];
+            const inj = (ln.match(/^\s*/)?.[0] || '').length;
+            if (inj <= baseIndent) break;
+            block.push(ln.slice(baseIndent + 2));
+          }
+          return block.join(after === '|' ? '\n' : ' ').trim();
+        }
+      }
+      return '';
+    } catch { return ''; }
+  }, [specRaw]);
+
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
       <main className="container spec-page" style={{ padding: '3rem 2rem' }}>
@@ -40,10 +70,16 @@ export default function AgentSpecPage() {
         {!error ? (
           <>
             <h1 className="spec-page-title">{project} / {file}</h1>
+            {purpose && (
+              <div className="spec-subtitle-card">
+                {purpose}
+              </div>
+            )}
             <YamlSpecCard
               spec={specRaw}
               downloadUrl={`agents/${project}/${file}`}
               initialVisible={true}
+              hideHeader={true}
             />
           </>
         ) : (

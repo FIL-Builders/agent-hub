@@ -132,7 +132,10 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
     const keyMatch = before.match(/^(\s*)([^:#]+):(\s*)(.*)$/);
     if (keyMatch) {
       const [, indent, key, spaceAfter, rest] = keyMatch;
-      const isString = /^(".*"|'.*'|\|\s*$|>\s*$)/.test(rest.trim());
+      const trimmed = (rest || '').trim();
+      const isString = /^(".*"|'.*'|\|\s*$|>\s*$)/.test(trimmed);
+      const isNumber = /^-?\d+(?:\.\d+)?$/.test(trimmed);
+      const isBoolean = /^(true|false)$/i.test(trimmed);
       return (
         <>
           <span className="yaml-indent">{indent}</span>
@@ -140,7 +143,7 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
           <span className="yaml-colon">:</span>
           <span className="yaml-space">{spaceAfter}</span>
           {rest && (
-            <span className={isString ? 'yaml-string' : 'yaml-value'}>{rest}</span>
+            <span className={isString ? 'yaml-string' : isNumber ? 'yaml-number' : isBoolean ? 'yaml-boolean' : 'yaml-value'}>{rest}</span>
           )}
           {comment && <span className="yaml-comment">{comment}</span>}
         </>
@@ -162,46 +165,47 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
 
   return (
     <div className="yaml-spec-card ai-card">
-      <div className="yaml-spec-header">
-        <div className="yaml-spec-headings">
-          <h3 className="yaml-spec-title">{specName || repoPath || 'Spec'}</h3>
-          {purpose && <p className="yaml-spec-purpose">{purpose}</p>}
-        </div>
-        <div className="yaml-actions">
-          {rawUrl && (
-            <a className="yaml-action-btn" href={rawUrl} download title="Download">
-              ⬇️
-            </a>
-          )}
-          {repoPath && (() => {
-            const m = repoPath.replace(/^agents\//, '').split('/');
-            const project = m[0];
-            const file = m.slice(1).join('/');
-            const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
-            return (
-              <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍</a>
-            );
-          })()}
-          {promptText && (
-            <a
+      {!hideHeader && (
+        <div className="yaml-spec-header">
+          <div className="yaml-spec-headings">
+            <h3 className="yaml-spec-title">{specName || repoPath || 'Spec'}</h3>
+            {purpose && <p className="yaml-spec-purpose">{purpose}</p>}
+          </div>
+          <div className="yaml-actions">
+            {rawUrl && (
+              <a className="yaml-action-btn" href={rawUrl} download title="Download">
+                ⬇️ Download
+              </a>
+            )}
+            {repoPath && (() => {
+              const m = repoPath.replace(/^agents\//, '').split('/');
+              const project = m[0];
+              const file = m.slice(1).join('/');
+              const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
+              return (
+                <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
+              );
+            })()}
+            {promptText && (
+              <a
+                className="yaml-action-btn"
+                href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open in ChatGPT"
+              >
+                🤖 Open in ChatGPT
+              </a>
+            )}
+            <button
               className="yaml-action-btn"
-              href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open in ChatGPT"
+              onClick={handleCopy}
+              title={copied ? 'Copied!' : 'Copy'}
             >
-              🤖
-            </a>
-          )}
-          <button
-            className="yaml-action-btn"
-            onClick={handleCopy}
-            title={copied ? 'Copied!' : 'Copy page'}
-          >
-            📄
-          </button>
-        </div>
-        <div className="yaml-actions-mobile" ref={menuRef}>
+              📋 {copied ? 'Copied' : 'Copy'}
+            </button>
+          </div>
+          <div className="yaml-actions-mobile" ref={menuRef}>
           <button
             className="yaml-action-btn"
             onClick={() => setMenuOpen((v) => !v)}
@@ -224,9 +228,9 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
                 const file = m.slice(1).join('/');
                 const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
                 return (
-                  <a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>
-                    🔍 View Spec
-                  </a>
+                <a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>
+                  🔍 View Spec
+                </a>
                 );
               })()}
               {promptText && (
@@ -235,12 +239,13 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
                 </a>
               )}
               <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>
-                📄 Copy page
+                📋 Copy
               </button>
             </div>
           )}
         </div>
-      </div>
+      )}
+      <div className="yaml-spec-controls" />
       <div className="yaml-spec-controls" />
       {visible && (
         <pre className="yaml-spec-content">

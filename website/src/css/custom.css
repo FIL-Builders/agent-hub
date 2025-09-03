@@ -74,18 +74,67 @@
 /* Agents index grid: enforce four columns per row */
 .agents-grid {
   display: grid;
-  gap: 1rem;
+  gap: 1.5rem;
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
-@media (min-width: 640px) {
+@media (min-width: 768px) {
   .agents-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-@media (min-width: 900px) {
+@media (min-width: 1200px) {
   .agents-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (min-width: 1200px) {
-  .agents-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* Agent cards */
+.agent-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--ifm-background-surface-color);
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
+.agent-card-header { display: flex; align-items: flex-start; justify-content: space-between; }
+.agent-card-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.1rem;
+  color: var(--ifm-color-primary);
+  border-bottom: 2px solid rgba(249, 115, 22, 0.25);
+  display: inline-block;
+}
+.agent-lang-pill {
+  display: inline-block;
+  margin-top: 0.25rem;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 999px;
+  color: var(--ifm-color-content-secondary, #64748b);
+}
+.agent-card-desc { color: var(--ifm-color-content); margin: 0.5rem 0 1rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.agent-card-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.pill-link {
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  text-decoration: none;
+  color: var(--ifm-color-primary);
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill-link:hover { background-color: var(--ifm-color-emphasis-100, #f3f4f6); }
+.older-link { background: transparent; border: 0; color: var(--ifm-color-content-secondary, #6b7280); cursor: pointer; }
+.older-list { margin-top: 0.5rem; display: grid; gap: 0.25rem; }
+.older-list a { color: var(--ifm-color-content-secondary, #6b7280); text-decoration: none; font-size: 0.9rem; }
+.older-list a:hover { text-decoration: underline; }
+.agent-actions { position: relative; }
+.agent-action-btn { border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0); background: transparent; border-radius: 6px; padding: 0.2rem 0.45rem; cursor: pointer; }
+
+/* Sticky filter bar */
+.agents-filter { position: sticky; top: calc(var(--ifm-navbar-height, 4rem) + 0.5rem); z-index: 20; display: flex; gap: 0.75rem; padding: 0.5rem 0; background: var(--ifm-background-color); }
+.agents-search { flex: 1; padding: 0.5rem 0.75rem; border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0); border-radius: 6px; background: var(--ifm-background-surface-color); color: var(--ifm-color-content); }
+.agents-select { padding: 0.5rem 0.75rem; border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0); border-radius: 6px; background: var(--ifm-background-surface-color); color: var(--ifm-color-content); }
 
 /* YAML specification card styles */
 .yaml-spec-card {
@@ -226,7 +275,7 @@
   background-color: #f8f8f8;
   border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
   border-radius: 8px;
-  padding: 0.75rem;
+  padding: 1.5rem;
   white-space: pre;
   overflow-x: auto;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
@@ -248,9 +297,11 @@
 .yaml-line-content { flex: 1; white-space: pre; }
 
 /* Simple token colors */
-.yaml-key { color: #1d4ed8; /* blue */ font-weight: 500; }
-.yaml-string { color: #15803d; /* green */ }
-.yaml-comment { color: #6b7280; /* gray */ }
+.yaml-key { color: #ffcc66; font-weight: 600; }
+.yaml-string { color: #99e6ff; }
+.yaml-number { color: #f2777a; }
+.yaml-boolean { color: #a9dc76; }
+.yaml-comment { color: #999999; }
 .yaml-colon, .yaml-value, .yaml-plain { color: inherit; }
 
 /* Section divider */
@@ -274,6 +325,16 @@
   text-decoration: none;
 }
 .spec-breadcrumb:hover { text-decoration: underline; }
+
+/* Subtitle card above YAML */
+.spec-subtitle-card {
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  color: var(--ifm-color-content);
+}
 
 .yaml-spec-line {
   display: flex;
