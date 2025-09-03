@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { buildPrompt } from '@site/src/utils/prompt';
 
 /**
  * YamlSpecCard displays YAML content in a styled card with a toggle to show
@@ -37,9 +38,7 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = 
 
   const repoPath = (downloadUrl || '').replace(/^\//, '');
   const rawUrl = repoPath ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}` : '';
-  const promptText = rawUrl
-    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
-    : '';
+  const promptText = buildPrompt(rawUrl);
   let projectSlug = '';
   let fileName = '';
   if (repoPath) {

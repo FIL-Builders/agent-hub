@@ -1,4 +1,5 @@
 import React from 'react';
+import { buildPrompt } from '@site/src/utils/prompt';
 
 const parseMeta = (yaml) => {
   try {
@@ -71,9 +72,7 @@ export default function AgentCard({ project, latest, older = [] }) {
 
   const specPageUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(latest.file)}`;
   const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${latest.file}`;
-  const promptText = rawUrl
-    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
-    : '';
+  const promptText = buildPrompt(rawUrl);
 
   const handleCopyLink = async () => {
     try { await navigator.clipboard.writeText(specPageUrl); } catch {}
@@ -93,7 +92,7 @@ export default function AgentCard({ project, latest, older = [] }) {
           </div>
         </div>
         <div className="agent-actions" ref={menuRef}>
-          <button className="agent-action-btn" onClick={() => setOpenMenu((v) => !v)} title="Actions">⋯</button>
+          <button className="agent-action-btn" onClick={() => setOpenMenu((v) => !v)} title="Actions">Actions ▾</button>
           {openMenu && (
             <div className="yaml-dropdown-menu" style={{ right: 0, left: 'auto' }}>
               <a className="yaml-dropdown-item" href={specPageUrl}>🔍 View Spec</a>

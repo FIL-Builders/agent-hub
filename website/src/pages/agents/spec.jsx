@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import YamlSpecCard from '@site/src/components/YamlSpecCard';
 import {useLocation} from '@docusaurus/router';
+import { buildPrompt } from '@site/src/utils/prompt';
 
 const req = require.context(
   '../../../../agents',
@@ -191,7 +192,7 @@ function ActionSheet({ open, onClose, project, file }) {
 
   if (!open) return null;
   const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${file}`;
-  const promptText = `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`;
+  const promptText = buildPrompt(rawUrl);
   const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
 
   const sheetStyle = dragY
