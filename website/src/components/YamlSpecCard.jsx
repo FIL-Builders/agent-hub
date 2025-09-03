@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 /**
  * YamlSpecCard displays YAML content in a styled card with a toggle to show
@@ -16,6 +16,8 @@ import React, { useState } from 'react';
 const YamlSpecCard = ({ spec, downloadUrl }) => {
   const [visible, setVisible] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
 
   const toggleVisible = () => setVisible((v) => !v);
 
@@ -28,6 +30,18 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
       console.error('Copy failed', err);
     }
   };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const onDocClick = (e) => {
+      if (!menuRef.current) return;
+      if (!menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
 
   // Split the YAML into lines for line numbering.  Use empty array when hidden to avoid unnecessary work.
   const lines = visible ? spec.trimEnd().split('\n') : [];
@@ -43,51 +57,80 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
 
   return (
     <div className="yaml-spec-card ai-card">
-      <div className="yaml-spec-controls">
+      <div className="yaml-spec-controls" ref={menuRef}>
         <button
           className="yaml-spec-toggle"
-          onClick={toggleVisible}
-          aria-expanded={visible}
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
         >
-          {visible ? 'Hide Specification' : 'View Specification'}
+          Actions ▾
         </button>
-        {rawUrl && (
-          <a className="yaml-spec-download" href={rawUrl} download>
-            Download
-          </a>
-        )}
-        {rawUrl && (
-          <>
-            <a
-              className="yaml-spec-chatgpt"
-              href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open prompt in ChatGPT"
-              title="Open in ChatGPT"
+
+        {menuOpen && (
+          <div className="yaml-dropdown-menu" role="menu">
+            <button
+              className="yaml-dropdown-item"
+              role="menuitem"
+              onClick={() => {
+                toggleVisible();
+                setMenuOpen(false);
+              }}
             >
-              ChatGPT
-            </a>
-            <a
-              className="yaml-spec-claude"
-              href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open prompt in Claude"
-              title="Open in Claude"
+              📄 {visible ? 'Hide Specification' : 'View Specification'}
+            </button>
+
+            {rawUrl && (
+              <a
+                className="yaml-dropdown-item"
+                role="menuitem"
+                href={rawUrl}
+                download
+                onClick={() => setMenuOpen(false)}
+              >
+                ⬇️ Download
+              </a>
+            )}
+
+            {promptText && (
+              <a
+                className="yaml-dropdown-item"
+                role="menuitem"
+                href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                🤖 Open in ChatGPT
+              </a>
+            )}
+
+            {promptText && (
+              <a
+                className="yaml-dropdown-item"
+                role="menuitem"
+                href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+              >
+                ✨ Open in Claude
+              </a>
+            )}
+
+            <button
+              className="yaml-dropdown-item"
+              role="menuitem"
+              onClick={() => {
+                handleCopy();
+                setMenuOpen(false);
+              }}
+              title={copied ? 'Copied!' : 'Copy page'}
             >
-              Claude
-            </a>
-          </>
+              📋 {copied ? 'Copied' : 'Copy page'}
+            </button>
+          </div>
         )}
-        <button
-          className="yaml-spec-copy"
-          onClick={handleCopy}
-          aria-label="Copy YAML to clipboard"
-          title={copied ? 'Copied!' : 'Copy'}
-        >
-          {copied ? 'Copied' : 'Copy'}
-        </button>
       </div>
       {visible && (
         <pre className="yaml-spec-content">
