@@ -74,8 +74,17 @@
 /* Agents index grid: enforce four columns per row */
 .agents-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  .agents-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
+  .agents-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 1200px) {
+  .agents-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 /* YAML specification card styles */
