@@ -186,17 +186,28 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
                 <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
               );
             })()}
-            {promptText && (
-              <a
-                className="yaml-action-btn"
-                href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Open in ChatGPT"
-              >
-                🤖 Open in ChatGPT
-              </a>
-            )}
+          {promptText && (
+            <a
+              className="yaml-action-btn"
+              href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in ChatGPT"
+            >
+              🤖 Open in ChatGPT
+            </a>
+          )}
+          {promptText && (
+            <a
+              className="yaml-action-btn"
+              href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in Claude"
+            >
+              ✨ Open in Claude
+            </a>
+          )}
             <button
               className="yaml-action-btn"
               onClick={handleCopy}
@@ -236,6 +247,18 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
               {promptText && (
                 <a className="yaml-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
                   🤖 Open in ChatGPT
+                </a>
+              )}
+              {promptText && (
+                <a
+                  className="yaml-dropdown-item"
+                  role="menuitem"
+                  href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  ✨ Open in Claude
                 </a>
               )}
               <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>
