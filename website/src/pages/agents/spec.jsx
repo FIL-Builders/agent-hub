@@ -19,17 +19,32 @@ export default function AgentSpecPage() {
   const project = query.get('project');
   const file = query.get('file');
 
-  let specRaw = null;
-  let error = null;
-  let path;
-  try {
-    if (!project || !file) throw new Error('Missing project or file parameter');
-    path = `./${project}/${file}`;
-    // Will throw if not found
-    specRaw = req(path).default;
-  } catch (e) {
-    error = e?.message || String(e);
-  }
+  const [specRaw, setSpecRaw] = React.useState('');
+  const [status, setStatus] = React.useState('loading'); // loading | ready | error
+  const [error, setError] = React.useState('');
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setStatus('loading');
+    setError('');
+    setSpecRaw('');
+    try {
+      if (!project || !file) throw new Error('Missing project or file parameter');
+      const path = `./${project}/${file}`;
+      // Synchronous require, but we defer state update to avoid flashing SSR mismatch
+      const raw = req(path).default;
+      if (!cancelled) {
+        setSpecRaw(raw);
+        setStatus('ready');
+      }
+    } catch (e) {
+      if (!cancelled) {
+        setError(e?.message || String(e));
+        setStatus('error');
+      }
+    }
+    return () => { cancelled = true; };
+  }, [project, file]);
 
   // Lightweight purpose extraction for subtitle
   const purpose = React.useMemo(() => {
@@ -67,7 +82,15 @@ export default function AgentSpecPage() {
         <div style={{ marginBottom: '1rem' }}>
           <a href="/agents/" className="spec-breadcrumb">← All Agent Specs</a>
         </div>
-        {!error ? (
+        {status === 'loading' && (
+          <div className="ai-card" aria-busy="true">
+            <h3 style={{marginTop: 0, marginBottom: '0.5rem'}}>Loading specification…</h3>
+            <p style={{ color: 'var(--ifm-color-muted, #94a3b8)', margin: 0 }}>
+              Preparing {project || '…'} / {file || '…'}
+            </p>
+          </div>
+        )}
+        {status === 'ready' ? (
           <>
             <h1 className="spec-page-title">{project} / {file}</h1>
             {purpose && (
@@ -82,7 +105,8 @@ export default function AgentSpecPage() {
               hideHeader={true}
             />
           </>
-        ) : (
+        ) : null}
+        {status === 'error' && (
           <div className="ai-card">
             <h3>Specification Not Found</h3>
             <p>
