@@ -1,5 +1,4 @@
-import React, { useState, useMemo } from 'react';
-import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import React, { useState } from 'react';
 
 /**
  * YamlSpecCard displays YAML content in a styled card with a toggle to show
@@ -33,26 +32,13 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
   // Split the YAML into lines for line numbering.  Use empty array when hidden to avoid unnecessary work.
   const lines = visible ? spec.trimEnd().split('\n') : [];
 
-  const { siteConfig } = useDocusaurusContext();
-
-  // Build absolute URL for the YAML spec so external tools can fetch it.
-  const specUrl = useMemo(() => {
-    if (!downloadUrl) return '';
-    try {
-      // Prefer the live origin in the browser for correctness on custom domains
-      if (typeof window !== 'undefined' && window.location?.origin) {
-        return new URL(downloadUrl, window.location.origin).toString();
-      }
-      // SSR fallback to configured site URL
-      const base = siteConfig?.url || 'https://example.com';
-      return new URL(downloadUrl, base).toString();
-    } catch (e) {
-      return downloadUrl;
-    }
-  }, [downloadUrl, siteConfig]);
-
-  const promptText = specUrl
-    ? `Fetch this YAML agent spec: ${specUrl}\nUse your browsing/tool agent to download it, then parse and process it. Confirm once loaded.`
+  // Always reference the YAML in GitHub Raw to avoid hosting copies.
+  const repoPath = (downloadUrl || '').replace(/^\//, ''); // agents/.../file.yaml
+  const rawUrl = repoPath
+    ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}`
+    : '';
+  const promptText = rawUrl
+    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
     : '';
 
   return (
@@ -65,12 +51,12 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
         >
           {visible ? 'Hide Specification' : 'View Specification'}
         </button>
-        {downloadUrl && (
-          <a className="yaml-spec-download" href={downloadUrl} download>
+        {rawUrl && (
+          <a className="yaml-spec-download" href={rawUrl} download>
             Download
           </a>
         )}
-        {downloadUrl && (
+        {rawUrl && (
           <>
             <a
               className="yaml-spec-chatgpt"
