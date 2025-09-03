@@ -353,6 +353,32 @@
   color: var(--ifm-color-content);
 }
 
+/* Skeleton shimmer for spec page loading */
+.skeleton { position: relative; overflow: hidden; border-radius: 6px; background: var(--ifm-color-emphasis-200, #e2e8f0); }
+[data-theme='dark'] .skeleton { background: #2a2a2a; }
+.skeleton::after {
+  content: '';
+  position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: shimmer 1.2s infinite;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+.spec-skeleton { display: block; }
+.skeleton-title { height: 28px; width: 60%; margin-bottom: 0.75rem; }
+.skeleton-subtitle { height: 14px; width: 80%; margin-bottom: 0.5rem; }
+.skeleton-subtitle.short { width: 55%; }
+.skeleton-code {
+  margin-top: 0.75rem;
+  border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
+  border-radius: 8px;
+  padding: 1rem;
+  background: var(--ifm-background-surface-color);
+}
+.skeleton-line { height: 12px; margin-bottom: 0.5rem; }
+
 .yaml-spec-line {
   display: flex;
   align-items: flex-start;

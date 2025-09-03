@@ -84,10 +84,16 @@ export default function AgentSpecPage() {
         </div>
         {status === 'loading' && (
           <div className="ai-card" aria-busy="true">
-            <h3 style={{marginTop: 0, marginBottom: '0.5rem'}}>Loading specification…</h3>
-            <p style={{ color: 'var(--ifm-color-muted, #94a3b8)', margin: 0 }}>
-              Preparing {project || '…'} / {file || '…'}
-            </p>
+            <div className="spec-skeleton">
+              <div className="skeleton skeleton-title" />
+              <div className="skeleton skeleton-subtitle" />
+              <div className="skeleton skeleton-subtitle short" />
+              <div className="skeleton-code">
+                {[80, 95, 60, 85, 70, 90, 50, 88].map((w, i) => (
+                  <div key={i} className="skeleton skeleton-line" style={{ width: w + '%' }} />
+                ))}
+              </div>
+            </div>
           </div>
         )}
         {status === 'ready' ? (
