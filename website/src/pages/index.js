@@ -65,7 +65,7 @@ export default function Home() {
         </div>
       </header>
       <main className="container" style={{ padding: '2rem 0' }}>
-        <div className="ai-grid">
+        <div className="home-features">
           {features.map((feat) => (
             <div key={feat.title} className="ai-card">
               <h3>{feat.title}</h3>

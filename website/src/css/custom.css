@@ -71,6 +71,21 @@
   gap: 1rem;
 }
 
+/* Centered three-card layout for homepage */
+.home-features {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(1, minmax(260px, 1fr));
+  max-width: 1000px;
+  margin: 0 auto;
+}
+@media (min-width: 768px) {
+  .home-features { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
+}
+@media (min-width: 1024px) {
+  .home-features { grid-template-columns: repeat(3, minmax(260px, 1fr)); }
+}
+
 /* Agents index grid: enforce four columns per row */
 .agents-grid {
   display: grid;
