@@ -426,10 +426,11 @@ footer, footer p, footer a {
   border-bottom: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
 }
 .navbar .navbar__inner {
-  max-width: var(--ifm-container-width, 1200px);
+  /* Match footer's container (container--fluid) width */
+  max-width: var(--ifm-container-width-xl, var(--ifm-container-width, 1200px));
   margin: 0 auto;
-  padding-left: 1rem;
-  padding-right: 1rem;
+  padding-left: var(--ifm-spacing-horizontal, 1rem);
+  padding-right: var(--ifm-spacing-horizontal, 1rem);
   width: 100%;
 }
 .footer {
