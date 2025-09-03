@@ -13,49 +13,42 @@ import React, { useRef, useState, useEffect } from 'react';
  * <YamlSpecCard spec={require('!!raw-loader!./my-spec.yaml').default} downloadUrl={'/agents/my-spec.yaml'} />
  * ```
  */
-const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
-  const [visible, setVisible] = useState(initialVisible);
+const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = false }) => {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const toggleVisible = () => setVisible((v) => !v);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(spec);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error('Copy failed', err);
-    }
-  };
-
-  // Close dropdown on outside click
   useEffect(() => {
     const onDocClick = (e) => {
       if (!menuRef.current) return;
-      if (!menuRef.current.contains(e.target)) {
-        setMenuOpen(false);
-      }
+      if (!menuRef.current.contains(e.target)) setMenuOpen(false);
     };
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  // Split the YAML into lines for line numbering.  Use empty array when hidden to avoid unnecessary work.
-  const lines = visible ? spec.trimEnd().split('\n') : [];
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(spec);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  };
 
-  // Always reference the YAML in GitHub Raw to avoid hosting copies.
-  const repoPath = (downloadUrl || '').replace(/^\//, ''); // agents/.../file.yaml
-  const rawUrl = repoPath
-    ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}`
-    : '';
+  const repoPath = (downloadUrl || '').replace(/^\//, '');
+  const rawUrl = repoPath ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}` : '';
   const promptText = rawUrl
     ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
     : '';
+  let projectSlug = '';
+  let fileName = '';
+  if (repoPath) {
+    const m = repoPath.replace(/^agents\//, '').split('/');
+    projectSlug = m[0];
+    fileName = m.slice(1).join('/');
+  }
+  const viewUrl = projectSlug && fileName ? `/agents/spec?project=${encodeURIComponent(projectSlug)}&file=${encodeURIComponent(fileName)}` : '';
 
-  // Extract simple metadata from the YAML (meta.spec_name or meta.library_name, and meta.purpose)
   const parseMeta = (yaml) => {
     try {
       const lines = (yaml || '').split('\n');
@@ -83,7 +76,6 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
         }
         return '';
       };
-      // purpose: may be inline, '|' block, or '>' folded
       let purpose = '';
       for (let i = 0; i < meta.length; i++) {
         const l = meta[i];
@@ -97,9 +89,8 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
           const block = [];
           for (let j = i + 1; j < meta.length; j++) {
             const ln = meta[j];
-            const ind = (ln.match(/^\s*/)?.[0] || '').length;
-            if (ind <= baseIndent) break;
-            // strip common indent (assume +2 under key)
+            const inj = (ln.match(/^\s*/)?.[0] || '').length;
+            if (inj <= baseIndent) break;
             block.push(ln.slice(baseIndent + 2));
           }
           purpose = (after === '|' ? block.join('\n') : block.join(' ')).trim();
@@ -108,60 +99,11 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
       }
       const specName = scalar('spec_name') || scalar('library_name');
       return { specName, purpose };
-    } catch {
-      return {};
-    }
+    } catch { return {}; }
   };
   const { specName, purpose } = parseMeta(spec);
 
-  // Copy a single line to clipboard
-  const handleCopyLine = async (text) => {
-    try { await navigator.clipboard.writeText(text); } catch {}
-  };
-
-  // Basic YAML syntax highlight per line
-  const renderLine = (line) => {
-    // Separate comment
-    let before = line;
-    let comment = '';
-    const hashIdx = line.indexOf('#');
-    if (hashIdx !== -1) {
-      before = line.slice(0, hashIdx);
-      comment = line.slice(hashIdx);
-    }
-    const keyMatch = before.match(/^(\s*)([^:#]+):(\s*)(.*)$/);
-    if (keyMatch) {
-      const [, indent, key, spaceAfter, rest] = keyMatch;
-      const trimmed = (rest || '').trim();
-      const isString = /^(".*"|'.*'|\|\s*$|>\s*$)/.test(trimmed);
-      const isNumber = /^-?\d+(?:\.\d+)?$/.test(trimmed);
-      const isBoolean = /^(true|false)$/i.test(trimmed);
-      return (
-        <>
-          <span className="yaml-indent">{indent}</span>
-          <span className="yaml-key">{key}</span>
-          <span className="yaml-colon">:</span>
-          <span className="yaml-space">{spaceAfter}</span>
-          {rest && (
-            <span className={isString ? 'yaml-string' : isNumber ? 'yaml-number' : isBoolean ? 'yaml-boolean' : 'yaml-value'}>{rest}</span>
-          )}
-          {comment && <span className="yaml-comment">{comment}</span>}
-        </>
-      );
-    }
-    return (
-      <>
-        <span className="yaml-plain">{before}</span>
-        {comment && <span className="yaml-comment">{comment}</span>}
-      </>
-    );
-  };
-
-  // Insert section dividers for readability
-  const isSectionStart = (t) => {
-    const s = t.trim();
-    return s === 'meta:' || s === 'groups:' || /^guiding_principles\s*:/.test(s) || /^design_notes\s*:/.test(s);
-  };
+  const lines = (spec || '').trimEnd().split('\n');
 
   return (
     <div className="yaml-spec-card ai-card">
@@ -173,124 +115,42 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
           </div>
           <div className="yaml-actions">
             {rawUrl && (
-              <a className="yaml-action-btn" href={rawUrl} download title="Download">
-                ⬇️ Download
-              </a>
+              <a className="yaml-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
             )}
-            {repoPath && (() => {
-              const m = repoPath.replace(/^agents\//, '').split('/');
-              const project = m[0];
-              const file = m.slice(1).join('/');
-              const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
-              return (
-                <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
-              );
-            })()}
-          {promptText && (
-            <a
-              className="yaml-action-btn"
-              href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open in ChatGPT"
-            >
-              🤖 Open in ChatGPT
-            </a>
-          )}
-          {promptText && (
-            <a
-              className="yaml-action-btn"
-              href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open in Claude"
-            >
-              ✨ Open in Claude
-            </a>
-          )}
-            <button
-              className="yaml-action-btn"
-              onClick={handleCopy}
-              title={copied ? 'Copied!' : 'Copy'}
-            >
-              📋 {copied ? 'Copied' : 'Copy'}
-            </button>
+            {viewUrl && (
+              <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
+            )}
+            {promptText && (
+              <a className="yaml-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
+            )}
+            {promptText && (
+              <a className="yaml-action-btn" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in Claude">✨ Open in Claude</a>
+            )}
+            <button className="yaml-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
           </div>
           <div className="yaml-actions-mobile" ref={menuRef}>
-          <button
-            className="yaml-action-btn"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            title="Actions"
-          >
-            ⋯
-          </button>
-          {menuOpen && (
-            <div className="yaml-dropdown-menu" role="menu">
-              {rawUrl && (
-                <a className="yaml-dropdown-item" role="menuitem" href={rawUrl} download onClick={() => setMenuOpen(false)}>
-                  ⬇️ Download
-                </a>
-              )}
-              {repoPath && (() => {
-                const m = repoPath.replace(/^agents\//, '').split('/');
-                const project = m[0];
-                const file = m.slice(1).join('/');
-                const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
-                return (
-                <a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>
-                  🔍 View Spec
-                </a>
-                );
-              })()}
-              {promptText && (
-                <a className="yaml-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>
-                  🤖 Open in ChatGPT
-                </a>
-              )}
-              {promptText && (
-                <a
-                  className="yaml-dropdown-item"
-                  role="menuitem"
-                  href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  ✨ Open in Claude
-                </a>
-              )}
-              <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>
-                📋 Copy
-              </button>
-            </div>
-          )}
+            <button className="yaml-action-btn" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} title="Actions">⋯</button>
+            {menuOpen && (
+              <div className="yaml-dropdown-menu" role="menu">
+                {rawUrl && (<a className="yaml-dropdown-item" role="menuitem" href={rawUrl} download onClick={() => setMenuOpen(false)}>⬇️ Download</a>)}
+                {viewUrl && (<a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>🔍 View Spec</a>)}
+                {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>🤖 Open in ChatGPT</a>)}
+                {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>✨ Open in Claude</a>)}
+                <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>📋 Copy</button>
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div className="yaml-spec-controls" />
-      <div className="yaml-spec-controls" />
-      {visible && (
-        <pre className="yaml-spec-content">
-          {lines.map((line, idx) => (
-            <React.Fragment key={idx}>
-              {idx > 0 && isSectionStart(line) && (
-                <div className="yaml-section-divider" />
-              )}
-              <div className="yaml-spec-line">
-                <span
-                  className="yaml-line-number"
-                  title="Copy line"
-                  onClick={() => handleCopyLine(line)}
-                >
-                  {idx + 1}
-                </span>
-                <span className="yaml-line-content">{renderLine(line)}</span>
-              </div>
-            </React.Fragment>
-          ))}
-        </pre>
-      )}
+      <pre className="yaml-spec-content">
+        {lines.map((line, idx) => (
+          <div key={idx} className="yaml-spec-line">
+            <span className="yaml-line-number" title="Copy line" onClick={() => handleCopyLine(line)}>{idx + 1}</span>
+            <span className="yaml-line-content">{line}</span>
+          </div>
+        ))}
+      </pre>
     </div>
   );
 };
