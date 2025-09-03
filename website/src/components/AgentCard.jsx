@@ -82,7 +82,7 @@ export default function AgentCard({ project, latest, older = [] }) {
     <div className="agent-card ai-card">
       <div className="agent-card-header">
         <div>
-          <h3 className="agent-card-title">{title}</h3>
+          <h3 className="agent-card-title"><a className="agent-card-title-link" href={specPageUrl}>{title}</a></h3>
           {language && <span className="agent-lang-pill">{language}</span>}
         </div>
         <div className="agent-actions" ref={menuRef}>
