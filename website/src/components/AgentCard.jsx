@@ -59,7 +59,8 @@ export default function AgentCard({ project, latest, older = [] }) {
   const { specName, purpose, language } = React.useMemo(() => parseMeta(latest.raw), [latest.raw]);
   const title = specName || project;
   const [openMenu, setOpenMenu] = React.useState(false);
-  const [showOlder, setShowOlder] = React.useState(false);
+  const [versionsOpen, setVersionsOpen] = React.useState(false);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
   const menuRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -84,6 +85,12 @@ export default function AgentCard({ project, latest, older = [] }) {
         <div>
           <h3 className="agent-card-title"><a className="agent-card-title-link" href={specPageUrl}>{title}</a></h3>
           {language && <span className="agent-lang-pill">{language}</span>}
+          <div className="agent-versions-row">
+            <span className="agent-version-latest">Latest: {latest.file.replace(/\.yaml$/, '')}</span>
+            {older.length > 0 && (
+              <button className="agent-older-link" onClick={() => setVersionsOpen(true)}>Older Versions</button>
+            )}
+          </div>
         </div>
         <div className="agent-actions" ref={menuRef}>
           <button className="agent-action-btn" onClick={() => setOpenMenu((v) => !v)} title="Actions">⋯</button>
@@ -121,17 +128,40 @@ export default function AgentCard({ project, latest, older = [] }) {
       {purpose && <p className="agent-card-desc">{purpose}</p>}
       <div className="agent-card-footer">
         <a className="pill-link" href={specPageUrl}>{`agents/${project}/${latest.file}`}</a>
-        {older.length > 0 && (
-          <button className="older-link" onClick={() => setShowOlder((s) => !s)}>
-            {showOlder ? 'Hide Older Versions' : 'View Older Versions'}
-          </button>
-        )}
+        <div className="agent-mobile-actions">
+          <button className="mobile-actions-btn" onClick={() => setSheetOpen(true)}>Actions ▼</button>
+        </div>
       </div>
-      {showOlder && (
-        <div className="older-list">
-          {older.map((v) => (
-            <a key={v.file} href={`/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(v.file)}`}>{v.file}</a>
-          ))}
+
+      {/* Versions modal */}
+      {versionsOpen && (
+        <div className="action-sheet-overlay" onClick={() => setVersionsOpen(false)}>
+          <div className="versions-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="versions-modal-header">Older Versions</div>
+            <div className="versions-list">
+              {older.map((v) => (
+                <a key={v.file} className="versions-item" href={`/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(v.file)}`} onClick={() => setVersionsOpen(false)}>
+                  {v.file}
+                </a>
+              ))}
+            </div>
+            <button className="versions-cancel" onClick={() => setVersionsOpen(false)}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile action sheet */}
+      {sheetOpen && (
+        <div className="action-sheet-overlay" onClick={() => setSheetOpen(false)}>
+          <div className="action-sheet" role="dialog" aria-label="Available Actions" onClick={(e) => e.stopPropagation()}>
+            <div className="action-sheet-header">Available Actions</div>
+            <a className="action-sheet-item" href={specPageUrl} onClick={() => setSheetOpen(false)}>🔍 View Spec</a>
+            <a className="action-sheet-item" href={rawUrl} download onClick={() => setSheetOpen(false)}>⬇️ Download</a>
+            {promptText && (<a className="action-sheet-item" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setSheetOpen(false)}>🤖 Open in ChatGPT</a>)}
+            {promptText && (<a className="action-sheet-item" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setSheetOpen(false)}>✨ Open in Claude</a>)}
+            <button className="action-sheet-item" onClick={() => { handleCopyLink(); setSheetOpen(false); }}>🔗 Copy Link</button>
+            <button className="action-sheet-cancel" onClick={() => setSheetOpen(false)}>Cancel</button>
+          </div>
         </div>
       )}
     </div>
