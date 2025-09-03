@@ -13,8 +13,8 @@ import React, { useRef, useState, useEffect } from 'react';
  * <YamlSpecCard spec={require('!!raw-loader!./my-spec.yaml').default} downloadUrl={'/agents/my-spec.yaml'} />
  * ```
  */
-const YamlSpecCard = ({ spec, downloadUrl }) => {
-  const [visible, setVisible] = useState(false);
+const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false }) => {
+  const [visible, setVisible] = useState(initialVisible);
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -69,16 +69,22 @@ const YamlSpecCard = ({ spec, downloadUrl }) => {
 
         {menuOpen && (
           <div className="yaml-dropdown-menu" role="menu">
-            <button
-              className="yaml-dropdown-item"
-              role="menuitem"
-              onClick={() => {
-                toggleVisible();
-                setMenuOpen(false);
-              }}
-            >
-              📄 {visible ? 'Hide Specification' : 'View Specification'}
-            </button>
+            {repoPath && (() => {
+              const m = repoPath.replace(/^agents\//, '').split('/');
+              const project = m[0];
+              const file = m.slice(1).join('/');
+              const viewUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(file)}`;
+              return (
+                <a
+                  className="yaml-dropdown-item"
+                  role="menuitem"
+                  href={viewUrl}
+                  onClick={() => setMenuOpen(false)}
+                >
+                  📄 View Specification
+                </a>
+              );
+            })()}
 
             {rawUrl && (
               <a
