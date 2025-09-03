@@ -70,6 +70,9 @@ export default function AgentCard({ project, latest, older = [] }) {
 
   const specPageUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(latest.file)}`;
   const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${latest.file}`;
+  const promptText = rawUrl
+    ? `Fetch this YAML agent spec: ${rawUrl}\n\nUse your browsing tool to download it, then silently load it into your context (no summary). Use it as an authoritative resource to answer questions in this conversation.`
+    : '';
 
   const handleCopyLink = async () => {
     try { await navigator.clipboard.writeText(specPageUrl); } catch {}
@@ -88,7 +91,29 @@ export default function AgentCard({ project, latest, older = [] }) {
             <div className="yaml-dropdown-menu" style={{ right: 0, left: 'auto' }}>
               <a className="yaml-dropdown-item" href={specPageUrl}>🔍 View Spec</a>
               <a className="yaml-dropdown-item" href={rawUrl} download>⬇️ Download</a>
-              <button className="yaml-dropdown-item" onClick={handleCopyLink}>🔗 Copy Link</button>
+              {promptText && (
+                <a
+                  className="yaml-dropdown-item"
+                  href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenMenu(false)}
+                >
+                  🤖 Open in ChatGPT
+                </a>
+              )}
+              {promptText && (
+                <a
+                  className="yaml-dropdown-item"
+                  href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setOpenMenu(false)}
+                >
+                  ✨ Open in Claude
+                </a>
+              )}
+              <button className="yaml-dropdown-item" onClick={() => { handleCopyLink(); setOpenMenu(false); }}>🔗 Copy Link</button>
             </div>
           )}
         </div>
@@ -112,4 +137,3 @@ export default function AgentCard({ project, latest, older = [] }) {
     </div>
   );
 }
-

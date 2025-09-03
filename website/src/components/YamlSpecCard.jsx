@@ -107,41 +107,41 @@ const YamlSpecCard = ({ spec, downloadUrl, initialVisible = false, hideHeader = 
 
   return (
     <div className="yaml-spec-card ai-card">
-      {!hideHeader && (
-        <div className="yaml-spec-header">
+      <div className="yaml-spec-header">
+        {!hideHeader && (
           <div className="yaml-spec-headings">
             <h3 className="yaml-spec-title">{specName || repoPath || 'Spec'}</h3>
             {purpose && <p className="yaml-spec-purpose">{purpose}</p>}
           </div>
-          <div className="yaml-actions">
-            {rawUrl && (
-              <a className="yaml-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
-            )}
-            {viewUrl && (
-              <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
-            )}
-            {promptText && (
-              <a className="yaml-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
-            )}
-            {promptText && (
-              <a className="yaml-action-btn" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in Claude">✨ Open in Claude</a>
-            )}
-            <button className="yaml-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
-          </div>
-          <div className="yaml-actions-mobile" ref={menuRef}>
-            <button className="yaml-action-btn" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} title="Actions">⋯</button>
-            {menuOpen && (
-              <div className="yaml-dropdown-menu" role="menu">
-                {rawUrl && (<a className="yaml-dropdown-item" role="menuitem" href={rawUrl} download onClick={() => setMenuOpen(false)}>⬇️ Download</a>)}
-                {viewUrl && (<a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>🔍 View Spec</a>)}
-                {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>🤖 Open in ChatGPT</a>)}
-                {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>✨ Open in Claude</a>)}
-                <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>📋 Copy</button>
-              </div>
-            )}
-          </div>
+        )}
+        <div className="yaml-actions">
+          {rawUrl && (
+            <a className="yaml-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
+          )}
+          {viewUrl && (
+            <a className="yaml-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
+          )}
+          {promptText && (
+            <a className="yaml-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
+          )}
+          {promptText && (
+            <a className="yaml-action-btn" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in Claude">✨ Open in Claude</a>
+          )}
+          <button className="yaml-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
         </div>
-      )}
+        <div className="yaml-actions-mobile" ref={menuRef}>
+          <button className="yaml-action-btn" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} title="Actions">⋯</button>
+          {menuOpen && (
+            <div className="yaml-dropdown-menu" role="menu">
+              {rawUrl && (<a className="yaml-dropdown-item" role="menuitem" href={rawUrl} download onClick={() => setMenuOpen(false)}>⬇️ Download</a>)}
+              {viewUrl && (<a className="yaml-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>🔍 View Spec</a>)}
+              {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>🤖 Open in ChatGPT</a>)}
+              {promptText && (<a className="yaml-dropdown-item" role="menuitem" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>✨ Open in Claude</a>)}
+              <button className="yaml-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>📋 Copy</button>
+            </div>
+          )}
+        </div>
+      </div>
       <div className="yaml-spec-controls" />
       <pre className="yaml-spec-content">
         {lines.map((line, idx) => (
