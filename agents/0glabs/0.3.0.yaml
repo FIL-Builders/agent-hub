@@ -1,0 +1,341 @@
+meta:
+spec\_name: 0glabs/0g-serving-broker
+spec\_version: 0.3.0
+library\_version: '>=0.1.0 <1.0.0'
+generated: '2025-09-16'
+language: typescript
+homepage: [https://docs.0g.ai](https://docs.0g.ai)
+tags:
+
+* ai
+* compute-network
+* inference
+* sdk
+* ethers
+* verification
+  purpose: Client SDK to discover providers, fund an account, generate authenticated
+  requests, and verify results when using the 0G Compute Network for AI inference
+  and related services.
+  guiding\_principles:
+* Always initialize with an Ethers v6 Signer or Wallet; the broker binds on-chain
+  auth and settlement to your requests.
+* 'Fund before you call: check `broker.ledger.getLedger()` and top‑up using `depositFund`
+  (or `addLedger`) before making requests.'
+* Treat request headers as single‑use credentials; call `inference.getRequestHeaders()`
+  for every outbound request and never reuse them.
+* Prefer `inference.processResponse(...)` to verify TEE/signed results; pass the
+  same `provider` and optional `chatID` used for the request.
+* Resolve the provider’s endpoint via `inference.getServiceMetadata()` instead of
+  hardcoding URLs; models and verification mode can change.
+* Amounts are OG token units; accept strings or bigints and format with `ethers.parseEther/formatEther`
+  to avoid precision bugs.
+* Use `acknowledgeProviderSigner(provider)` once per provider if required by your
+  environment before the first verified call.
+* Handle network variance: providers are decentralized; retry list/metadata calls
+  and implement timeouts/backoff for HTTP requests.
+  design\_notes: Based on the authoritative SDK and docs aggregate (all-docs.md) and
+  symbol dump (0g-serving-broker.out). Groups mirror how developers interact: initialization,
+  inference, ledger, and types. Definitions reflect the public surface area shown
+  in README/SDK usage and extracted declaration snippets.
+  groups:
+* name: Initialization
+  summary: Create a broker bound to your signer and access component modules.
+  exports:
+
+  * createZGComputeNetworkBroker
+  * ZGComputeNetworkBroker
+    symbols:
+    createZGComputeNetworkBroker:
+    kind: function
+    summary: Factory that creates a connected 0G Compute Network broker for a given
+    Ethers signer or wallet.
+    definition:
+    lang: typescript
+    code: |-
+    export declare function createZGComputeNetworkBroker(
+    signer: import("ethers").Signer
+    ): Promise<ZGComputeNetworkBroker>;
+    guidance:
+
+    * Use `new ethers.Wallet(PRIVATE_KEY, provider)` on Node or `BrowserProvider(window.ethereum).getSigner()`
+      in browsers.
+    * Ensure your signer has OG for gas and funding; RPC can be `https://evmrpc-testnet.0g.ai`
+      per docs.
+    * Create one broker per signer; reuse it across requests to share ledger/account
+      state.
+      example:
+      lang: javascript
+      description: Node.js (Ethers v6)
+      code: |-
+      import { ethers } from "ethers";
+      import { createZGComputeNetworkBroker } from "@0glabs/0g-serving-broker";
+
+      const provider = new ethers.JsonRpcProvider(process.env.RPC\_ENDPOINT || "[https://evmrpc-testnet.0g.ai](https://evmrpc-testnet.0g.ai)");
+      const wallet = new ethers.Wallet(process.env.PRIVATE\_KEY, provider);
+      const broker = await createZGComputeNetworkBroker(wallet);
+      console.log("Broker ready", !!broker.inference, !!broker.ledger);
+      ZGComputeNetworkBroker:
+      kind: class
+      summary: Top‑level broker exposing domain modules for inference and funds management.
+      definition:
+      lang: typescript
+      code: |-
+      declare class ZGComputeNetworkBroker {
+      readonly inference: InferenceBroker;
+      readonly ledger: LedgerBroker;
+      }
+      guidance:
+    * Treat `broker.inference` and `broker.ledger` as long‑lived facades; they encapsulate
+      on‑chain calls and stateless helpers.
+    * Avoid direct construction; always obtain via `createZGComputeNetworkBroker`
+      to ensure internal dependencies are wired.
+      example:
+      lang: javascript
+      code: |-
+      const services = await broker.inference.listService();
+      const account = await broker.ledger.getLedger();
+      console.log("providers:", services.length, "balance:", account.balance?.toString?.());
+* name: Inference
+  summary: Discover providers, generate single‑use auth headers, call models, and
+  verify results.
+  exports:
+
+  * InferenceBroker
+  * ServiceStructOutput
+    symbols:
+    InferenceBroker:
+    kind: class
+    summary: Interface for querying available services and creating/verifying authenticated
+    inference requests.
+    definition:
+    lang: typescript
+    code: |-
+    declare class InferenceBroker {
+    listService(): Promise\<ServiceStructOutput\[]>;
+    getServiceMetadata(provider: string): Promise<{ endpoint: string; model: string; verifiability?: string }>;
+    getRequestHeaders(
+    provider: string,
+    content: string | Record\<string, unknown>,
+    chatID?: string
+    ): Promise\<Record\<string, string>>;
+    processResponse(
+    provider: string,
+    content: string,
+    chatID?: string,
+    vllmProxy?: boolean
+    ): Promise<boolean>;
+    acknowledgeProviderSigner(provider: string): Promise<void>;
+    }
+    guidance:
+
+    * Call `listService()` first, then choose a `provider` and fetch `{ endpoint,
+      model }` via `getServiceMetadata()`.
+    * Generate fresh `headers` with `getRequestHeaders()` **for each request**; these
+      are single‑use.
+    * Use the OpenAI SDK with `baseURL = endpoint`, `apiKey = ""` and `defaultHeaders = headers` to call `/chat/completions`.
+    * After receiving the model output, run `processResponse(provider, content,
+      chatID?)` to verify signatures/TEE proofs.
+    * If a provider requires signer acknowledgment, invoke `acknowledgeProviderSigner(provider)`
+      once before your first call.
+      example:
+      lang: javascript
+      description: Minimal chat completion with verification
+      code: |-
+      import { OpenAI } from "openai";
+
+      const services = await broker.inference.listService();
+      if (!services.length) throw new Error("No services");
+      const provider = services\[0].provider;
+      const { endpoint, model } = await broker.inference.getServiceMetadata(provider);
+
+      const question = "Explain attention like I’m five.";
+      const headers = await broker.inference.getRequestHeaders(provider, question);
+
+      const openai = new OpenAI({ baseURL: endpoint, apiKey: "", defaultHeaders: headers });
+      const completion = await openai.chat.completions.create({
+      model,
+      messages: \[{ role: "user", content: question }]
+      });
+
+      const content = completion.choices\[0]?.message?.content ?? "";
+      const ok = await broker.inference.processResponse(provider, content);
+      console.log({ ok, content });
+      ServiceStructOutput:
+      kind: interface
+      summary: Shape of a discovered inference service as returned by `listService()`.
+      definition:
+      lang: typescript
+      code: |-
+      export type ServiceStructOutput = {
+      provider: string;
+      serviceType: string;
+      url: string;
+      inputPrice: bigint;
+      outputPrice: bigint;
+      updatedAt: bigint;
+      model: string;
+      verifiability: string; // e.g. "TEE" when verified by a Trusted Execution Environment; empty string when non‑verifiable
+      };
+      guidance:
+    * Use `provider` as the stable identifier; endpoints and pricing can change
+      without breaking the provider address.
+    * Decide whether to require `verifiability` (e.g., TEE) at selection time—mixing
+      trusted/untrusted outputs in one workflow is discouraged.
+      example:
+      lang: javascript
+      code: |-
+      const items = await broker.inference.listService();
+      for (const s of items) {
+      console.log(`${s.model} @ ${s.url} — in:${s.inputPrice} out:${s.outputPrice} ver:${s.verifiability}`);
+      }
+* name: Ledger & Funding
+  summary: Inspect balances and deposit/withdraw OG to pay for usage.
+  exports:
+
+  * LedgerBroker
+  * AccountStructOutput
+    symbols:
+    LedgerBroker:
+    kind: class
+    summary: Funds interface for deposits, withdrawals, and reading account state.
+    definition:
+    lang: typescript
+    code: |-
+    declare class LedgerBroker {
+    getLedger(): Promise<AccountStructOutput>;
+    addLedger(amount: string | bigint): Promise<void>;// legacy deposit
+    depositFund(amount: string | bigint): Promise<void>;
+    retrieveFund(service: string, amount: string | bigint): Promise<void>;
+    }
+    guidance:
+
+    * Prefer `depositFund` for new code; `addLedger` remains for backward compatibility
+      in some docs.
+    * Pass amounts as strings (e.g., "0.5") or bigints; use `ethers.parseEther`
+      to convert decimals to wei‑like bigint precisely.
+    * Always check `balance` and `locked` to compute what’s available before a large
+      request; some requests reserve funds temporarily.
+      example:
+      lang: javascript
+      code: |-
+      import { ethers } from "ethers";
+
+      await broker.ledger.depositFund("0.1");
+      const ledger = await broker.ledger.getLedger();
+      console.log(`Balance: ${ethers.formatEther(ledger.balance)} OG, Locked: ${ethers.formatEther(ledger.locked)} OG`);
+      await broker.ledger.retrieveFund("inference", "0.05");
+      AccountStructOutput:
+      kind: interface
+      summary: Simplified account snapshot returned by `getLedger()`.
+      definition:
+      lang: typescript
+      code: |-
+      export type AccountStructOutput = {
+      balance: bigint;
+      locked: bigint;
+      lastUpdated?: bigint;
+      };
+      guidance:
+    * '`available = balance - locked`; do not spend more than available.'
+    * Treat `lastUpdated` as advisory; always re‑read before high‑value operations.
+      example:
+      lang: javascript
+      code: |-
+      const { balance, locked } = await broker.ledger.getLedger();
+      const available = balance - locked;
+      console.log({ available: available.toString() });
+      common\_workflows:
+* title: Initialize broker (Node)
+  steps:
+
+  * 'Install: `pnpm add @0glabs/0g-serving-broker ethers openai`'
+  * Create signer and broker
+  * Ping modules
+    example:
+    lang: javascript
+    code: |-
+    import { ethers } from "ethers";
+    import { createZGComputeNetworkBroker } from "@0glabs/0g-serving-broker";
+
+    const provider = new ethers.JsonRpcProvider(process.env.RPC\_ENDPOINT || "[https://evmrpc-testnet.0g.ai](https://evmrpc-testnet.0g.ai)");
+    const wallet = new ethers.Wallet(process.env.PRIVATE\_KEY, provider);
+    const broker = await createZGComputeNetworkBroker(wallet);
+    console.log({ inference: !!broker.inference, ledger: !!broker.ledger });
+* title: Discover a provider and fetch metadata
+  steps:
+
+  * List services via `listService()`
+  * Pick a provider address; fetch endpoint/model via `getServiceMetadata()`
+    example:
+    lang: javascript
+    code: |-
+    const services = await broker.inference.listService();
+    if (!services.length) throw new Error("No services available");
+    const { provider } = services\[0];
+    const meta = await broker.inference.getServiceMetadata(provider);
+    console.log(meta);
+* title: Fund, request, and verify
+  steps:
+
+  * Top‑up ledger (`depositFund`) and wait for balance
+  * Generate single‑use headers via `getRequestHeaders()`
+  * Call OpenAI‑compatible endpoint and verify with `processResponse()`
+    example:
+    lang: javascript
+    code: |-
+    import { OpenAI } from "openai";
+    import { ethers } from "ethers";
+
+    await broker.ledger.depositFund("0.05");
+    const services = await broker.inference.listService();
+    if (!services.length) throw new Error("No services available");
+    const provider = services\[0].provider;
+    const { endpoint, model } = await broker.inference.getServiceMetadata(provider);
+    const prompt = "Write a haiku about GPUs.";
+    const headers = await broker.inference.getRequestHeaders(provider, prompt);
+    const client = new OpenAI({ baseURL: endpoint, apiKey: "", defaultHeaders: headers });
+    const out = await client.chat.completions.create({ model, messages: \[{ role: "user", content: prompt }] });
+    const answer = out.choices\[0]?.message?.content ?? "";
+    const ok = await broker.inference.processResponse(provider, answer);
+    console.log({ ok, answer });
+* title: Withdraw unused funds
+  steps:
+
+  * Call `retrieveFund("inference", amount)` to pull OG back to your wallet
+    example:
+    lang: javascript
+    code: |-
+    await broker.ledger.retrieveFund("inference", "0.02");
+    troubleshooting\_cheatsheet:
+* symptom: HTTP 401 / 403 from provider after a successful call
+  cause: Reusing single‑use headers or clock skew.
+  fix: Always call `getRequestHeaders()` for each request; ensure system time is accurate
+  (use NTP).
+* symptom: 'Verification fails (`processResponse` returns false)'
+  cause: Mismatched `provider`, wrong `chatID`, or calling a non‑verifiable service.
+  fix: Pass the exact provider address used to create headers; include the same `chatID`
+  if your request used one; check `verifiability`.
+* symptom: Insufficient funds despite a recent deposit
+  cause: Funds are still locked or not yet confirmed on‑chain.
+  fix: Wait for confirmation and re‑read `getLedger()`; ensure available balance is
+  `balance - locked`.
+* symptom: MetaMask not detected in browser
+  cause: '`window.ethereum` is undefined.'
+  fix: Prompt user to install a wallet; otherwise use `JsonRpcProvider` with a server‑side
+  signer.
+  faq:
+* q: Do I need an API key?
+  a: 'No. Providers authenticate requests using single‑use signed headers issued by
+  the broker; set `apiKey: ""` with the OpenAI SDK.'
+* q: What is `chatID` used for?
+  a: Some providers issue chat‑scoped tokens or TEEs that bind verification to a conversation;
+  pass the same `chatID` to `getRequestHeaders` and `processResponse` when applicable.
+* q: Can I call providers without the broker?
+  a: You can hit endpoints directly, but you will not be authenticated or settled
+  on‑chain and verification will fail. Use the broker for proper billing and trust.
+  external\_resources:
+* label: 0G Docs — Compute Network
+  url: [https://docs.0g.ai](https://docs.0g.ai)
+* label: 0G Discord
+  url: [https://discord.gg/0glabs](https://discord.gg/0glabs)
+

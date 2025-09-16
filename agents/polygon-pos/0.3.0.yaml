@@ -1,0 +1,630 @@
+meta:
+spec\_name: "polygon/heimdall-v2-apis"
+spec\_version: "0.3.0"
+generated: "2025-09-16"
+library\_version: "^0.2.0"  # Heimdall‑v2 train; Cosmos‑SDK v0.50.13, CometBFT v0.38.17
+language: "go"
+homepage: "[https://docs.polygon.technology/pos/](https://docs.polygon.technology/pos/)"
+tags:
+\- polygon
+\- cosmos-sdk
+\- cometbft
+\- grpc
+\- rest
+\- cli
+purpose: "Teach an LLM to query and transact against Polygon PoS Heimdall‑v2 (Cosmos‑SDK fork) and related Bor node interfaces via gRPC, REST, and CLI, with senior‑level guardrails for validator and full‑node operations."
+guiding\_principles:
+\- Prefer gRPC for correctness and full typing; REST and CLI are convenience layers over the same Query services.&#x20;
+\- Heimdall‑v2 uses Ethereum‑style 0x addresses in examples; be consistent about address format when calling Account/Bank/Gov queries.&#x20;
+\- Always verify Heimdall sync (`/status` → `catching_up:false`) before starting Bor or broadcasting txs.&#x20;
+\- When signing txs with `heimdalld tx`, validate signatures locally before broadcasting; multisig helpers are not supported on Heimdall. &#x20;
+\- For governance, prefer v1 endpoints over legacy v1beta1; know deposits, votes, tally, and params paths. &#x20;
+\- Use `grpcurl` for portable gRPC checks; pass `-plaintext` for local, non‑TLS endpoints.&#x20;
+\- For node health, check CometBFT `/status` and Bor `eth_syncing`; ensure required ports are open only where necessary (sentry model). &#x20;
+design\_notes: >
+Sources are the consolidated Polygon PoS Heimdall‑v2 docs and command references, plus the Open Agent Spec v0.3 schema.
+Grouping mirrors high‑value operator tasks: Auth (accounts & params), Auth TX (sign/validate/broadcast),
+Governance (Gov), Bank (balances & sends), and Ops health checks.
+Definitions are extracted verbatim or minimally compressed from REST paths, gRPC method names, and CLI signatures
+as published in the docs. &#x20;
+
+groups:
+
+* name: "Heimdall Auth — Accounts & Params"
+  exports:
+
+  * "cosmos.auth.v1beta1.Query/Account (gRPC)"
+  * "cosmos.auth.v1beta1.Query/Accounts (gRPC)"
+  * "GET /cosmos/auth/v1beta1/account"
+  * "GET /cosmos/auth/v1beta1/accounts"
+  * "GET /cosmos/auth/v1beta1/params"
+  * "heimdalld query auth account"
+  * "heimdalld query auth accounts"
+  * "heimdalld query auth params"
+    symbols:
+    "cosmos.auth.v1beta1.Query/Account (gRPC)":
+    kind: "function"
+    summary: "Fetch a single account by address."
+    definition:
+    code: "cosmos.auth.v1beta1.Query/Account"
+    lang: "grpc"
+    source: "Heimdall Auth gRPC reference. "
+    guidance:
+
+    * "Use a hex EVM address consistently (e.g., 0x…) when querying accounts on Heimdall‑v2."
+    * "Run locally with `grpcurl -plaintext`; default port is 9090 in examples."
+    * "If the account is a module account, inspect the `@type` field for `ModuleAccount`."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      -d '{"address":"0x..."}'&#x20;
+      localhost:9090&#x20;
+      cosmos.auth.v1beta1.Query/Account
+      description: "Returns BaseAccount/ModuleAccount details."
+      "cosmos.auth.v1beta1.Query/Accounts (gRPC)":
+      kind: "function"
+      summary: "List all accounts (paginated)."
+      definition:
+      code: "cosmos.auth.v1beta1.Query/Accounts"
+      lang: "grpc"
+      source: "Heimdall Auth gRPC examples. "
+      guidance:
+    * "Paginate for large result sets; response includes `pagination`."
+    * "Use to discover module accounts like `fee_collector`, `mint`, `gov`."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      localhost:9090&#x20;
+      cosmos.auth.v1beta1.Query/Accounts
+      "GET /cosmos/auth/v1beta1/account":
+      kind: "function"
+      summary: "REST: fetch one account by address."
+      definition:
+      code: "GET /cosmos/auth/v1beta1/account?address={address}"
+      lang: "http"
+      source: "Auth REST endpoints listing. "
+      guidance:
+    * "Prefer gRPC in automations; REST is great for quick shell checks."
+    * "Address should be EVM‑compatible hex; examples use `0x...` as placeholder."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      curl '[http://localhost:1317/cosmos/auth/v1beta1/account?address=0x](http://localhost:1317/cosmos/auth/v1beta1/account?address=0x)...'
+      "GET /cosmos/auth/v1beta1/accounts":
+      kind: "function"
+      summary: "REST: list all accounts."
+      definition:
+      code: "GET /cosmos/auth/v1beta1/accounts"
+      lang: "http"
+      source: "Auth REST endpoints listing. "
+      guidance:
+    * "Use query params for pagination if supported by your build; otherwise process client‑side."
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/auth/v1beta1/accounts](http://localhost:1317/cosmos/auth/v1beta1/accounts)
+      "GET /cosmos/auth/v1beta1/params":
+      kind: "function"
+      summary: "REST: fetch current auth module parameters."
+      definition:
+      code: "GET /cosmos/auth/v1beta1/params"
+      lang: "http"
+      source: "Auth REST endpoints listing. "
+      guidance:
+    * "Check limits like `MaxMemoCharacters`, `TxSigLimit`, `MaxTxGas`, and fee settings before crafting txs."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/auth/v1beta1/params](http://localhost:1317/cosmos/auth/v1beta1/params)
+      "heimdalld query auth account":
+      kind: "function"
+      summary: "CLI: query a single account by address."
+      definition:
+      code: "heimdalld query auth account \[address] \[flags]"
+      lang: "bash"
+      source: "Auth CLI signature & output. "
+      guidance:
+    * "Use on hosts where `heimdalld` is installed; match the node `--home` if customized."
+    * "Great for quick human‑readable inspection during ops."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query auth account 0x...
+      "heimdalld query auth accounts":
+      kind: "function"
+      summary: "CLI: list accounts."
+      definition:
+      code: "heimdalld query auth accounts \[flags]"
+      lang: "bash"
+      source: "Accounts CLI usage & sample output. "
+      guidance:
+    * "Use piping/`jq` to filter module accounts (e.g., `name: gov`, `mint`)."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query auth accounts
+      "heimdalld query auth params":
+      kind: "function"
+      summary: "CLI: fetch auth params."
+      definition:
+      code: "heimdalld query auth params \[flags]"
+      lang: "bash"
+      source: "Params CLI usage. "
+      guidance:
+    * "Verify `tx_fees` and limits prior to signing/broadcasting high‑volume tx batches."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query auth params
+
+* name: "Heimdall Auth — TX Signing & Broadcast"
+  exports:
+
+  * "heimdalld tx sign"
+  * "heimdalld tx sign-batch"
+  * "heimdalld tx validate-signatures"
+  * "heimdalld tx broadcast"
+  * "heimdalld tx multisign"
+  * "heimdalld tx multisign-batch"
+    symbols:
+    "heimdalld tx sign":
+    kind: "function"
+    summary: "Sign an offline‑generated transaction."
+    definition:
+    code: "heimdalld tx sign \<tx.json> --from <keyName> > tx.signed.json"
+    lang: "bash"
+    source: "Signing command and usage notes. "
+    guidance:
+
+    * "Use keyring safely; Heimdall‑v2 encourages importing validator keys into the keyring backend."&#x20;
+    * "Always run `validate-signatures` before broadcasting."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      heimdalld tx sign tx.json --from alice > tx.signed.json
+      "heimdalld tx sign-batch":
+      kind: "function"
+      summary: "Sign multiple txs from file(s)."
+      definition:
+      code: "heimdalld tx sign-batch \<txs.json|tx1.json ...> --from <keyName> > tx.signed.json"
+      lang: "bash"
+      source: "Batch signing guidance. "
+      guidance:
+    * "Use one‑per‑line JSON in a single file for easier auditing."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld tx sign-batch txs.json --from alice > tx.signed.json
+      "heimdalld tx validate-signatures":
+      kind: "function"
+      summary: "Validate signatures of a signed tx locally."
+      definition:
+      code: "heimdalld tx validate-signatures \<tx.signed.json>"
+      lang: "bash"
+      source: "Validation example & output shape. "
+      guidance:
+    * "Validate before broadcast to avoid wasted fees and noisy mempools."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld tx validate-signatures tx.signed.json
+      "heimdalld tx broadcast":
+      kind: "function"
+      summary: "Broadcast a signed transaction."
+      definition:
+      code: "heimdalld tx broadcast \<tx.signed.json>"
+      lang: "bash"
+      source: "Broadcast example. "
+      guidance:
+    * "Ensure Heimdall node is synced (`catching_up:false`) before broadcast."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      heimdalld tx broadcast tx.signed.json
+      "heimdalld tx multisign":
+      kind: "function"
+      summary: "Sign an offline tx with a multisig account (not supported on Heimdall)."
+      definition:
+      code: "heimdalld tx multisign \<tx.json> \<multisig\_addr> \<sig1.json> \<sig2.json> ..."
+      lang: "bash"
+      source: "CLI reference noting Heimdall does not support multisig flow. "
+      deprecated:
+      reason: "Multi‑signature helpers are not supported by Heimdall."
+      replaced\_by: "Use single‑sig flow (`sign`, `validate-signatures`, `broadcast`)."
+      guidance:
+    * "Do not rely on `multisign` or nested multisig helpers on Heimdall; they are explicitly unsupported."&#x20;
+      example:
+      lang: "bash"
+      code: |
+
+      # Unsupported on Heimdall (for reference only)
+
+      heimdalld tx multisign tx.json k1k2k3 k1sig.json k2sig.json
+      "heimdalld tx multisign-batch":
+      kind: "function"
+      summary: "Batch multisig (not supported on Heimdall)."
+      definition:
+      code: "heimdalld tx multisign-batch \<txs.json> \<multisig\_addr> <sig files...>"
+      lang: "bash"
+      source: "CLI reference noting unsupported state. "
+      deprecated:
+      reason: "Multi‑signature helpers are not supported by Heimdall."
+      guidance:
+    * "Avoid; use single‑sig batch signing instead (`sign-batch`)."&#x20;
+      example:
+      lang: "bash"
+      code: |
+
+      # Unsupported on Heimdall (for reference only)
+
+      heimdalld tx multisign-batch txs.json k1k2k3 k1sig.json k2sig.json
+
+* name: "Governance (cosmos.gov.v1)"
+  exports:
+
+  * "GET /cosmos/gov/v1/proposals"
+  * "GET /cosmos/gov/v1/proposals/{proposal\_id}"
+  * "GET /cosmos/gov/v1/proposals/{proposal\_id}/votes"
+  * "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits"
+  * "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits/{depositor}"
+  * "GET /cosmos/gov/v1/proposals/{proposal\_id}/tally"
+  * "GET /cosmos/gov/v1/params/{params\_type}"
+  * "cosmos.gov.v1.Query/Deposits"
+  * "cosmos.gov.v1.Query/Deposit"
+  * "cosmos.gov.v1.Query/TallyResult"
+    symbols:
+    "GET /cosmos/gov/v1/proposals":
+    kind: "function"
+    summary: "List proposals."
+    definition:
+    code: "GET /cosmos/gov/v1/proposals"
+    lang: "http"
+    source: "Gov REST examples (v1 preferred). "
+    guidance:
+
+    * "Use v1 responses (`messages[]`, modern tally fields) rather than legacy v1beta1."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals](http://localhost:1317/cosmos/gov/v1/proposals)
+      "GET /cosmos/gov/v1/proposals/{proposal\_id}":
+      kind: "function"
+      summary: "Fetch a single proposal."
+      definition:
+      code: "GET /cosmos/gov/v1/proposals/{proposal\_id}"
+      lang: "http"
+      source: "Gov proposal REST. "
+      guidance:
+    * "Cross‑check `status` and `voting_{start,end}_time` before tally queries."
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals/1](http://localhost:1317/cosmos/gov/v1/proposals/1)
+      "GET /cosmos/gov/v1/proposals/{proposal\_id}/votes":
+      kind: "function"
+      summary: "List votes for a proposal."
+      definition:
+      code: "GET /cosmos/gov/v1/proposals/{proposal\_id}/votes"
+      lang: "http"
+      source: "Gov votes REST. "
+      guidance:
+    * "In v1, each vote includes `options[]` with weighted entries and optional `metadata`."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals/1/votes](http://localhost:1317/cosmos/gov/v1/proposals/1/votes)
+      "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits":
+      kind: "function"
+      summary: "List all deposits for a proposal."
+      definition:
+      code: "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits"
+      lang: "http"
+      source: "Gov deposits REST. "
+      guidance:
+    * "Use pagination for proposals with many depositors."
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals/1/deposits](http://localhost:1317/cosmos/gov/v1/proposals/1/deposits)
+      "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits/{depositor}":
+      kind: "function"
+      summary: "Fetch a specific depositor’s deposit on a proposal."
+      definition:
+      code: "GET /cosmos/gov/v1/proposals/{proposal\_id}/deposits/{depositor}"
+      lang: "http"
+      source: "Gov deposit by depositor. "
+      guidance:
+    * "Verify `denom` and `amount` match chain’s governance token (e.g., `pol`)."
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals/1/deposits/0x](http://localhost:1317/cosmos/gov/v1/proposals/1/deposits/0x)...
+      "GET /cosmos/gov/v1/proposals/{proposal\_id}/tally":
+      kind: "function"
+      summary: "Fetch tally for a proposal."
+      definition:
+      code: "GET /cosmos/gov/v1/proposals/{proposal\_id}/tally"
+      lang: "http"
+      source: "Gov tally REST. "
+      guidance:
+    * "Monitor live tallies during voting period; finalize after close."
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/proposals/1/tally](http://localhost:1317/cosmos/gov/v1/proposals/1/tally)
+      "GET /cosmos/gov/v1/params/{params\_type}":
+      kind: "function"
+      summary: "Fetch governance params (`voting`, `deposit`, `tally`)."
+      definition:
+      code: "GET /cosmos/gov/v1/params/{params\_type}"
+      lang: "http"
+      source: "Gov params REST (v1). "
+      guidance:
+    * "Prefer v1; legacy v1beta1 shows nils on some builds."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      curl [http://localhost:1317/cosmos/gov/v1/params/voting](http://localhost:1317/cosmos/gov/v1/params/voting)
+      "cosmos.gov.v1.Query/Deposits":
+      kind: "function"
+      summary: "gRPC: list deposits for a proposal."
+      definition:
+      code: "cosmos.gov.v1.Query/Deposits"
+      lang: "grpc"
+      source: "Gov gRPC (Deposits). "
+      guidance:
+    * "Use for typed pagination and robust automation instead of REST when possible."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext -d '{"proposal\_id":"1"}'&#x20;
+      localhost:9090 cosmos.gov.v1.Query/Deposits
+      "cosmos.gov.v1.Query/Deposit":
+      kind: "function"
+      summary: "gRPC: fetch a single depositor’s deposit."
+      definition:
+      code: "cosmos.gov.v1.Query/Deposit"
+      lang: "grpc"
+      source: "Gov gRPC (Deposit). "
+      guidance:
+    * "Deposit lookups are idempotent; empty result indicates no deposit."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext -d '{"proposal\_id":"1","depositor":"0x..."}'&#x20;
+      localhost:9090 cosmos.gov.v1.Query/Deposit
+      "cosmos.gov.v1.Query/TallyResult":
+      kind: "function"
+      summary: "gRPC: fetch tally for a proposal."
+      definition:
+      code: "cosmos.gov.v1.Query/TallyResult"
+      lang: "grpc"
+      source: "Gov gRPC (TallyResult). "
+      guidance:
+    * "Use to watch weighted results (`yes`, `no`, `abstain`, `noWithVeto`)."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext -d '{"proposal\_id":"1"}'&#x20;
+      localhost:9090 cosmos.gov.v1.Query/TallyResult
+
+* name: "Bank (cosmos.bank.v1beta1)"
+  exports:
+
+  * "heimdalld query bank balances"
+  * "heimdalld query bank denom-metadata"
+  * "heimdalld query bank total"
+  * "heimdalld query bank send-enabled"
+  * "heimdalld tx bank send"
+  * "cosmos.bank.v1beta1.Query/Balance"
+  * "cosmos.bank.v1beta1.Query/AllBalances"
+  * "cosmos.bank.v1beta1.Query/DenomMetadata"
+  * "cosmos.bank.v1beta1.Query/DenomsMetadata"
+    symbols:
+    "heimdalld query bank balances":
+    kind: "function"
+    summary: "CLI: get balances for an address."
+    definition:
+    code: "heimdalld query bank balances \[address] \[flags]"
+    lang: "bash"
+    source: "Bank CLI balance example. "
+    guidance:
+
+    * "Validate `denom` names used on your chain; examples use `stake` in docs."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query bank balances 0x...
+      "heimdalld query bank denom-metadata":
+      kind: "function"
+      summary: "CLI: view denomination metadata."
+      definition:
+      code: "heimdalld query bank denom-metadata \[--denom <denom>]"
+      lang: "bash"
+      source: "Denom metadata CLI example. "
+      guidance:
+    * "Use to discover display units and aliases for UI/UX mapping."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query bank denom-metadata --denom stake
+      "heimdalld query bank total":
+      kind: "function"
+      summary: "CLI: total supply for a denom or all."
+      definition:
+      code: "heimdalld query bank total \[--denom <denom>]"
+      lang: "bash"
+      source: "Total supply CLI example. "
+      guidance:
+    * "Correlate totals with module mint/burn events when auditing supply."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query bank total --denom stake
+      "heimdalld query bank send-enabled":
+      kind: "function"
+      summary: "CLI: which denoms are send‑enabled."
+      definition:
+      code: "heimdalld query bank send-enabled \[denom1 ...] \[flags]"
+      lang: "bash"
+      source: "Send‑enabled CLI example. "
+      guidance:
+    * "Useful guardrail before attempting programmatic transfers."
+      example:
+      lang: "bash"
+      code: |
+      heimdalld query bank send-enabled
+      "heimdalld tx bank send":
+      kind: "function"
+      summary: "CLI: transfer funds."
+      definition:
+      code: "heimdalld tx bank send \[from\_key\_or\_address] \[to\_address] \[amount] \[flags]"
+      lang: "bash"
+      source: "Send CLI example. "
+      guidance:
+    * "Confirm fees and `MaxTxGas` in auth params before sending high‑value txs."&#x20;
+      example:
+      lang: "bash"
+      code: |
+      heimdalld tx bank send 0xFROM 0xTO 100stake
+      "cosmos.bank.v1beta1.Query/Balance":
+      kind: "function"
+      summary: "gRPC: balance for address+denom."
+      definition:
+      code: "cosmos.bank.v1beta1.Query/Balance"
+      lang: "grpc"
+      source: "Bank gRPC Balance. "
+      guidance:
+    * "Prefer gRPC for typed responses; REST is fine for manual checks."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      -d '{"address":"0x...","denom":"stake"}'&#x20;
+      localhost:9090&#x20;
+      cosmos.bank.v1beta1.Query/Balance
+      "cosmos.bank.v1beta1.Query/AllBalances":
+      kind: "function"
+      summary: "gRPC: all balances for address."
+      definition:
+      code: "cosmos.bank.v1beta1.Query/AllBalances"
+      lang: "grpc"
+      source: "Bank gRPC AllBalances. "
+      guidance:
+    * "Use pagination; combine with denom metadata for UI display."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      -d '{"address":"0x..."}'&#x20;
+      localhost:9090&#x20;
+      cosmos.bank.v1beta1.Query/AllBalances
+      "cosmos.bank.v1beta1.Query/DenomMetadata":
+      kind: "function"
+      summary: "gRPC: metadata for a denom."
+      definition:
+      code: "cosmos.bank.v1beta1.Query/DenomMetadata"
+      lang: "grpc"
+      source: "Bank gRPC DenomMetadata. "
+      guidance:
+    * "Use to map base/display units and symbols programmatically."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      -d '{"denom":"stake"}'&#x20;
+      localhost:9090&#x20;
+      cosmos.bank.v1beta1.Query/DenomMetadata
+      "cosmos.bank.v1beta1.Query/DenomsMetadata":
+      kind: "function"
+      summary: "gRPC: metadata for all denoms."
+      definition:
+      code: "cosmos.bank.v1beta1.Query/DenomsMetadata"
+      lang: "grpc"
+      source: "Bank gRPC DenomsMetadata. "
+      guidance:
+    * "Cache metadata and refresh sparsely; it changes infrequently."
+      example:
+      lang: "bash"
+      code: |
+      grpcurl -plaintext&#x20;
+      localhost:9090&#x20;
+      cosmos.bank.v1beta1.Query/DenomsMetadata
+
+common\_workflows:
+
+* title: "Check Heimdall sync and start Bor"
+  steps:
+
+  * "Check CometBFT status: `curl localhost:26657/status` and confirm `catching_up:false`."
+  * "Start Bor only after Heimdall is fully synced; then follow logs with `journalctl -u bor.service -f`."
+  * "If Bor needs Heimdall REST, start REST server and verify `/bor/span/1`."
+  * "For Bor sync progress, call JSON‑RPC `eth_syncing`."
+  * "References:    "
+* title: "Query an account via gRPC, REST, and CLI"
+  steps:
+
+  * "gRPC: `cosmos.auth.v1beta1.Query/Account` with `grpcurl -plaintext -d '{\"address\":\"0x...\"}'`."
+  * "REST: `GET /cosmos/auth/v1beta1/account?address=0x...`."
+  * "CLI: `heimdalld query auth account 0x...`."
+  * "References:   "
+* title: "Get governance tally and deposits"
+  steps:
+
+  * "Tally (REST): `GET /cosmos/gov/v1/proposals/{id}/tally`."
+  * "Deposits (REST): `GET /cosmos/gov/v1/proposals/{id}/deposits`."
+  * "gRPC equivalents: `cosmos.gov.v1.Query/TallyResult`, `cosmos.gov.v1.Query/Deposits`."
+  * "References:  "
+* title: "Send a transfer"
+  steps:
+
+  * "Check send‑enabled denoms: `heimdalld query bank send-enabled`."
+  * "Optionally inspect denom metadata and balance."
+  * "Send: `heimdalld tx bank send <from> <to> <amount>`."
+  * "References:  "
+* title: "Sign → validate → broadcast"
+  steps:
+
+  * "Sign: `heimdalld tx sign tx.json --from <key> > tx.signed.json`."
+  * "Validate: `heimdalld tx validate-signatures tx.signed.json`."
+  * "Broadcast: `heimdalld tx broadcast tx.signed.json`."
+  * "References:  "
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Heimdall remains `catching_up:true` for a long time"
+  cause: "Poor peering or ports not open as per sentry model; or syncing from scratch without snapshot."
+  fix: "Open only required ports (26656/30303 on sentry), add official seeds/bootnodes, or use maintained snapshots to accelerate sync."
+* symptom: "Node not signing checkpoints"
+  cause: "Incorrect `bor_rpc_url` in `app.toml` or services not healthy."
+  fix: "Point `bor_rpc_url` to a working external provider temporarily, restart Heimdall/Bor; revert once fixed; ensure services are running and logs are clean."&#x20;
+* symptom: "Error: Failed to unlock account (0x...) No key for given address or file"
+  cause: "Wrong keystore/password path or file permissions."
+  fix: "Copy keystore to `/var/lib/bor/keystore`, password to `/var/lib/bor/`, set proper ownership on `priv_validator_key.json` and the UTC keystore file."&#x20;
+
+faq:
+
+* q: "Where do I add the API key?"
+  a: "In the Heimdall `app.toml` file as documented in the FAQ."&#x20;
+* q: "Does Heimdall support CLI multisig helpers?"
+  a: "No. The `multisign`/`multisign-batch` flows are not supported; use single‑sig signing, validate, then broadcast."&#x20;
+* q: "Which framework versions underlie Heimdall‑v2?"
+  a: "Cosmos‑SDK v0.50.13 and CometBFT v0.38.17 (forks used by Heimdall‑v2)."&#x20;
+* q: "Should I use 0x or bech32 addresses?"
+  a: "Docs show Ethereum‑style `0x...` addresses for Heimdall‑v2 examples; use that consistently for Auth/Bank/Gov queries."&#x20;
+
+external\_resources:
+
+* label: "Heimdall‑v2 GitHub"
+  url: "[https://github.com/0xPolygon/heimdall-v2](https://github.com/0xPolygon/heimdall-v2)"
+* label: "Bor GitHub"
+  url: "[https://github.com/0xPolygon/bor](https://github.com/0xPolygon/bor)"
+* label: "Polygon PoS Docs (Heimdall/Bor)"
+  url: "[https://docs.polygon.technology/pos/](https://docs.polygon.technology/pos/)"
+* label: "Seed and Bootnodes"
+  url: "[https://docs.polygon.technology/pos/reference/seed-and-bootnodes/](https://docs.polygon.technology/pos/reference/seed-and-bootnodes/)"
+* label: "RPC Endpoints (Mainnet/Amoy)"
+  url: "[https://docs.polygon.technology/pos/reference/rpc-endpoints/](https://docs.polygon.technology/pos/reference/rpc-endpoints/)"
+

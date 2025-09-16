@@ -1,0 +1,471 @@
+meta:
+spec\_name: polygon/cdk-expert-pack
+spec\_version: 0.3.0
+generated: '2025-09-16'
+library\_version: Fork-12; zkevm-contracts v8.0.0-rc.3-fork.12; cdk-validium-node v0.6.4-cdk.5
+language: mixed (solidity, bash, openapi, javascript)
+homepage: [https://github.com/0xPolygon/cdk](https://github.com/0xPolygon/cdk)
+tags:
+
+* blockchain
+* polygon
+* cdk
+* zkEVM
+* validium
+* bridge
+* prover
+  purpose: This Expert Knowledge Pack teaches an LLM how to operate core developer‑facing surfaces in Polygon CDK: Solidity interfaces for Validium Data Availability (DA), the Bridge Service REST API used for deposits and withdrawals, the Paladin (Type‑1) prover CLI, and the CDK Validium Node policy CLI.
+  guiding\_principles:
+* Prefer official contracts and CLI entrypoints; avoid private or internal APIs.
+* Pin to the documented fork/versions; mismatch across repos causes subtle breakage.
+* Start with small test cases (empty blocks, ERC‑20 transfers) before scaling proofs.
+* For DA integrations, align on the protocol name string between contracts and node config.
+* Always check limits and memory needs when proving; size circuits conservatively.
+* Use the Bridge Service for discovery and proofs, then submit transactions with eth\_call/eth\_sendRawTransaction.
+* Treat policies as runtime toggles; changes apply without node restarts but require the correct container context.
+* Log every on‑chain address at deployment time; wire these into node/genesis and bridge configs.
+  design\_notes: Compiled from the user‑provided Polygon CDK docs bundle (how‑tos, architecture, and references). Key sources include: DA integration guide, Type‑1 prover guides, policy CLI, bridge service usage, and network/testnet references.&#x20;
+  groups:
+* name: Solidity—Validium Data Availability
+  exports:
+
+  * IDataAvailabilityProtocol.verifyMessage
+  * IDataAvailabilityProtocol.getProcotolName
+  * PolygonValidiumEtrog.setDataAvailabilityProtocol
+  * PolygonDataCommittee.setupCommittee
+    symbols:
+    IDataAvailabilityProtocol.verifyMessage:
+    kind: function
+    summary: Validate that a DAC/protocol accepts the dataAvailabilityMessage for a given accumulated transactions hash (view).
+    definition:
+    code: |-
+    interface IDataAvailabilityProtocol {
+    function verifyMessage(bytes32 accumulatedNonForcedTransactionsHash, bytes calldata dataAvailabilityMessage) external view;
+    }
+    lang: solidity
+    source: zkevm-contracts v8.0.0-rc.3-fork.12 / contracts/v2/interfaces/IDataAvailabilityProtocol.sol; usage shown in PolygonValidiumEtrog.verifyMessage(..).&#x20;
+    guidance:
+
+    * Pass the exact accumulated non‑forced transactions hash used during batch formation.
+    * dataAvailabilityMessage must be ABI‑encoded as expected by your DA backend (e.g., signature bundle with committee addresses ascending).
+    * This is a view call; prefer eth\_call to preflight before sequencing a batch.
+    * Ensure the DA protocol implementation and node backend use the same protocol name constant.
+      example:
+      lang: solidity
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      interface IDataAvailabilityProtocol {
+      function verifyMessage(bytes32 h, bytes calldata msgData) external view;
+      }
+      contract CheckDA {
+      IDataAvailabilityProtocol public dap;
+      constructor(address dapAddr){ dap = IDataAvailabilityProtocol(dapAddr); }
+      function check(bytes32 h, bytes calldata msgData) external view {
+      // Reverts if invalid
+      dap.verifyMessage(h, msgData);
+      }
+      }
+      description: Minimal wrapper that uses verifyMessage to validate a DA bundle.
+      since: v8.0.0-rc.3-fork.12
+      IDataAvailabilityProtocol.getProcotolName:
+      kind: function
+      summary: Return a unique protocol name string for this DA backend.
+      definition:
+      code: |-
+      interface IDataAvailabilityProtocol {
+      function getProcotolName() external pure returns (string memory);
+      }
+      lang: solidity
+      source: zkevm-contracts v8.0.0-rc.3-fork.12 / contracts/v2/interfaces/IDataAvailabilityProtocol.sol; cited example in docs.&#x20;
+      guidance:
+    * Must exactly match the DABackendType constant used by the node (e.g., DataAvailabilityCommittee).
+    * Use a stable, ASCII‑only identifier (e.g., 'PolygonDataCommittee', 'Avail', 'Celestia').
+    * Changing this after deployment will break node↔contract routing; treat it as immutable.
+      example:
+      lang: solidity
+      code: |-
+      contract AvailDA is IDataAvailabilityProtocol {
+      string internal constant \_PROTOCOL\_NAME = "Avail";
+      function getProcotolName() external pure returns (string memory) { return \_PROTOCOL\_NAME; }
+      function verifyMessage(bytes32, bytes calldata) external view {}
+      }
+      description: Example DA contract returning a stable protocol identifier.
+      since: v8.0.0-rc.3-fork.12
+      PolygonValidiumEtrog.setDataAvailabilityProtocol:
+      kind: function
+      summary: Set a new on‑chain DA protocol implementation used by the Validium consensus contract.
+      definition:
+      code: |-
+      interface IDataAvailabilityProtocol { /\* ... \*/ }
+      interface IPolygonValidiumEtrog {
+      function setDataAvailabilityProtocol(IDataAvailabilityProtocol newDataAvailabilityProtocol) external;
+      }
+      lang: solidity
+      source: zkevm-contracts v8.0.0-rc.3-fork.12 / contracts/v2/consensus/validium/PolygonValidiumEtrog.sol (setter example).&#x20;
+      guidance:
+    * Restricted to admin; wire timelock/governance before mainnet.
+    * Emit and index the SetDataAvailabilityProtocol event to simplify off‑chain monitoring.
+    * After switching the protocol, update node configs and restart the aggregator/sequencer as required.
+      example:
+      lang: solidity
+      code: |-
+      // Admin script snippet (ethers.js):
+      // await etrog.setDataAvailabilityProtocol(newProtocolAddr).then(tx => tx.wait());
+      since: v8.0.0-rc.3-fork.12
+      PolygonDataCommittee.setupCommittee:
+      kind: function
+      summary: Initialize or reset the committee membership for the DAC protocol.
+      definition:
+      code: |-
+      interface IPolygonDataCommittee {
+      function setupCommittee(uint256 epoch, address\[] calldata members, bytes calldata extraData) external;
+      }
+      lang: solidity
+      source: zkevm-contracts v8.0.0-rc.3-fork.12 / PolygonDataCommittee.sol; example usage in deployment script.&#x20;
+      guidance:
+    * Call during deployment with epoch=0 to bootstrap; supply member addresses in ascending order if signatures assume sorted inputs.
+    * Persist the deployed DAC address and membership off‑chain for audits and node configuration.
+    * Consider a minimum quorum policy aligned with on‑chain multi‑sig verification.
+      example:
+      lang: javascript
+      code: |-
+      // Using ethers.js in a deploy script
+      const dac = await ethers.getContractAt("IPolygonDataCommittee", dacAddr);
+      await (await dac.setupCommittee(0, \[], "0x")).wait();
+      description: Bootstrap an empty committee; replace with real members for production.
+      since: v8.0.0-rc.3-fork.12
+* name: Bridge Service REST
+  exports:
+
+  * BridgeService.getBridgesByAddress
+  * BridgeService.getMerkleProof
+    symbols:
+    BridgeService.getBridgesByAddress:
+    kind: function
+    summary: List deposits destined to an address; used to find claimable withdrawals.
+    definition:
+    code: |-
+    openapi: 3.0.0
+    info: { title: Bridge Service, version: '0' }
+    paths:
+    /bridges/{address}:
+    get:
+    summary: List deposits for a destination address
+    parameters:
+    \- { name: address, in: path, required: true, schema: { type: string } }
+    \- { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000 } }
+    \- { name: offset, in: query, required: false, schema: { type: integer, minimum: 0 } }
+    responses:
+    '200':
+    description: OK
+    content:
+    application/json:
+    schema:
+    type: object
+    properties:
+    deposits:
+    type: array
+    items:
+    type: object
+    properties:
+    ready\_for\_claim: { type: boolean }
+    claim\_tx\_hash:   { type: string }
+    dest\_net:        { type: integer }
+    deposit\_cnt:     { type: integer }
+    network\_id:      { type: integer }
+    global\_index:    { type: string }
+    orig\_net:        { type: integer }
+    orig\_addr:       { type: string }
+    dest\_addr:       { type: string }
+    amount:          { type: string }
+    metadata:        { type: string }
+    lang: openapi
+    source: Bridge Service endpoints used in the manual claim script.&#x20;
+    guidance:
+
+    * Filter for ready\_for\_claim==true, empty claim\_tx\_hash, and dest\_net==L1 when preparing L1 claims.
+    * Paginate with limit/offset; store raw JSON for audit trails.
+    * Cross‑validate dest\_net against your L1 chain id mapping.
+      example:
+      lang: javascript
+      code: |-
+      const base = process.env.BRIDGE\_API;
+      const addr = "0x85dA99c8a7C2C95964c8EfD687E95E632Fc533D6";
+      fetch(`${base}/bridges/${addr}?limit=100&offset=0`)
+      .then(r => r.json())
+      .then(j => console.log(j.deposits.filter(d => d.ready\_for\_claim && !d.claim\_tx\_hash)));
+      since: Bridge service V2 (zkEVM)
+      BridgeService.getMerkleProof:
+      kind: function
+      summary: Fetch Merkle proof and exit roots for a given deposit counter and network id.
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: Bridge Service, version: '0' }
+      paths:
+      /merkle-proof:
+      get:
+      summary: Fetch Merkle proof for a deposit
+      parameters:
+      \- { name: deposit\_cnt, in: query, required: true, schema: { type: integer } }
+      \- { name: net\_id, in: query, required: true, schema: { type: integer } }
+      responses:
+      '200':
+      description: OK
+      content:
+      application/json:
+      schema:
+      type: object
+      properties:
+      proof:
+      type: object
+      properties:
+      merkle\_proof:        { type: array, items: { type: string } }
+      rollup\_merkle\_proof: { type: array, items: { type: string } }
+      main\_exit\_root:      { type: string }
+      rollup\_exit\_root:    { type: string }
+      lang: openapi
+      source: Bridge Service /merkle-proof usage in claim script.&#x20;
+      guidance:
+    * Use outputs to build calldata for PolygonZkEVMBridgeV2.claimAsset(...).
+    * Always preflight with eth\_call before sending the claim transaction.
+    * Cache proofs per deposit\_cnt to avoid duplicate requests.
+      example:
+      lang: javascript
+      code: |-
+      const base = process.env.BRIDGE\_API;
+      async function getProof(deposit\_cnt, net\_id){
+      const r = await fetch(`${base}/merkle-proof?deposit_cnt=${deposit_cnt}&net_id=${net_id}`);
+      return (await r.json()).proof;
+      }
+      since: Bridge service V2 (zkEVM)
+* name: Type‑1 Prover (Paladin) CLI
+  exports:
+
+  * PaladinLeader.rpc
+  * PaladinLeader.prove
+  * PaladinWorker.run
+    symbols:
+    PaladinLeader.rpc:
+    kind: function
+    summary: Generate a witness for a target transaction (typically the last tx in the block).
+    definition:
+    code: paladin-leader rpc -u \<ETHEREUM\_RPC\_URL> -t \<TX\_HASH> > \<witness.json>
+    lang: bash
+    source: eth-tx-proof deployment guide.&#x20;
+    guidance:
+
+    * Ensure the RPC is archive‑capable (full state) for the target block range.
+    * Use the last tx hash of the block when creating a block‑wide witness.
+    * Store witnesses with deterministic filenames for resume/retries.
+      example:
+      lang: bash
+      code: paladin-leader rpc -u "\$RPC\_URL" -t 0xdead...beef > 0xdead...beef.json
+      since: eth-tx-proof (Paladin) initial deployment
+      PaladinLeader.prove:
+      kind: function
+      summary: Produce a proof from a witness using the in‑memory runtime (single host) or AMQP (distributed).
+      definition:
+      code: |-
+
+      # In‑memory proving (single host)
+
+      env RUST\_MIN\_STACK=33554432&#x20;
+      ARITHMETIC\_CIRCUIT\_SIZE="15..28"&#x20;
+      BYTE\_PACKING\_CIRCUIT\_SIZE="9..28"&#x20;
+      CPU\_CIRCUIT\_SIZE="12..28"&#x20;
+      KECCAK\_CIRCUIT\_SIZE="14..28"&#x20;
+      KECCAK\_SPONGE\_CIRCUIT\_SIZE="9..28"&#x20;
+      LOGIC\_CIRCUIT\_SIZE="12..28"&#x20;
+      MEMORY\_CIRCUIT\_SIZE="17..30"&#x20;
+      paladin-leader prove --runtime in-memory --num-workers 1 --input-witness \<witness.json>
+      lang: bash
+      source: Type‑1 prover quick start (in‑memory).&#x20;
+      guidance:
+    * Allocate at least 40 GB RAM; increase --num-workers as cores allow (\~8 cores/worker).
+    * Tune circuit size ranges only if you know the block profile; delete any persisted state if sizes change.
+    * Log prove time and store proof artifacts for aggregation.
+      example:
+      lang: bash
+      code: |-
+      env RUST\_MIN\_STACK=33554432 CPU\_CIRCUIT\_SIZE="12..28" paladin-leader&#x20;
+      prove --runtime in-memory --num-workers 1 --input-witness ./witness.json
+      since: eth-tx-proof (Paladin) initial deployment
+      PaladinWorker.run:
+      kind: function
+      summary: Start a worker that consumes proving jobs over AMQP.
+      definition:
+      code: |-
+      env RUST\_MIN\_STACK=33554432&#x20;
+      ARITHMETIC\_CIRCUIT\_SIZE="15..28"&#x20;
+      BYTE\_PACKING\_CIRCUIT\_SIZE="9..28"&#x20;
+      CPU\_CIRCUIT\_SIZE="12..28"&#x20;
+      KECCAK\_CIRCUIT\_SIZE="14..28"&#x20;
+      KECCAK\_SPONGE\_CIRCUIT\_SIZE="9..28"&#x20;
+      LOGIC\_CIRCUIT\_SIZE="12..28"&#x20;
+      MEMORY\_CIRCUIT\_SIZE="17..30"&#x20;
+      paladin-worker --runtime amqp --amqp-uri=amqp\://localhost:5672
+      lang: bash
+      source: Distributed proving guide (AMQP).&#x20;
+      guidance:
+    * Co‑locate workers with the leader’s AMQP broker for low latency.
+    * Use systemd templated units ([paladin-worker@.service](mailto:paladin-worker@.service)) to scale to N workers.
+    * Match circuit env vars between leader and workers to avoid incompatibilities.
+      example:
+      lang: bash
+      code: paladin-worker --runtime amqp --amqp-uri=\$AMQP\_URL
+* name: CDK Validium Node — Policy CLI
+  exports:
+
+  * PolicyCLI.add
+  * PolicyCLI.remove
+  * PolicyCLI.clear
+  * PolicyCLI.describe
+  * PolicyCLI.update
+    symbols:
+    PolicyCLI.add:
+    kind: function
+    summary: Add address(es) to a policy’s exclusion list (allow/deny).
+    definition:
+    code: cdk-validium-node policy add --policy \<sendtx|deploy> \[--csv \<file.csv>] \[0xAddress1 0xAddress2 ...]
+    lang: bash
+    source: Validium node policy management (cmd/policy.go).&#x20;
+    guidance:
+
+    * Run inside the aggregator container (or wherever cdk-validium-node binary lives).
+    * CSV mode is safer for bulk edits—validate addresses and dedupe prior to import.
+      example:
+      lang: bash
+      code: docker exec -it cdk-validium-aggregator /app/cdk-validium-node policy add --policy deploy 0xAbc...
+      PolicyCLI.remove:
+      kind: function
+      summary: Remove address(es) from a policy’s exclusion list.
+      definition:
+      code: cdk-validium-node policy remove --policy \<sendtx|deploy> \[--csv \<file.csv>] \[0xAddress...]
+      lang: bash
+      source: Validium node policy management.&#x20;
+      guidance:
+    * Supports single or CSV batch removal.
+    * Audit the effective ACL after changes with policy describe.
+      example:
+      lang: bash
+      code: docker exec -it cdk-validium-aggregator /app/cdk-validium-node policy remove --policy deploy --csv ./addresses.csv
+      PolicyCLI.clear:
+      kind: function
+      summary: Clear all addresses from a policy’s exclusion list.
+      definition:
+      code: cdk-validium-node policy clear --policy \<sendtx|deploy>
+      lang: bash
+      source: Validium node policy management.&#x20;
+      guidance:
+    * Use with caution in production; snapshot current ACLs before clearing.
+    * Prefer staged rollouts—test in devnet first.
+      example:
+      lang: bash
+      code: docker exec -it cdk-validium-aggregator /app/cdk-validium-node policy clear --policy deploy
+      PolicyCLI.describe:
+      kind: function
+      summary: Inspect default actions and ACL entries for one or all policies.
+      definition:
+      code: cdk-validium-node policy describe \[--policy \<sendtx|deploy>] \[--no-header]
+      lang: bash
+      source: Validium node policy management.&#x20;
+      guidance:
+    * Run without --policy to list all policies and defaults.
+    * Pipe to jq/awk for automation and audits.
+      example:
+      lang: bash
+      code: docker exec -it cdk-validium-aggregator /app/cdk-validium-node policy describe --policy deploy
+      PolicyCLI.update:
+      kind: function
+      summary: Update a policy’s default action to allow or deny.
+      definition:
+      code: cdk-validium-node policy update --policy \<sendtx|deploy> (--allow|--deny)
+      lang: bash
+      source: Validium node policy management.&#x20;
+      guidance:
+    * Use 'deny by default' for deploy in public environments; rely on allowlists.
+    * Changes are hot‑reloaded—no node restart required.
+      example:
+      lang: bash
+      code: docker exec -it cdk-validium-aggregator /app/cdk-validium-node policy update --policy deploy --deny
+      common\_workflows:
+* title: Integrate a custom DA protocol and boot a Validium
+  steps:
+
+  * Implement IDataAvailabilityProtocol with a stable getProcotolName().
+  * Deploy PolygonValidiumEtrog with your DA protocol and call setDataAvailabilityProtocol().
+  * Call setupCommittee(epoch=0, members, extraData) if using a committee‑based protocol.
+  * Configure the node backend to use the matching DABackendType (protocol name).
+  * Run E2E tests and confirm verifyMessage() succeeds for staged batches.
+* title: Generate a witness and prove with Paladin (in‑memory)
+  steps:
+
+  * Build paladin binaries with 'cargo build --release'.
+  * Run 'paladin-leader rpc -u <RPC> -t <lastTxHash> > witness.json'.
+  * Run 'paladin-leader prove --runtime in-memory --num-workers 1 --input-witness witness.json'.
+  * Persist outputs and measure proof times for capacity planning.
+* title: Scale proving across workers (AMQP)
+  steps:
+
+  * Provision a RabbitMQ broker reachable by leader and workers.
+  * Start N paladin-worker instances with identical circuit env vars.
+  * Run 'paladin-leader prove --runtime amqp --amqp-uri=<uri> --input-witness witness.json'.
+  * Monitor queue depth and worker CPU utilization.
+* title: Denylist contract deployers on a Validium
+  steps:
+
+  * List current defaults: 'policy describe'.
+  * Set deploy policy default to deny: 'policy update --policy deploy --deny'.
+  * Add approved deployers: 'policy add --policy deploy --csv allow\.csv'.
+  * Verify effective ACL via 'policy describe --policy deploy'.
+* title: Discover and claim withdrawals on L1
+  steps:
+
+  * Call BridgeService.getBridgesByAddress for the recipient.
+  * Filter deposits where ready\_for\_claim=true, claim\_tx\_hash='', and dest\_net=L1.
+  * Fetch proof via BridgeService.getMerkleProof.
+  * eth\_call PolygonZkEVMBridgeV2.claimAsset(...) to preflight, then send the transaction.
+* title: Quick‑test a running CDK stack
+  steps:
+
+  * Locate zkevm-node-rpc URL from logs.
+  * Use Foundry 'cast send --legacy --mnemonic "code ... quality" --value 0 --gas-price 0 --rpc-url <url> <to>' to send a zero‑value tx.
+  * Confirm receipt status=1 in the node logs or explorer.
+    troubleshooting\_cheatsheet:
+* symptom: Prover exits with OOM or hangs during Keccak/cpu stage.
+  cause: Circuit size ranges too large for host RAM; insufficient physical memory (<40GB).
+  fix: Reduce circuit ranges, provision >=40GB RAM, and remove any persisted prover\_state\_\* after changes.&#x20;
+* symptom: Bridge UI shows withdrawal but claim button disabled or fails.
+  cause: Wrong destination network selected; UI bug.
+  fix: Use Bridge Service to fetch proof and call claimAsset directly via cast/ethers; ensure dest\_net=0 (L1) for claims.&#x20;
+* symptom: policy update has no effect.
+  cause: Command executed in the wrong container or against the wrong DB.
+  fix: Run policy CLI inside the aggregator container and verify Postgres connectivity; re‑run 'policy describe'.&#x20;
+* symptom: verifyMessage reverts unexpectedly.
+  cause: accumulatedNonForcedTransactionsHash mismatch or malformed dataAvailabilityMessage.
+  fix: Recompute hash with the exact batch and ensure committee addresses are sorted and signatures aggregated correctly.&#x20;
+  faq:
+* q: Can I switch DA protocols after launch?
+  a: Yes—use setDataAvailabilityProtocol to point to a new implementation, then update node configs. Perform via governance/timelock in production.&#x20;
+* q: Is the Type‑1 prover production‑ready?
+  a: Not yet for full CDK integration; treat as experimental and use for research/validation per docs.&#x20;
+* q: How do I post gas tokens on L2?
+  a: Enable the gas token flag at deploy time (zkevm\_use\_gas\_token\_contract), mint L1 tokens, then bridge and use on L2 as shown in the gas‑token how‑to.&#x20;
+  external\_resources:
+* label: CDK monorepo (CLI, sequencer sender, aggregator)
+  url: [https://github.com/0xPolygon/cdk](https://github.com/0xPolygon/cdk)
+* label: zkevm-contracts
+  url: [https://github.com/0xPolygonHermez/zkevm-contracts](https://github.com/0xPolygonHermez/zkevm-contracts)
+* label: cdk-validium-node
+  url: [https://github.com/0xPolygon/cdk-validium-node](https://github.com/0xPolygon/cdk-validium-node)
+* label: cdk-data-availability
+  url: [https://github.com/0xPolygon/cdk-data-availability](https://github.com/0xPolygon/cdk-data-availability)
+* label: zkevm-bridge-service
+  url: [https://github.com/0xPolygonHermez/zkevm-bridge-service](https://github.com/0xPolygonHermez/zkevm-bridge-service)
+* label: Paladin (eth-tx-proof)
+  url: [https://github.com/0xPolygonZero/eth-tx-proof](https://github.com/0xPolygonZero/eth-tx-proof)
+* label: Type‑1 prover architecture
+  url: [https://github.com/0xPolygonZero/plonky2/tree/main/evm/spec](https://github.com/0xPolygonZero/plonky2/tree/main/evm/spec)
+

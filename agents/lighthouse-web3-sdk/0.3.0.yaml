@@ -1,0 +1,696 @@
+meta:
+spec\_name: lighthouse-web3/sdk
+spec\_version: 0.3.0
+library\_version: ^0.4.2
+generated: '2025-09-16'
+purpose: 'JavaScript/TypeScript SDK for Lighthouse decentralized storage: upload/retrieve files (public & encrypted), manage access control, query pricing & deals, and publish IPNS records.'
+guiding\_principles:
+
+* 'Prefer CIDv1 for interoperability; pass `cidVersion: 1` when available.'
+* Use `getPrice → fund → oneTimeAuth` for pay‑per‑use; treat returned tokens/receipts as single‑use.
+* Never send plaintext secrets—use `uploadEncrypted` / `textUploadEncrypted` and fetch the encryption key via a signed flow.
+* Paginate with `lastKey` as an opaque cursor; do not assume it is an integer or sequential.
+* Check `dealStatus` after upload and verify with `posdi` for proof‑of‑storage before treating data as durable.
+* Share/revoke access only from the owner account; signatures must match `getAuthMessage(publicKey)`.
+* 'Handle network variability: add retries with backoff and surface progress via the provided callback hooks.'
+* Avoid long‑running single files; prefer chunked uploads and stable network (no VPN/Proxies) for large datasets.
+* Store CIDs, not gateway URLs; gateways are interchangeable while CIDs are canonical content addresses.
+  design\_notes: 'Definitions were taken from TypeScript signatures extracted from the SDK build (lighthouse.out) and cross‑checked against Lighthouse docs and the npm package sidebar. Symbols are grouped by developer workflows (auth, pricing, upload, encryption/access, retrieval/status, IPNS). Sources include official docs pages for pricing, uploads, encryption/access control, and listing files, plus the npm package page for versioning.'
+  language: typescript
+  homepage: [https://docs.lighthouse.storage/lighthouse-1](https://docs.lighthouse.storage/lighthouse-1)
+  tags:
+* storage
+* ipfs
+* filecoin
+* encryption
+* access-control
+* ipns
+* web3
+  groups:
+* name: Auth & Wallet
+  exports:
+
+  * createWallet
+  * getAuthMessage
+  * getApiKey
+  * oneTimeAuth
+  * getBalance
+    symbols:
+    createWallet:
+    kind: function
+    summary: Generate a new Lighthouse wallet (public/private keypair) managed by the SDK.
+    definition:
+    code: declare function createWallet(password: string) => Promise<createWalletResponse>;
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * Store the private key securely; treat it as you would a blockchain wallet.
+    * Use strong, user‑supplied passwords; the SDK does not recover lost secrets.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const { data } = await lighthouse.createWallet('strong-password');
+      console.log(data.publicKey);
+      })();
+      lang: javascript
+      description: Minimal usage of `createWallet` using the default SDK import.
+      getAuthMessage:
+      kind: function
+      summary: Retrieve a nonce-based auth message for the given wallet address to sign.
+      definition:
+      code: declare function getAuthMessage(publicKey: string) => Promise<authMessageResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Call before signing to avoid replay; the message includes a time‑bound nonce.
+    * Sign with the same account you intend to use for access control and uploads.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const { data } = await lighthouse.getAuthMessage('0xYourPublicKey');
+      console.log(data.message);
+      })();
+      lang: javascript
+      description: Minimal usage of `getAuthMessage` using the default SDK import.
+      getApiKey:
+      kind: function
+      summary: Exchange a signed auth message for a Lighthouse API key.
+      definition:
+      code: declare function getApiKey(publicKey: string, signedMessage: string) => Promise<apiKeyResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Verify signatures with EIP‑191 style personal\_sign in browser wallets.
+    * API keys are scoped to your account—rotate regularly and avoid embedding in client apps.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const apiKey = await lighthouse.getApiKey('0xYourPublicKey','0xSignedAuthMessage');
+      console.log(apiKey);
+      })();
+      lang: javascript
+      description: Minimal usage of `getApiKey` using the default SDK import.
+      oneTimeAuth:
+      kind: function
+      summary: Create a one-time authorization token for uploads or actions.
+      definition:
+      code: declare function oneTimeAuth(privateKey?: string) => Promise<string>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use for ephemeral uploads or server‑to‑server jobs where a long‑lived API key is undesirable.
+    * Treat the returned token as single‑use and short‑lived.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const token = await lighthouse.oneTimeAuth('0xPrivateKeyOptional');
+      console.log(token);
+      })();
+      lang: javascript
+      description: Minimal usage of `oneTimeAuth` using the default SDK import.
+      getBalance:
+      kind: function
+      summary: Fetch remaining data cap / balance for the API key.
+      definition:
+      code: declare function getBalance(apiKey: string) => Promise<balanceResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use to enforce organization quotas before allowing user uploads.
+    * Cache results briefly to avoid rate limits.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const bal = await lighthouse.getBalance('YOUR\_API\_KEY');
+      console.log(bal);
+      })();
+      lang: javascript
+      description: Minimal usage of `getBalance` using the default SDK import.
+* name: Pricing & Funding
+  exports:
+
+  * getPrice
+  * getQuote
+  * fund
+    symbols:
+    getPrice:
+    kind: function
+    summary: Quote pay‑per‑use price for a file path or size on a given network/token.
+    definition:
+    code: declare function getPrice(pathOrSize: string | number | any, network: string, token?: string) => Promise<bigint>;
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * For accuracy, pass file size in bytes; using a path reads from disk, which may be slower.
+    * "Valid networks: 'filecoin' or 'calibration'; tokens: 'native' (FIL) or 'usdc'/'usdt' (calibration)."
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const price = await lighthouse.getPrice(1024,'filecoin','native');
+      console.log(price.toString());
+      })();
+      lang: javascript
+      description: Minimal usage of `getPrice` using the default SDK import.
+      getQuote:
+      kind: function
+      summary: Return a size/plan quote for a local path using your API key.
+      definition:
+      code: "declare function getQuote(path: string, apiKey: string) => Promise<{\n    data: {\n        metaData: {\n            fileSize: any;\n            mimeType: any;\n            fileName: string | undefined;\n        }\[];\n        dataLimit: number;\n        dataUsed: number;\n        totalSize: any;\n    };\n}>;"
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use for local paths to compute total size across directories.
+    * The response includes `dataLimit` and `dataUsed`; enforce limits before triggering uploads.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const { data } = await lighthouse.getQuote('/path/to/file','YOUR\_API\_KEY');
+      console.log(data.totalSize);
+      })();
+      lang: javascript
+      description: Minimal usage of `getQuote` using the default SDK import.
+      fund:
+      kind: function
+      summary: Fund your Lighthouse account for pay‑per‑use uploads.
+      definition:
+      code: declare function fund(amount: number, network: string, token: string, privateKey?: string) => Promise<any>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Pair with `getPrice` to pre‑fund the exact amount needed for a planned upload.
+    * Keep the payment receipt and transaction hash for audits.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const receipt = await lighthouse.fund(10,'filecoin','native');
+      console.log(receipt);
+      })();
+      lang: javascript
+      description: Minimal usage of `fund` using the default SDK import.
+* name: Uploads (Public)
+  exports:
+
+  * uploadText
+  * uploadBuffer
+    symbols:
+    uploadText:
+    kind: function
+    summary: Upload a small text/blob as a file to Lighthouse (public).
+    definition:
+    code: "declare function uploadText(text: string, apiKey: string, name?: string, cidVersion?: number) => Promise<{\n    data: any;\n}>;"
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * Prefer `cidVersion: 1` for multibase compatibility across gateways.
+    * Large buffers can exhaust memory—stream or use file‑based uploads where possible.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.uploadText('hello world','YOUR\_API\_KEY','hello.txt',1);
+      console.log(res.data);
+      })();
+      lang: javascript
+      description: Minimal usage of `uploadText` using the default SDK import.
+      uploadBuffer:
+      kind: function
+      summary: Upload a Node.js Buffer to Lighthouse (public).
+      definition:
+      code: "declare function uploadBuffer(buffer: any, apiKey: string, cidVersion?: number) => Promise<{\n    data: any;\n}>;"
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Prefer `cidVersion: 1` for multibase compatibility across gateways.
+    * Large buffers can exhaust memory—stream or use file‑based uploads where possible.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const fs = await import('fs');
+      const buf = fs.readFileSync('/path/file.bin');
+      const res = await lighthouse.uploadBuffer(buf,'YOUR\_API\_KEY',1);
+      console.log(res.data);
+      })();
+      lang: javascript
+      description: Minimal usage of `uploadBuffer` using the default SDK import.
+* name: Encryption & Access Control
+  exports:
+
+  * uploadEncrypted
+  * textUploadEncrypted
+  * fetchEncryptionKey
+  * decryptFile
+  * applyAccessCondition
+  * getAccessConditions
+  * shareFile
+  * revokeFileAccess
+    symbols:
+    uploadEncrypted:
+    kind: function
+    summary: Upload a file with client‑side encryption and split‑key storage.
+    definition:
+    code: "declare function uploadEncrypted(path: string | any, apiKey: string, publicKey: string, signedMessage: string, cidVersion?: number, uploadProgressCallback?: ((data: any) => void) | undefined) => Promise<{\n    data: import("../../../../types").IFileUploadedResponse\[];\n}>;"
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * Obtain `publicKey` and `signedMessage` via `getAuthMessage` + wallet signature before calling.
+    * Use the `uploadProgressCallback` to report client‑side encryption + upload progress.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.uploadEncrypted('/path/file.pdf','YOUR\_API\_KEY','0xYourPublicKey','0xSignedMessage',1);
+      console.log(res.data);
+      })();
+      lang: javascript
+      description: Minimal usage of `uploadEncrypted` using the default SDK import.
+      textUploadEncrypted:
+      kind: function
+      summary: Upload text with client‑side encryption.
+      definition:
+      code: "declare function textUploadEncrypted(text: string, apiKey: string, publicKey: string, signedMessage: string, name?: string) => Promise<{\n    data: any;\n}>;"
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Obtain `publicKey` and `signedMessage` via `getAuthMessage` + wallet signature before calling.
+    * Use the `uploadProgressCallback` to report client‑side encryption + upload progress.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.textUploadEncrypted('secret text','YOUR\_API\_KEY','0xYourPublicKey','0xSignedMessage','note.txt');
+      console.log(res.data);
+      })();
+      lang: javascript
+      description: Minimal usage of `textUploadEncrypted` using the default SDK import.
+      fetchEncryptionKey:
+      kind: function
+      summary: Fetch the encrypted file’s symmetric key via a signed access flow.
+      definition:
+      code: declare function fetchEncryptionKey(cid: string, publicKey: string, signedMessage: string, dynamicData?: {}, shardCount?: number) => Promise<fetchEncryptionKeyResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Call on behalf of the reader; access is granted if on‑chain conditions evaluate true.
+    * Avoid logging the returned key; pass it directly into `decryptFile`.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const key = await lighthouse.fetchEncryptionKey('bafy...','0xYourPublicKey','0xSignedMessage');
+      console.log(key);
+      })();
+      lang: javascript
+      description: Minimal usage of `fetchEncryptionKey` using the default SDK import.
+      decryptFile:
+      kind: function
+      summary: Decrypt and return the file (Buffer/Blob) given its file‑encryption key.
+      definition:
+      code: declare function decryptFile(cid: string | any, fileEncryptionKey: string, mimeType?: string) => Promise<any>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Supply `mimeType` to get a correctly typed Blob in browsers; optional in Node.
+    * Never persist the decrypted bytes on shared storage without re‑encrypting.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const file = await lighthouse.decryptFile('bafy...','your-file-encryption-key','application/pdf');
+      console.log(file);
+      })();
+      lang: javascript
+      description: Minimal usage of `decryptFile` using the default SDK import.
+      applyAccessCondition:
+      kind: function
+      summary: Attach/update access control conditions for an encrypted CID.
+      definition:
+      code: declare function applyAccessCondition(publicKey: string, cid: string, signedMessage: string, conditions: any, aggregator?: string | undefined, chainType?: ChainType) => Promise<accessControlResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use aggregators like '(\["and"])' or '(\["or"])' to combine conditions.
+    * Choose the correct `chainType`; mismatched chains cause silent denials.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.applyAccessCondition('0xYourPublicKey','bafy...','0xSignedMessage', {conditions:\[/\* ... \*/]}, '(\["and"])');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `applyAccessCondition` using the default SDK import.
+      getAccessConditions:
+      kind: function
+      summary: Get access control conditions for an encrypted CID.
+      definition:
+      code: declare function getAccessConditions(cid: string) => Promise<getAccessConditionResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Cache access conditions client‑side to reduce round‑trips.
+    * Use to explain to users why access is denied (without leaking sensitive policy info).
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.getAccessConditions('bafy...');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `getAccessConditions` using the default SDK import.
+      shareFile:
+      kind: function
+      summary: Grant direct access for an encrypted file to one or more wallets.
+      definition:
+      code: declare function shareFile(publicKey: string, shareTo: string | string\[], cid: string, signedMessage: string) => Promise<shareResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Only the owner address can share; batch share by passing an array of recipient addresses.
+    * Sharing is for encrypted files; public uploads are readable by anyone via CID.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.shareFile('0xYourPublicKey',\['0xReceiverAddress'],'bafy...','0xSignedMessage');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `shareFile` using the default SDK import.
+      revokeFileAccess:
+      kind: function
+      summary: Revoke previously granted access for an encrypted file.
+      definition:
+      code: declare function revokeFileAccess(publicKey: string, revokeTo: string | string\[], cid: string, signedMessage: string) => Promise<revokeResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use cautiously—revocation is immediate for future fetches but cannot retract already shared raw keys.
+    * Audit recipients before revoking if collaboration workflows depend on access.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.revokeFileAccess('0xYourPublicKey',\['0xReceiverAddress'],'bafy...','0xSignedMessage');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `revokeFileAccess` using the default SDK import.
+* name: Retrieval & Status
+  exports:
+
+  * getFileInfo
+  * getUploads
+  * dealStatus
+  * posdi
+  * deleteFile
+    symbols:
+    getFileInfo:
+    kind: function
+    summary: Fetch metadata for a CID (e.g., size, mime type, file name).
+    definition:
+    code: declare function getFileInfo(cid: string) => Promise<fileInfoType>;
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * Use before downloads to display file size and type to users.
+    * If `mimeType` is missing, infer from filename extension.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const info = await lighthouse.getFileInfo('bafy...');
+      console.log(info);
+      })();
+      lang: javascript
+      description: Minimal usage of `getFileInfo` using the default SDK import.
+      getUploads:
+      kind: function
+      summary: List your uploads (paginated) using `lastKey` cursor.
+      definition:
+      code: declare function getUploads(authToken: string, lastKey?: string | null) => Promise<uploadsResponseType>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Paginate by passing the `lastKey` from the previous call; treat it as opaque.
+    * Responses are limited to \~2000 records per page per docs; loop until exhausted.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const page = await lighthouse.getUploads('YOUR\_API\_KEY', null);
+      console.log(page);
+      })();
+      lang: javascript
+      description: Minimal usage of `getUploads` using the default SDK import.
+      dealStatus:
+      kind: function
+      summary: Get Filecoin deal status for a CID.
+      definition:
+      code: declare function dealStatus(cid: string) => Promise<dealResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Deals may take hours; poll with backoff and surface a 'pinning' state in UX.
+    * Store miner IDs and deal IDs for auditability.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const status = await lighthouse.dealStatus('bafy...');
+      console.log(status);
+      })();
+      lang: javascript
+      description: Minimal usage of `dealStatus` using the default SDK import.
+      posdi:
+      kind: function
+      summary: Retrieve Proof‑of‑Data Storage Index (PoDSI) for a CID.
+      definition:
+      code: "declare function posdi(cid: string) => Promise<{\n    data: PODSIData;\n}>;"
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Use PoDSI to verify long‑term availability; pin failures should trigger re‑upload workflows.
+    * Schedule periodic PoDSI checks for critical data.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const proof = await lighthouse.posdi('bafy...');
+      console.log(proof.data);
+      })();
+      lang: javascript
+      description: Minimal usage of `posdi` using the default SDK import.
+      deleteFile:
+      kind: function
+      summary: Delete a file by internal id (requires API key).
+      definition:
+      code: declare function deleteFile(authToken: string, fileId: string) => Promise<deleteFileResponseType>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Deletion removes Lighthouse indexing and serving; IPFS copies outside Lighthouse may persist.
+    * Record `fileId` after uploads to allow future deletion.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.deleteFile('YOUR\_API\_KEY','FILE\_ID');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `deleteFile` using the default SDK import.
+* name: Keys & IPNS
+  exports:
+
+  * generateKey
+  * publishRecord
+  * getAllKeys
+  * removeKey
+    symbols:
+    generateKey:
+    kind: function
+    summary: Create a new IPNS key record under your account.
+    definition:
+    code: declare function generateKey(apiKey: string) => Promise<generateKeyResponse>;
+    lang: typescript
+    source: /mnt/data/lighthouse.out
+    guidance:
+
+    * Use human‑readable names for keys to identify purposes (e.g., 'public-site').
+    * Keys enable IPNS publishing; store the returned key id securely.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const key = await lighthouse.generateKey('YOUR\_API\_KEY');
+      console.log(key);
+      })();
+      lang: javascript
+      description: Minimal usage of `generateKey` using the default SDK import.
+      publishRecord:
+      kind: function
+      summary: Publish/update IPNS record to point to a CID using a key.
+      definition:
+      code: declare function publishRecord(cid: string, key: string, apiKey: string) => Promise<publishRecordResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Publishing updates may take time to propagate; cache bust with `?filename` query on gateways.
+    * Rotate keys sparingly; updates on a new key start from a cold cache.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.publishRecord('bafy...','KEY\_ID','YOUR\_API\_KEY');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `publishRecord` using the default SDK import.
+      getAllKeys:
+      kind: function
+      summary: List IPNS keys associated with your account.
+      definition:
+      code: declare function getAllKeys(apiKey: string) => Promise<keyDataResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * List keys at startup to populate admin UIs.
+    * Avoid displaying full key material in client apps.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const { data } = await lighthouse.getAllKeys('YOUR\_API\_KEY');
+      console.log(data);
+      })();
+      lang: javascript
+      description: Minimal usage of `getAllKeys` using the default SDK import.
+      removeKey:
+      kind: function
+      summary: Delete an IPNS key from your account.
+      definition:
+      code: declare function removeKey(key: string, apiKey: string) => Promise<removeRecordResponse>;
+      lang: typescript
+      source: /mnt/data/lighthouse.out
+      guidance:
+    * Deleting a key breaks IPNS resolution for its name; confirm no active clients rely on it.
+    * Take a final snapshot CID and publish on a replacement key before removal.
+      example:
+      code: |-
+      import lighthouse from '@lighthouse-web3/sdk';
+
+      (async () => {
+      const res = await lighthouse.removeKey('KEY\_ID','YOUR\_API\_KEY');
+      console.log(res);
+      })();
+      lang: javascript
+      description: Minimal usage of `removeKey` using the default SDK import.
+      common\_workflows:
+* title: Public upload and retrieve
+  steps:
+
+  * Call `getQuote(path, apiKey)` to compute size and confirm allowance.
+  * Optionally pre‑fund with `getPrice(size, 'filecoin', 'native')` → `fund(amount, 'filecoin', 'native')`.
+  * Upload with `uploadBuffer` or `uploadText` (prefer `cidVersion: 1`).
+  * Display the returned CID; later fetch metadata via `getFileInfo(cid)` and show a gateway link.
+* title: Encrypted upload and gated access
+  steps:
+
+  * Get `message` with `getAuthMessage(publicKey)` and sign it in the wallet.
+  * Upload using `uploadEncrypted(path, apiKey, publicKey, signedMessage)`.
+  * Set access rules with `applyAccessCondition(publicKey, cid, signedMessage, conditions, aggregator)`.
+  * Readers call `fetchEncryptionKey(cid, theirPublicKey, theirSignature)` and decrypt via `decryptFile(cid, key)`.
+* title: Pay‑per‑use flow (no long‑lived API keys)
+  steps:
+
+  * Quote exact price with `getPrice(sizeInBytes, 'filecoin', 'native'|'usdc')`.
+  * Pay via `fund(amount, network, token)`.
+  * Generate a short‑lived token using `oneTimeAuth()` and perform the intended upload.
+  * Revoke/rotate tokens as soon as the operation completes.
+* title: Check persistence (deals + PoDSI)
+  steps:
+
+  * Poll `dealStatus(cid)` until active deals are reported.
+  * Call `posdi(cid)` to verify storage proofs and schedule periodic checks.
+* title: Publish a site root with IPNS
+  steps:
+
+  * Create a key with `generateKey(apiKey)`.
+  * Upload your build; get CID (e.g., from `uploadBuffer`).
+  * Point the key using `publishRecord(cid, key, apiKey)`.
+  * List / audit keys with `getAllKeys(apiKey)`.
+    troubleshooting\_cheatsheet:
+* symptom: '`getUploads` returns empty even after uploads.'
+  cause: Incorrect or expired API key; or pagination cursor omitted.
+  fix: Verify the API key and pass `lastKey` from the previous page; do not hardcode null in loops.
+* symptom: '`decryptFile` throws due to invalid key.'
+  cause: Using a key fetched for a different address or stale policy.
+  fix: Refetch via `fetchEncryptionKey` using the current reader’s signed auth message.
+* symptom: Upload stalls at \~100%.
+  cause: Client‑side encryption overhead + network flakiness.
+  fix: Implement retry with resume; surface progress via the callback; avoid VPN/proxy interference.
+* symptom: '`dealStatus` never reaches active.'
+  cause: Network congestion or insufficient funding.
+  fix: Ensure funding succeeded; contact support if stuck >24h; consider re‑uploading.
+  faq:
+* q: Do I need an API key to upload?
+  a: For standard flows, yes. Use `getApiKey` after `getAuthMessage` + wallet signature. A pay‑per‑use path exists via `getPrice → fund → oneTimeAuth` without creating a long‑lived key.
+* q: Are CIDs private when using encryption?
+  a: No. CIDs are content addresses and visible. Encryption hides the content; access control gates the decryption key via signed checks.
+* q: CID v0 or v1?
+  a: Prefer CIDv1. Many gateways and tools default to v1 multibase; pass `cidVersion: 1` where available.
+  external\_resources:
+* label: Lighthouse JS SDK on npm
+  url: [https://www.npmjs.com/package/%40lighthouse-web3/sdk](https://www.npmjs.com/package/%40lighthouse-web3/sdk)
+* label: Lighthouse docs: Quick Start
+  url: [https://docs.lighthouse.storage/lighthouse-1/quick-start](https://docs.lighthouse.storage/lighthouse-1/quick-start)
+* label: How‑To: List Files (getUploads)
+  url: [https://docs.lighthouse.storage/lighthouse-1/how-to/list-files](https://docs.lighthouse.storage/lighthouse-1/how-to/list-files)
+* label: How‑To: Upload Encrypted Data
+  url: [https://docs.lighthouse.storage/lighthouse-1/how-to/upload-encrypted-data](https://docs.lighthouse.storage/lighthouse-1/how-to/upload-encrypted-data)
+* label: How‑To: Check Access Conditions
+  url: [https://docs.lighthouse.storage/lighthouse-1/how-to/encryption-features/get-access-conditions](https://docs.lighthouse.storage/lighthouse-1/how-to/encryption-features/get-access-conditions)
+* label: How‑To: Pay‑per‑use (getPrice, fund)
+  url: [https://docs.lighthouse.storage/lighthouse-1/how-to/pay-per-use](https://docs.lighthouse.storage/lighthouse-1/how-to/pay-per-use)
+

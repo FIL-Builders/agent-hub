@@ -1,0 +1,880 @@
+meta:
+spec\_name: maticjs
+spec\_version: 0.3.0
+generated: '2025-09-16'
+library\_version: '>=3.6.4'
+purpose: High-precision reference for using @maticnetwork/maticjs to bridge assets and messages across Polygon PoS and zkEVM, with clear contracts, caveats, and workflow recipes.
+guiding\_principles:
+
+* Initialize a client once per process; reuse instances (POSClient/ZkEvmClient) to avoid provider churn.
+* Always wait for `getReceipt()` after writes; don't assume a tx hash means success.
+* For PoS withdraws, ensure the burn tx is checkpointed (`isCheckPointed`) before calling exits; otherwise `withdrawExit` will revert.
+* Prefer `withdrawExitFaster` with a configured Proof API for production; self-host the Proof API for throughput and reliability.
+* Pass explicit `from`, `gasPrice` when running in non-interactive environments; respect Polygon minimum priority fee on mainnet.
+* Treat amounts as strings (wei) to avoid float rounding; validate token decimals client-side.
+* Separate root vs child token objects (`isRoot` flag) carefully; wrong side is a common source of reverts.
+* Use plugins (`maticjs-web3` or `maticjs-ethers`) consistently across parent/child to prevent mixed provider types.
+* Store deposit/withdraw tx hashes durably; they are required for later `depositClaim`/`withdrawExit` calls.
+  design\_notes: "Definitions are distilled from the official Polygon developer docs bundle for Matic.js (PoS and zkEVM), Launchpad, and related tooling. See consolidated source pack: tools\_all.md "
+  language: javascript
+  homepage: [https://github.com/maticnetwork/matic.js](https://github.com/maticnetwork/matic.js)
+  tags:
+* polygon
+* maticjs
+* bridge
+* pos
+* zkevm
+* web3
+* ethers
+  groups:
+* name: core
+  exports:
+
+  * use
+  * POSClient
+  * ZkEvmClient
+  * setProofApi
+  * ABIManager
+  * ExitUtil.buildPayloadForExit
+    symbols:
+    use:
+    kind: function
+    summary: Register a plugin (web3.js or ethers) with matic.js before client init.
+    definition:
+    code: |-
+    declare function use(plugin: IPlugin): void
+    interface IPlugin { setup(matic: any): void }
+    lang: typescript
+    source: tools/matic-js/advanced/plugin.md
+    guidance:
+
+    * Call once at startup, before creating POSClient or ZkEvmClient.
+    * Use exactly one style (either web3 or ethers) across both parent and child to avoid provider mismatch.
+      example:
+      code: |-
+      import { use } from '@maticnetwork/maticjs';
+      import { Web3ClientPlugin } from '@maticnetwork/maticjs-web3';
+      use(Web3ClientPlugin);
+      POSClient:
+      kind: class
+      summary: Client for Polygon PoS bridge operations.
+      definition:
+      code: |-
+      class POSClient {
+      init(config: {
+      network: 'mainnet' | 'testnet',
+      version: string,                 // e.g. 'amoy'
+      parent: { provider: any, defaultConfig?: { from?: string } },
+      child:  { provider: any, defaultConfig?: { from?: string } }
+      }): Promise<void>;
+      erc20(address: string, isRoot?: boolean): ERC20;
+      erc721(address: string, isRoot?: boolean): ERC721;
+      erc1155(address: string, isRoot?: boolean): ERC1155;
+      isDeposited(txHash: string): Promise<boolean>;
+      isCheckPointed(txHash: string): Promise<boolean>;
+      }
+      lang: typescript
+      source: tools/matic-js/pos/client.md
+      guidance:
+    * Initialize with the correct network/version pair (e.g., testnet/amoy).
+    * Pass default `from` addresses that own the tokens on each side.
+    * Reuse the instance; avoid per-call re-init to reduce RPC load.
+      example:
+      code: |-
+      import { POSClient, use } from '@maticnetwork/maticjs';
+      import { Web3ClientPlugin } from '@maticnetwork/maticjs-web3';
+      use(Web3ClientPlugin);
+      const client = new POSClient();
+      await client.init({ network: 'testnet', version: 'amoy', parent: { provider: parentProvider, defaultConfig: { from: fromAddress } }, child: { provider: childProvider, defaultConfig: { from: fromAddress } } });
+      ZkEvmClient:
+      kind: class
+      summary: Client for Polygon zkEVM bridge operations.
+      definition:
+      code: |-
+      class ZkEvmClient {
+      init(config: {
+      network: 'mainnet' | 'testnet',
+      version: string,                 // e.g. 'blueberry'
+      parent: { provider: any, defaultConfig?: { from?: string } },
+      child:  { provider: any, defaultConfig?: { from?: string } }
+      }): Promise<void>;
+      erc20(address: string, isRoot?: boolean): ZkEvmERC20;
+      isDeposited(txHash: string): Promise<boolean>;
+      isDepositClaimable(txHash: string): Promise<boolean>;
+      isWithdrawExitable(txHash: string): Promise<boolean>;
+      isExited(txHash: string): Promise<boolean>;
+      }
+      lang: typescript
+      source: tools/matic-js/zkevm/initialize.md
+      guidance:
+    * Set `network/version` to the correct pair (e.g., testnet/blueberry).
+    * Use the same provider family for parent and child (both ethers or both web3).
+      example:
+      code: |-
+      import { ZkEvmClient } from '@maticnetwork/maticjs';
+      const zk = new ZkEvmClient();
+      await zk.init({ network: 'testnet', version: 'blueberry', parent: { provider: parent }, child: { provider: child } });
+      setProofApi:
+      kind: function
+      summary: Configure the Proof Generation API base URL used by *faster* exit helpers.
+      definition:
+      code: |-
+      declare function setProofApi(baseUrl: string): void
+      lang: typescript
+      source: tools/matic-js/set-proof-api.md
+      guidance:
+    * Use Polygon's public endpoint for quick starts; self-host the Proof API for reliability and performance.
+    * Required when calling methods suffixed with `Faster`. Set once at process start.
+      example:
+      code: |-
+      import { setProofApi } from '@maticnetwork/maticjs';
+      setProofApi('[https://proof-generator.polygon.technology/](https://proof-generator.polygon.technology/)');
+      ABIManager:
+      kind: class
+      summary: Utility to override or retrieve contract ABIs and config by network/version.
+      definition:
+      code: |-
+      class ABIManager {
+      constructor(networkName: string, version: string);
+      init(): Promise<void>;
+      setABI(contractName: string, bridge: 'pos' | 'zkevm', abi: any): void;
+      getABI(contractName: string, bridge: 'pos' | 'zkevm'): any;
+      }
+      lang: typescript
+      source: tools/matic-js/advanced/abi-manager.md
+      guidance:
+    * Call `init()` before get/set.
+    * Use only for development/testing to match local contract changes; avoid in production unless you know the implications.
+      example:
+      code: |-
+      import { ABIManager } from '@maticnetwork/maticjs';
+      const m = new ABIManager('testnet','amoy');
+      await m.init();
+      m.setABI('ERC20PredicateProxy','pos', myAbiJson);
+      const abi = m.getABI('ERC20PredicateProxy','pos');
+      ExitUtil.buildPayloadForExit:
+      kind: function
+      summary: Low-level proof builder for PoS exits (advanced).
+      definition:
+      code: |-
+      class ExitUtil {
+      constructor(client: any, rootChain: any);
+      buildPayloadForExit(burnTxHash: string, logEventSig: string, isFast: boolean): Promise<string>;
+      }
+      lang: typescript
+      source: tools/matic-js/advanced/exit-util.md
+      guidance:
+    * Prefer high-level `withdrawExit`/`withdrawExitFaster` unless you need custom proof handling.
+    * Ensure the burn tx is checkpointed before attempting exit.
+      example:
+      code: |-
+      const proof = await posClient.exitUtil.buildPayloadForExit('0xBURN...', '0xddf252ad...', true);
+* name: pos/core
+  exports:
+
+  * pos.isCheckPointed
+  * pos.isDeposited
+    symbols:
+    pos.isCheckPointed:
+    kind: function
+    summary: Check whether a PoS tx has been checkpointed to Ethereum.
+    definition:
+    code: function isCheckPointed(txHash: string): Promise<boolean>
+    lang: typescript
+    source: tools/matic-js/pos/is-check-pointed.md
+    guidance:
+
+    * Required gate before exit calls; retry until true.
+    * Checkpointing is periodic; plan for minutes-level latency on testnets.
+      example:
+      code: const ok = await posClient.isCheckPointed('0x...');
+      pos.isDeposited:
+      kind: function
+      summary: Check whether a PoS deposit has completed.
+      definition:
+      code: function isDeposited(txHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/pos/is-deposited.md
+      guidance:
+    * Poll with backoff; when true, funds should appear on child chain.
+    * Store the original deposit tx hash to use here.
+      example:
+      code: const done = await posClient.isDeposited('0x...');
+* name: pos/erc20
+  exports:
+
+  * pos.erc20.getBalance
+  * pos.erc20.approve
+  * pos.erc20.approveMax
+  * pos.erc20.deposit
+  * pos.erc20.transfer
+  * pos.erc20.withdrawStart
+  * pos.erc20.withdrawExit
+  * pos.erc20.withdrawExitFaster
+  * pos.erc20.getAllowance
+  * pos.erc20.isWithdrawExited
+    symbols:
+    pos.erc20.getBalance:
+    kind: function
+    summary: Get ERC20 balance (root or child).
+    definition:
+    code: function getBalance(userAddress: string): Promise<string>
+    lang: typescript
+    source: tools/matic-js/pos/erc20/get-balance.md
+    guidance:
+
+    * Use child token for balances on Polygon; root token for Ethereum.
+      example:
+      code: |-
+      const erc20 = posClient.erc20(tokenAddress); // child
+      const bal = await erc20.getBalance(user);
+      pos.erc20.approve:
+      kind: function
+      summary: Approve ERC20 spend on the root chain.
+      definition:
+      code: |-
+      function approve(amount: string|number|BN, options?: {
+      spenderAddress?: string, gasPrice?: string|number|BN
+      }): Promise<TransactionResult>
+      interface TransactionResult {
+      getTransactionHash(): Promise<string>;
+      getReceipt(): Promise<any>;
+      }
+      lang: typescript
+      source: tools/matic-js/pos/erc20/approve.md
+      guidance:
+    * Approve on the root token before deposits.
+    * Override `spenderAddress` only if you know the correct predicate contract.
+      example:
+      code: |-
+      const erc20Root = posClient.erc20(rootToken, true);
+      const tx = await erc20Root.approve('1000000000000000000');
+      await tx.getReceipt();
+      pos.erc20.approveMax:
+      kind: function
+      summary: Approve max allowance on the root chain.
+      definition:
+      code: function approveMax(options?: { spenderAddress?: string }): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/approve-max.md
+      guidance:
+    * Convenient for UX; consider allowance management/security implications.
+    * Use when frequent deposits are expected to reduce future approvals.
+      example:
+      code: |-
+      const tx = await posClient.erc20(rootToken, true).approveMax();
+      await tx.getReceipt();
+      pos.erc20.deposit:
+      kind: function
+      summary: Deposit ERC20 from Ethereum to Polygon PoS.
+      definition:
+      code: function deposit(amount: string|number|BN, userAddress: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/deposit.md
+      guidance:
+    * Store the deposit tx hash; use `isDeposited` to track completion.
+    * Ensure sufficient allowance before deposit.
+      example:
+      code: |-
+      const tx = await posClient.erc20(rootToken, true).deposit('1000000000000000000', user);
+      console.log(await tx.getTransactionHash());
+      pos.erc20.transfer:
+      kind: function
+      summary: Transfer ERC20 on the child or root chain.
+      definition:
+      code: function transfer(amount: string|number|BN, to: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/transfer.md
+      guidance:
+    * Use child token for Polygon-side transfers; root token for Ethereum.
+      example:
+      code: |-
+      const tx = await posClient.erc20(childToken).transfer('100', to);
+      await tx.getReceipt();
+      pos.erc20.withdrawStart:
+      kind: function
+      summary: Start PoS withdraw by burning tokens on Polygon.
+      definition:
+      code: function withdrawStart(amount: string|number|BN): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/withdraw-start.md
+      guidance:
+    * Save the burn tx hash; it is required to exit on root.
+    * Do not attempt exit until `isCheckPointed` returns true for the burn tx.
+      example:
+      code: |-
+      const tx = await posClient.erc20(childToken).withdrawStart('100');
+      const burnHash = await tx.getTransactionHash();
+      pos.erc20.withdrawExit:
+      kind: function
+      summary: Exit PoS withdraw on Ethereum using the burn tx hash.
+      definition:
+      code: function withdrawExit(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/withdraw-exit.md
+      guidance:
+    * This runs multiple RPC calls to generate proof; consider `withdrawExitFaster` with Proof API.
+    * Ensure checkpointing is complete; otherwise it will revert.
+      example:
+      code: |-
+      const tx = await posClient.erc20(rootToken, true).withdrawExit(burnHash);
+      await tx.getReceipt();
+      pos.erc20.withdrawExitFaster:
+      kind: function
+      summary: Faster PoS withdraw exit using the configured Proof API.
+      definition:
+      code: function withdrawExitFaster(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/withdraw-exit-faster.md
+      guidance:
+    * Call `setProofApi()` first; consider self-hosting the Proof API for production.
+    * Still requires the burn to be checkpointed.
+      example:
+      code: |-
+      import { setProofApi } from '@maticnetwork/maticjs';
+      setProofApi('[https://proof-generator.polygon.technology/](https://proof-generator.polygon.technology/)');
+      const tx = await posClient.erc20(rootToken, true).withdrawExitFaster(burnHash);
+      await tx.getReceipt();
+      pos.erc20.getAllowance:
+      kind: function
+      summary: Read approved allowance for a user; default spender is the PoS predicate.
+      definition:
+      code: function getAllowance(userAddress: string, options?: { spenderAddress?: string }): Promise<string>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/get-allowance.md
+      guidance:
+    * Specify `spenderAddress` when interacting with non-standard predicates or custom flows.
+      example:
+      code: |-
+      const allowance = await posClient.erc20(rootToken, true).getAllowance(user);
+      pos.erc20.isWithdrawExited:
+      kind: function
+      summary: Check whether a PoS ERC20 withdraw has finished exiting on root.
+      definition:
+      code: function isWithdrawExited(burnTxHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/pos/erc20/is-withdraw-exited.md
+      guidance:
+    * Useful for polling state after submitting exit tx.
+      example:
+      code: const done = await posClient.erc20(childToken).isWithdrawExited(burnHash);
+* name: pos/erc721
+  exports:
+
+  * pos.erc721.approve
+  * pos.erc721.approveAll
+  * pos.erc721.isApproved
+  * pos.erc721.isApprovedAll
+  * pos.erc721.transfer
+  * pos.erc721.getAllTokens
+  * pos.erc721.getTokensCount
+  * pos.erc721.withdrawStart
+  * pos.erc721.withdrawExit
+  * pos.erc721.withdrawExitFaster
+    symbols:
+    pos.erc721.approve:
+    kind: function
+    summary: Approve a specific ERC721 tokenId on root.
+    definition:
+    code: function approve(tokenId: string|number): Promise<TransactionResult>
+    lang: typescript
+    source: tools/matic-js/pos/erc721/approve.md
+    guidance:
+
+    * Approve before deposit from Ethereum to Polygon.
+      example:
+      code: await posClient.erc721(root721, true).approve('123');
+      pos.erc721.approveAll:
+      kind: function
+      summary: Approve all ERC721 tokens on root.
+      definition:
+      code: function approveAll(): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/approve-all.md
+      guidance:
+    * Simplifies UX when depositing many NFTs; understand security implications.
+      example:
+      code: await posClient.erc721(root721, true).approveAll();
+      pos.erc721.isApproved:
+      kind: function
+      summary: Check if a given tokenId is approved.
+      definition:
+      code: function isApproved(tokenId: string|number): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/is-approved.md
+      guidance:
+    * Call before transfers to avoid reverts.
+      example:
+      code: const ok = await posClient.erc721(root721, true).isApproved('123');
+      pos.erc721.isApprovedAll:
+      kind: function
+      summary: Check if operator approval-for-all is set.
+      definition:
+      code: function isApprovedAll(userAddress: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/is-approved-all.md
+      guidance:
+    * Use to gate UI paths that require blanket approvals.
+      example:
+      code: const ok = await posClient.erc721(root721, true).isApprovedAll(user);
+      pos.erc721.transfer:
+      kind: function
+      summary: Transfer an ERC721 on child or root.
+      definition:
+      code: function transfer(tokenId: string|number, from: string, to: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/transfer.md
+      guidance:
+    * Transferring on child requires using the child instance (isRoot omitted).
+      example:
+      code: await posClient.erc721(child721).transfer('123', from, to);
+      pos.erc721.getAllTokens:
+      kind: function
+      summary: List all ERC721 tokenIds owned by a user (may be paginated).
+      definition:
+      code: function getAllTokens(userAddress: string, limit?: number): Promise\<string\[]>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/get-all-tokens.md
+      guidance:
+    * Use limit to avoid heavy RPC responses.
+      example:
+      code: const ids = await posClient.erc721(child721).getAllTokens(user, 100);
+      pos.erc721.getTokensCount:
+      kind: function
+      summary: Count ERC721 tokens for a user.
+      definition:
+      code: function getTokensCount(userAddress: string): Promise<number>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/get-tokens-count.md
+      guidance:
+    * Handy to gate pagination and avoid empty loops.
+      example:
+      code: const n = await posClient.erc721(child721).getTokensCount(user);
+      pos.erc721.withdrawStart:
+      kind: function
+      summary: Burn an ERC721 on Polygon to begin PoS withdrawal.
+      definition:
+      code: function withdrawStart(tokenId: string|number): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/withdraw-start.md
+      guidance:
+    * Save the burn tx hash for later exit.
+      example:
+      code: const { getTransactionHash } = await posClient.erc721(child721).withdrawStart('123');
+      pos.erc721.withdrawExit:
+      kind: function
+      summary: Exit an ERC721 withdrawal on Ethereum.
+      definition:
+      code: function withdrawExit(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/withdraw-exit.md
+      guidance:
+    * Requires the burn tx to be checkpointed first.
+      example:
+      code: await posClient.erc721(root721, true).withdrawExit(burnHash);
+      pos.erc721.withdrawExitFaster:
+      kind: function
+      summary: Exit ERC721 withdrawal using Proof API acceleration.
+      definition:
+      code: function withdrawExitFaster(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc721/withdraw-exit-faster.md
+      guidance:
+    * Call `setProofApi()` first; still requires checkpointing.
+      example:
+      code: await posClient.erc721(root721, true).withdrawExitFaster(burnHash);
+* name: pos/erc1155
+  exports:
+
+  * pos.erc1155.approveAll
+  * pos.erc1155.getBalance
+  * pos.erc1155.transfer
+  * pos.erc1155.deposit
+  * pos.erc1155.depositMany
+  * pos.erc1155.withdrawStart
+  * pos.erc1155.withdrawExit
+  * pos.erc1155.withdrawExitFaster
+  * pos.erc1155.isWithdrawExited
+  * pos.erc1155.withdrawStartMany
+  * pos.erc1155.withdrawExitFasterMany
+    symbols:
+    pos.erc1155.approveAll:
+    kind: function
+    summary: Approve all ERC1155 tokens on root.
+    definition:
+    code: function approveAll(): Promise<TransactionResult>
+    lang: typescript
+    source: tools/matic-js/pos/erc1155/approve-all.md
+    guidance:
+
+    * Enable before deposits; consider operator risks.
+      example:
+      code: await posClient.erc1155(root1155, true).approveAll();
+      pos.erc1155.getBalance:
+      kind: function
+      summary: Get ERC1155 balance for a tokenId.
+      definition:
+      code: function getBalance(userAddress: string, tokenId: string|number): Promise<string>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/get-balance.md
+      guidance:
+    * Child instance returns Polygon-side balances.
+      example:
+      code: const bal = await posClient.erc1155(child1155).getBalance(user, '123');
+      pos.erc1155.transfer:
+      kind: function
+      summary: Transfer ERC1155 tokens.
+      definition:
+      code: |-
+      function transfer(opts: {
+      tokenId: string|number,
+      amount: string|number|BN,
+      from: string,
+      to: string,
+      data?: string
+      }): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/transfer.md
+      guidance:
+    * Set `data` only if your receiver contract expects it.
+      example:
+      code: |-
+      await posClient.erc1155(child1155).transfer({ tokenId:'123', amount:'1', from, to });
+      pos.erc1155.deposit:
+      kind: function
+      summary: Deposit one ERC1155 tokenId/amount to Polygon.
+      definition:
+      code: |-
+      function deposit(opts: {
+      amount: string|number|BN,
+      tokenId: string|number,
+      userAddress: string,
+      data?: string
+      }): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/deposit.md
+      guidance:
+    * Approve the root token for the bridge before deposit.
+      example:
+      code: await posClient.erc1155(root1155, true).deposit({ amount:'1', tokenId:'123', userAddress\:user });
+      pos.erc1155.depositMany:
+      kind: function
+      summary: Batch deposit multiple ERC1155 tokenIds/amounts.
+      definition:
+      code: |-
+      function depositMany(opts: {
+      amount: (string|number|BN)\[],
+      tokenId: (string|number)\[],
+      userAddress: string,
+      data?: string
+      }): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/deposit-many.md
+      guidance:
+    * Ensure arrays align by index; large batches may hit gas limits.
+      example:
+      code: await posClient.erc1155(root1155, true).depositMany({ amount:\['1','2'], tokenId:\['123','456'], userAddress\:user });
+      pos.erc1155.withdrawStart:
+      kind: function
+      summary: Burn ERC1155 on Polygon to start withdrawal.
+      definition:
+      code: function withdrawStart(tokenId: string|number, amount: string|number|BN): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/withdraw-start.md
+      guidance:
+    * Save the burn tx hash for exit.
+      example:
+      code: const burnTx = await posClient.erc1155(child1155).withdrawStart('123','1');
+      pos.erc1155.withdrawExit:
+      kind: function
+      summary: Exit ERC1155 withdrawal on Ethereum.
+      definition:
+      code: function withdrawExit(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/withdraw-exit.md
+      guidance:
+    * Requires checkpoint completion.
+      example:
+      code: await posClient.erc1155(root1155, true).withdrawExit(burnHash);
+      pos.erc1155.withdrawExitFaster:
+      kind: function
+      summary: Exit ERC1155 withdrawal using Proof API acceleration.
+      definition:
+      code: function withdrawExitFaster(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/withdraw-exit-faster.md
+      guidance:
+    * Call `setProofApi()` first; still requires checkpointing.
+      example:
+      code: await posClient.erc1155(root1155, true).withdrawExitFaster(burnHash);
+      pos.erc1155.isWithdrawExited:
+      kind: function
+      summary: Check if ERC1155 withdrawal has exited.
+      definition:
+      code: function isWithdrawExited(burnTxHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/is-withdraw-exited.md
+      guidance:
+    * Poll after submitting the exit tx to confirm completion.
+      example:
+      code: const done = await posClient.erc1155(child1155).isWithdrawExited(burnHash);
+      pos.erc1155.withdrawStartMany:
+      kind: function
+      summary: Burn multiple ERC1155 tokenIds to start withdrawal.
+      definition:
+      code: function withdrawStartMany(tokenIds: (string|number)\[], amounts: (string|number|BN)\[]): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/withdraw-start-many.md
+      guidance:
+    * Prefer smaller batches if you hit gas limits.
+      example:
+      code: await posClient.erc1155(child1155).withdrawStartMany(\['1','2'], \['1','2']);
+      pos.erc1155.withdrawExitFasterMany:
+      kind: function
+      summary: Exit many ERC1155 withdraws via Proof API.
+      definition:
+      code: function withdrawExitFasterMany(burnTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/pos/erc1155/withdraw-exit-faster-many.md
+      guidance:
+    * Requires Proof API; process a batch burn tx hash.
+      example:
+      code: await posClient.erc1155(root1155, true).withdrawExitFasterMany(burnHash);
+* name: zkevm/erc20
+  exports:
+
+  * zkevm.erc20.getBalance
+  * zkevm.erc20.approve
+  * zkevm.erc20.approveMax
+  * zkevm.erc20.isApprovalNeeded
+  * zkevm.erc20.transfer
+  * zkevm.erc20.deposit
+  * zkevm.erc20.depositWithPermit
+  * zkevm.erc20.depositClaim
+  * zkevm.erc20.withdraw
+  * zkevm.erc20.withdrawExit
+    symbols:
+    zkevm.erc20.getBalance:
+    kind: function
+    summary: Get ERC20 balance on zkEVM or Ethereum.
+    definition:
+    code: function getBalance(userAddress: string): Promise<string>
+    lang: typescript
+    source: tools/matic-js/zkevm/erc20.md
+    guidance:
+
+    * Use child instance for zkEVM; root instance for Ethereum.
+      example:
+      code: const bal = await zk.erc20(childToken).getBalance(user);
+      zkevm.erc20.approve:
+      kind: function
+      summary: Approve ERC20 spend (root or child) for zkEVM flows.
+      definition:
+      code: function approve(amount: string|number|BN, options?: { spenderAddress?: string}): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Some tokens require approval during deposit, others for withdraw; check `isApprovalNeeded`.
+      example:
+      code: await zk.erc20(rootToken, true).approve('1000');
+      zkevm.erc20.approveMax:
+      kind: function
+      summary: Approve max allowance for zkEVM bridge.
+      definition:
+      code: function approveMax(options?: { spenderAddress?: string }): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Use sparingly; aligns with UX patterns that favor one-time approvals.
+      example:
+      code: await zk.erc20(rootToken, true).approveMax();
+      zkevm.erc20.isApprovalNeeded:
+      kind: function
+      summary: Check whether approval is required for the next bridge step.
+      definition:
+      code: function isApprovalNeeded(): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Call before attempting deposit/withdraw to avoid reverts.
+      example:
+      code: const need = await zk.erc20(rootToken, true).isApprovalNeeded();
+      zkevm.erc20.transfer:
+      kind: function
+      summary: Transfer ERC20 on zkEVM or Ethereum.
+      definition:
+      code: function transfer(amount: string|number|BN, to: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Ensure receiver exists on the specific chain you are sending on.
+      example:
+      code: await zk.erc20(childToken).transfer('100', to);
+      zkevm.erc20.deposit:
+      kind: function
+      summary: Deposit ERC20 from Ethereum to zkEVM.
+      definition:
+      code: function deposit(amount: string|number|BN, userAddress: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Persist the deposit tx hash; required for `depositClaim`.
+    * Check `isDepositClaimable` before claiming on child.
+      example:
+      code: const tx = await zk.erc20(rootToken, true).deposit('100', user); console.log(await tx.getTransactionHash());
+      zkevm.erc20.depositWithPermit:
+      kind: function
+      summary: Deposit with permit to avoid separate approval transaction.
+      definition:
+      code: function depositWithPermit(amount: string|number|BN, userAddress: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Useful for tokens supporting EIP-2612 style permits; reduces txs.
+      example:
+      code: await zk.erc20(rootToken, true).depositWithPermit('100', user);
+      zkevm.erc20.depositClaim:
+      kind: function
+      summary: Claim a previously initiated deposit on zkEVM.
+      definition:
+      code: function depositClaim(depositTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Call after `isDepositClaimable(depositTxHash)` is true.
+      example:
+      code: await zk.erc20(childToken).depositClaim(depositHash);
+      zkevm.erc20.withdraw:
+      kind: function
+      summary: Start withdrawal on zkEVM (child) back to Ethereum.
+      definition:
+      code: function withdraw(amount: string|number|BN, userAddress: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Persist the withdraw tx hash; needed for exit.
+      example:
+      code: const burn = await zk.erc20(childToken).withdraw('100', user);
+      zkevm.erc20.withdrawExit:
+      kind: function
+      summary: Exit a zkEVM withdrawal on Ethereum using the withdraw tx hash.
+      definition:
+      code: function withdrawExit(withdrawTxHash: string): Promise<TransactionResult>
+      lang: typescript
+      source: tools/matic-js/zkevm/erc20.md
+      guidance:
+    * Ensure that the validity proof for the withdraw tx has been submitted before calling exit.
+      example:
+      code: await zk.erc20(rootToken, true).withdrawExit(withdrawHash);
+* name: zkevm/common
+  exports:
+
+  * zkevm.isDeposited
+  * zkevm.isDepositClaimable
+  * zkevm.isWithdrawExitable
+  * zkevm.isExited
+    symbols:
+    zkevm.isDeposited:
+    kind: function
+    summary: Check if a zkEVM deposit has completed.
+    definition:
+    code: function isDeposited(txHash: string): Promise<boolean>
+    lang: typescript
+    source: tools/matic-js/zkevm/common-methods.md
+    guidance:
+
+    * Use to drive UI state for showing claim button.
+      example:
+      code: const ok = await zk.isDeposited(depHash);
+      zkevm.isDepositClaimable:
+      kind: function
+      summary: Whether a deposit can be claimed on the destination network.
+      definition:
+      code: function isDepositClaimable(txHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/zkevm/common-methods.md
+      guidance:
+    * Poll until true, then call `depositClaim(tx)` on child token.
+      example:
+      code: const claimable = await zk.isDepositClaimable(depHash);
+      zkevm.isWithdrawExitable:
+      kind: function
+      summary: Whether a withdrawal can be exited on the origin network.
+      definition:
+      code: function isWithdrawExitable(txHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/zkevm/common-methods.md
+      guidance:
+    * Use before calling `withdrawExit` to avoid premature exit attempts.
+      example:
+      code: const exitable = await zk.isWithdrawExitable(wdHash);
+      zkevm.isExited:
+      kind: function
+      summary: Check if a zkEVM withdrawal has finished exiting.
+      definition:
+      code: function isExited(txHash: string): Promise<boolean>
+      lang: typescript
+      source: tools/matic-js/zkevm/common-methods.md
+      guidance:
+    * Useful for confirmation UIs post-exit submission.
+      example:
+      code: const done = await zk.isExited(wdHash);
+      common\_workflows:
+* title: PoS: Deposit ERC20 then transfer on Polygon
+  steps:
+
+  * Create and init POSClient (testnet/amoy).
+  * Create root ERC20 via `erc20(root, true)`. Approve if needed.
+  * Call `deposit(amount, user)` on root token; persist tx hash.
+  * Poll `isDeposited(tx)`; once true, use child token to transfer.
+* title: PoS: Withdraw ERC20 back to Ethereum
+  steps:
+
+  * Use child token `withdrawStart(amount)` to burn on Polygon; save burn tx hash.
+  * Poll `isCheckPointed(burnHash)`.
+  * Call `withdrawExit(burnHash)` on root token or `withdrawExitFaster` with Proof API.
+  * Wait for `getReceipt()` and confirm with `isWithdrawExited(burnHash)`.
+* title: zkEVM: Deposit and claim ERC20
+  steps:
+
+  * Init ZkEvmClient (testnet/blueberry).
+  * Approve if `isApprovalNeeded()` is true on the root token.
+  * Call `deposit(amount, user)`; persist hash.
+  * Poll `isDepositClaimable(tx)`; when true, call `depositClaim(tx)` on child token.
+* title: zkEVM: Withdraw and exit ERC20
+  steps:
+
+  * Call `withdraw(amount, user)` on child token; persist hash.
+  * Wait until proofs are posted (`isWithdrawExitable` true).
+  * Call `withdrawExit(tx)` on root token.
+  * Confirm with `isExited(tx)`.
+* title: Configure Proof API for faster PoS exits
+  steps:
+
+  * Import `setProofApi` from '@maticnetwork/maticjs'.
+  * Call `setProofApi('https://proof-generator.polygon.technology/')` at startup.
+  * Use `withdrawExitFaster` variants.
+    troubleshooting\_cheatsheet:
+* symptom: PoS withdraw exit reverts with checkpoint/merkle errors
+  cause: Burn transaction not yet checkpointed to Ethereum.
+  fix: Poll `pos.isCheckPointed(burnTxHash)` until true, then retry `withdrawExit` or `withdrawExitFaster`.
+* symptom: Transactions are slow or failing sporadically during proof generation
+  cause: Public Proof API saturation or rate limits.
+  fix: Self-host Proof Generation API and point matic.js via `setProofApi()`.
+* symptom: Writes succeed but balances do not change
+  cause: Using the wrong side of the token (root vs child).
+  fix: Ensure you constructed the token object with the correct `isRoot` flag for the chain you are acting on.
+* symptom: Approval/allowance related reverts on zkEVM
+  cause: Token requires approval for the specific path; allowance insufficient.
+  fix: Use `isApprovalNeeded()` and call `approve`/`approveMax` accordingly; verify `getAllowance` if unsure.
+  faq:
+* q: Do I always need to approve before deposit?
+  a: On PoS, yes for ERC20 deposits. On zkEVM, some tokens require approval at deposit or withdraw; check `isApprovalNeeded()`.
+* q: Why use withdrawExitFaster?
+  a: It offloads proof construction to the Proof API and reduces RPC fanout. You still must wait for checkpointing.
+* q: Which plugin should I pick—web3.js or ethers?
+  a: Pick one based on your stack and keep it consistent across parent and child. Mixed providers lead to subtle bugs.
+  external\_resources:
+* label: Matic.js Examples
+  url: [https://github.com/maticnetwork/matic.js/tree/master/examples](https://github.com/maticnetwork/matic.js/tree/master/examples)
+

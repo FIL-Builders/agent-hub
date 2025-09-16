@@ -1,0 +1,500 @@
+meta:
+spec\_name: polygon/zkevm-expert-pack
+spec\_version: "0.3.0"
+generated: "2025-09-16"
+library\_version: "bridge v2; data-streamer protocol r1"
+language: "solidity, go"
+homepage: "[https://github.com/0xPolygonHermez](https://github.com/0xPolygonHermez)"
+tags: \["ethereum", "polygon", "zkEVM", "bridge", "data-streamer", "rollup"]
+purpose: >
+Senior‑developer guide to the Polygon zkEVM Bridge (v2) and the Data Streamer
+protocols used by zkNode/Sequencer. This pack combines the authoritative
+Solidity and protocol signatures with field-tested usage guidance for safe
+bridging, streaming, and batch/validium operations.  &#x20;
+guiding\_principles:
+\- Prefer atomic ops: always pair StartAtomicOp → CommitAtomicOp; only RollbackAtomicOp before commit, never after.&#x20;
+\- For catch‑up streaming, use StartBookmark (e.g., by L2 block number) rather than guessing entry numbers.&#x20;
+\- Do not send start() again mid‑stream; the server treats it as an error and drops the TCP connection.&#x20;
+\- For L1→L2 ERC‑20 bridging, pass permitData when possible; set forceUpdateGlobalExitRoot only when a fresh GER is required.&#x20;
+\- Be proxy‑aware: PolygonZkEVMBridgeV2 uses an upgradeable proxy on L1; interact via the proxy address.&#x20;
+\- Guard reentrancy paths in token hooks; the bridge warns about reentrant beforeTransfer patterns.&#x20;
+\- Encode bookmarks as bytes that are meaningful to your app (e.g., L2 blockNumber) and index them via the Bookmarks DB.&#x20;
+\- Use verifyMerkleProof/exit‑root proofs precisely as specified; mismatched indices or roots are common failure points.&#x20;
+design\_notes: >
+Consolidated from the Polygon zkEVM architecture docs bundle (zkEVM\_all.md),
+including Bridge v2 API, Data Streamer server‑source + client‑server protocol,
+Validium/committee pieces, and Merkle helpers; signatures reproduced verbatim
+where provided, and protocol layouts preserved as binary field lists.
+Open Agent Spec v0.3.0 schema used to structure `definition` & examples. &#x20;
+
+groups:
+
+* name: zkevm-data-streamer/server-source
+  exports: \[StartAtomicOp, AddStreamEntry, AddStreamBookmark, CommitAtomicOp, RollbackAtomicOp, UpdateEntryData]
+  symbols:
+  StartAtomicOp:
+  kind: function
+  summary: Starts an atomic operation (batch) on the stream source; entries appended until commit/rollback.&#x20;
+  definition:
+  code: |
+  // Server‑source library (conceptual API)
+  StartAtomicOp()
+  lang: idl
+  source: "server-source library overview. "
+  guidance:
+  \- Call first in every batch; without it the server cannot mark batch boundaries.&#x20;
+  \- Pair with CommitAtomicOp; use RollbackAtomicOp only before commit if you must abort.&#x20;
+  example:
+  lang: go
+  code: |
+  // pseudo-Go usage
+  ss.StartAtomicOp()
+  n := ss.AddStreamEntry(1, \[]byte("block-headers"))
+  \_ = n
+  ss.CommitAtomicOp()
+  AddStreamEntry:
+  kind: function
+  summary: Adds an entry (event) to the current atomic op; returns the sequential entryNumber.&#x20;
+  definition:
+  code: |
+  AddStreamEntry(entryType: u32, data: u8\[]) -> u64 entryNumber
+  lang: idl
+  source: "server-source library. "
+  guidance:
+  \- Keep entry payloads self‑describing; consumers may fetch individual entries later.&#x20;
+  \- Entry numbers are global across ops; do not assume dense per‑op numbering.&#x20;
+  example:
+  lang: go
+  code: |
+  n := ss.AddStreamEntry(2, encodedBlockData) // 2 == app-defined entry type
+  log.Printf("added entry %d", n)
+  AddStreamBookmark:
+  kind: function
+  summary: Inserts a bookmark entry (opaque bytes) into the current atomic op; returns its entryNumber.&#x20;
+  definition:
+  code: |
+  AddStreamBookmark(bookmark: u8\[]) -> u64 entryNumber
+  lang: idl
+  source: "server-source library. "
+  guidance:
+  \- Encode app-meaningful positions (e.g., L2 blockNumber) to support StartBookmark queries.&#x20;
+  \- Keep bookmark size modest; Bookmarks DB stores key=bookmark, value=entryNumber.&#x20;
+  example:
+  lang: go
+  code: |
+  ss.AddStreamBookmark(uint64ToBytes(blockNumber))
+  CommitAtomicOp:
+  kind: function
+  summary: Commits the atomic op; only committed entries become visible to clients.&#x20;
+  definition:
+  code: |
+  CommitAtomicOp()
+  lang: idl
+  source: "server-source protocol; commit gates streaming. "
+  guidance:
+  \- Header fields (totalLength/totalEntries) are updated only on commit.&#x20;
+  \- After commit, rollback is no longer possible.&#x20;
+  example:
+  lang: go
+  code: |
+  if err := validate(batch); err != nil { ss.RollbackAtomicOp(); return }
+  ss.CommitAtomicOp()
+  RollbackAtomicOp:
+  kind: function
+  summary: Aborts the current atomic op; uncommitted entries are overwritten by subsequent ops.&#x20;
+  definition:
+  code: |
+  RollbackAtomicOp()
+  lang: idl
+  source: "rollback semantics. "
+  guidance:
+  \- Use only before commit; server will stream up to the last committed entry in the header.&#x20;
+  \- Design idempotent producers; a rollback may partially overwrite file bytes but remains invisible to clients.&#x20;
+  example:
+  lang: go
+  code: |
+  if transientError { ss.RollbackAtomicOp(); return }
+  UpdateEntryData:
+  kind: function
+  summary: Updates data for an existing entry within an uncommitted atomic op.&#x20;
+  definition:
+  code: |
+  UpdateEntryData(entryNumber: u64, entryType: u32, newData: u8\[])
+  lang: idl
+  source: "server-source library (update before commit). "
+  guidance:
+  \- Only valid prior to commit; track modified entryNumbers for downstream reconciliation.&#x20;
+  \- Prefer additive entries over in‑place updates when consumers cache by hash.
+  example:
+  lang: go
+  code: |
+  ss.UpdateEntryData(n, 2, patchedBlockData)
+
+* name: zkevm-data-streamer/client-server-protocol
+  exports: \[start, stop, StartBookmark, Result]
+  symbols:
+  start:
+  kind: function
+  summary: Client requests streaming from a given entryNumber (0 means from the start).&#x20;
+  definition:
+  code: |
+  // start() TCP command layout
+  u64 command = 1
+  u64 streamType     // e.g., 1 = zkEVM Sequencer
+  u64 fromEntryNumber
+  lang: binary
+  source: "client-server start() command. "
+  guidance:
+  \- Do not issue start() while already receiving a stream; server treats it as error and drops the connection.&#x20;
+  \- Use streamType to target the correct source (e.g., sequencer).&#x20;
+  example:
+  lang: python
+  code: |
+  import socket, struct
+  sock = socket.create\_connection(("server", 6000))
+  payload = struct.pack("\<QQQ", 1, 1, 0)  # command,start; streamType=1; from=0
+  sock.sendall(payload)
+  stop:
+  kind: function
+  summary: Client requests the server to stop streaming for a given streamType.&#x20;
+  definition:
+  code: |
+  // stop() TCP command layout
+  u64 command = 2
+  u64 streamType
+  lang: binary
+  source: "client-server stop() command. "
+  guidance:
+  \- Always perform a clean stop to free server resources and close the TCP session gracefully.
+  \- Reconnect with start()/StartBookmark for resumption semantics.
+  example:
+  lang: python
+  code: |
+  sock.sendall(struct.pack("\<QQ", 2, 1))  # stop streamType=1
+  sock.close()
+  StartBookmark:
+  kind: function
+  summary: Client requests streaming from a bookmark (opaque bytes) instead of an entryNumber.&#x20;
+  definition:
+  code: |
+  // StartBookmark TCP command layout
+  u64 command = 4
+  u64 streamType
+  u32 bookmarkLength
+  u8\[] fromBookmark
+  lang: binary
+  source: "StartBookmark command; bookmarks map to entryNumber via Bookmarks DB.  "
+  guidance:
+  \- Encode bookmarks as little-endian blockNumber (or app-specific key) to leverage Bookmarks DB binary search.&#x20;
+  \- Expect a Result packet first, followed by entries starting at the resolved entryNumber.&#x20;
+  example:
+  lang: python
+  code: |
+  bn = (123456).to\_bytes(8, "little")
+  hdr = struct.pack("\<QQI", 4, 1, len(bn))
+  sock.sendall(hdr + bn)
+  Result:
+  kind: type
+  summary: Response envelope for commands; conveys error code/string before any streamed entries.&#x20;
+  definition:
+  code: |
+  // Result packet layout from server
+  u8  packetType  // 0xff
+  u32 length      // total length of the entry
+  u32 errorNum    // 0 = OK
+  u8\[] errorStr   // ASCII bytes
+  lang: binary
+  source: "client-server messages: Result entry format. "
+  guidance:
+  \- Always read and check Result before consuming entries; nonzero errorNum halts the session.&#x20;
+  \- Log errorStr verbatim; it is human-readable ASCII.
+
+* name: zkevm-bridge/PolygonZkEVMBridgeV2
+  exports: \[initialize, bridgeAsset, bridgeMessage, bridgeMessageWETH]
+  symbols:
+  initialize:
+  kind: function
+  summary: Initializes the Bridge (networkID, gas token, GER manager, RollupManager, gas metadata).&#x20;
+  definition:
+  code: |
+  function initialize(
+  uint32 \_networkID,
+  address \_gasTokenAddress,
+  uint32 \_gasTokenNetwork,
+  contract IBasePolygonZkEVMGlobalExitRoot \_globalExitRootManager,
+  address \_polygonRollupManager,
+  bytes \_gasTokenMetadata
+  ) external
+  lang: solidity
+  source: "PolygonZkEVMBridgeV2 API. "
+  guidance:
+  \- On L2 deployments, \_polygonRollupManager is address(0) (no emergency mode).&#x20;
+  \- Use proxy address for interactions; implementation constructor disables initializers.&#x20;
+  example:
+  code: |
+  import { ethers } from "ethers";
+  const bridge = new ethers.Contract(addr, \[
+  "function initialize(uint32,address,uint32,address,address,bytes) external"
+  ], signer);
+  await bridge.initialize(1442, gasToken, 1, gerMgr, rollupMgr, "0x");
+  bridgeAsset:
+  kind: function
+  summary: Locks/mints tokens cross‑chain and appends a leaf to the exit tree.&#x20;
+  definition:
+  code: |
+  function bridgeAsset(
+  uint32 destinationNetwork,
+  address destinationAddress,
+  uint256 amount,
+  address token,
+  bool forceUpdateGlobalExitRoot,
+  bytes permitData
+  ) public
+  lang: solidity
+  source: "Bridge v2 API. "
+  guidance:
+  \- Set forceUpdateGlobalExitRoot only when a fresh GER is required; it incurs extra cost.&#x20;
+  \- Provide permitData for ERC‑20 approvals in a single tx when available.&#x20;
+  \- Beware reentrant beforeTransfer on third‑party tokens; do not call external addresses in such hooks.&#x20;
+  example:
+  code: |
+  import { ethers } from "ethers";
+  const bridge = new ethers.Contract(addr, \[
+  "function bridgeAsset(uint32,address,uint256,address,bool,bytes) public"
+  ], signer);
+  await bridge.bridgeAsset(1, recipient, amt, token, false, "0x");
+  bridgeMessage:
+  kind: function
+  summary: Bridges an arbitrary message (and ETH value) to a destination network.&#x20;
+  definition:
+  code: |
+  function bridgeMessage(
+  uint32 destinationNetwork,
+  address destinationAddress,
+  bool forceUpdateGlobalExitRoot,
+  bytes metadata
+  ) external
+  lang: solidity
+  source: "Bridge v2 API. "
+  guidance:
+  \- Use metadata to encode message payload succinctly; large payloads inflate exit proofs.
+  \- Prefer bridgeMessageWETH when attaching WETH amount explicitly.&#x20;
+  example:
+  code: |
+  const bridge = new ethers.Contract(addr, \[
+  "function bridgeMessage(uint32,address,bool,bytes) external"
+  ], signer);
+  await bridge.bridgeMessage(1, app, false, ethers.toUtf8Bytes("ping"));
+  bridgeMessageWETH:
+  kind: function
+  summary: Bridges a message while specifying amountWETH in the call.&#x20;
+  definition:
+  code: |
+  function bridgeMessageWETH(
+  uint32 destinationNetwork,
+  address destinationAddress,
+  uint256 amountWETH,
+  bool forceUpdateGlobalExitRoot,
+  bytes metadata
+  ) external
+  lang: solidity
+  source: "Bridge v2 API. "
+  guidance:
+  \- Useful when funding the L2 recipient with gas token semantics aligned to WETH.
+  \- Ensure amountWETH matches token decimals and L2 expectations.
+
+* name: validium/committee
+  exports: \[verifyMessage, getAmountOfMembers, getProcotolName, CommitteeUpdated]
+  symbols:
+  verifyMessage:
+  kind: function
+  summary: Verifies a signedHash against the committee signature set (threshold=requiredAmountOfSignatures).&#x20;
+  definition:
+  code: |
+  function verifyMessage(
+  bytes32 signedHash,
+  bytes signaturesAndAddrs
+  ) external
+  lang: solidity
+  source: "Validium/committee API. "
+  guidance:
+  \- Concatenate signatures first, then all committee addresses in ascending order. Each ECDSA sig is 65 bytes.&#x20;
+  \- Ensure requiredAmountOfSignatures aligns with committeeHash provenance.
+  example:
+  code: |
+  const c = new ethers.Contract(addr, \[
+  "function verifyMessage(bytes32,bytes) external"
+  ], provider);
+  const ok = await c.verifyMessage(hash, packedSigsAndAddrs);
+  getAmountOfMembers:
+  kind: function
+  summary: Returns the current committee size.&#x20;
+  definition:
+  code: |
+  function getAmountOfMembers() public returns (uint256)
+  lang: solidity
+  source: "Validium/committee API. "
+  guidance:
+  \- For quorum math, read both committee size and required threshold from configuration.
+  example:
+  code: |
+  const n = await committee.getAmountOfMembers();
+  getProcotolName:
+  kind: function
+  summary: Returns the protocol name string.&#x20;
+  definition:
+  code: |
+  function getProcotolName() external returns (string)
+  lang: solidity
+  source: "Validium/committee API. (Note: 'Procotol' spelling per source.) "
+  guidance:
+  \- Do not rely on this string for logic; treat it as metadata.
+  example:
+  code: |
+  console.log(await committee.getProcotolName());
+  CommitteeUpdated:
+  kind: other
+  summary: Event emitted when the committee is updated (committeeHash changed).&#x20;
+  definition:
+  code: |
+  event CommitteeUpdated(bytes32 committeeHash)
+  lang: solidity
+  source: "Validium/committee events. "
+  guidance:
+  \- Index this event off‑chain to track governance actions and rotate verifiers.
+
+* name: merkle-utils
+  exports: \[getRoot, \_addLeaf, verifyMerkleProof]
+  symbols:
+  getRoot:
+  kind: function
+  summary: Computes and returns the Merkle root.&#x20;
+  definition:
+  code: |
+  function getRoot() public returns (bytes32)
+  lang: solidity
+  source: "Merkle helper API. "
+  guidance:
+  \- Root depends on current in‑contract tree; ensure leaves were added in expected order.
+  example:
+  code: |
+  const root = await lib.getRoot();
+  \_addLeaf:
+  kind: function
+  summary: Internal helper to append a leaf (bytes32) to the Merkle tree.&#x20;
+  definition:
+  code: |
+  function \_addLeaf(bytes32 leaf) internal
+  lang: solidity
+  source: "Merkle helper API. "
+  guidance:
+  \- For public trees, expose a safe wrapper; validate leaf preimage externally.
+  example:
+  code: |
+  // internal-only; see public wrappers in your contract
+  verifyMerkleProof:
+  kind: function
+  summary: Verifies a sparse Merkle proof for a leaf at index against a root.&#x20;
+  definition:
+  code: |
+  function verifyMerkleProof(
+  bytes32 leaf,
+  bytes32\[32] smtProof,
+  uint32 index,
+  bytes32 root
+  ) public returns (bool)
+  lang: solidity
+  source: "Merkle helper API. "
+  guidance:
+  \- Index must match the leaf position used when constructing the root; off‑by‑one is a common bug.
+  \- Proof array must be exactly 32 hashes as specified by the sparse tree.
+  example:
+  code: |
+  const ok = await lib.verifyMerkleProof(leaf, proof, idx, root);
+
+* name: validium/sequence
+  exports: \[sequenceBatchesValidium]
+  symbols:
+  sequenceBatchesValidium:
+  kind: function
+  summary: Sequencer entry point to append multiple validium batches with DA message.&#x20;
+  definition:
+  code: |
+  function sequenceBatchesValidium(
+  struct PolygonValidiumStorageMigration.ValidiumBatchData\[] batches,
+  uint64 maxSequenceTimestamp,
+  uint64 initSequencedBatch,
+  address l2Coinbase,
+  bytes dataAvailabilityMessage
+  ) external
+  lang: solidity
+  source: "PolygonRollupBaseEtrogNoGap API. "
+  guidance:
+  \- Ensure batches are well‑formed and DA message is committed for auditors/verifiers.
+  \- Time bounds (maxSequenceTimestamp) and initSequencedBatch must be consistent with on‑chain state.
+  example:
+  code: |
+  await rollup.sequenceBatchesValidium(batches, tsMax, first, coinbase, daMsg);
+
+common\_workflows:
+
+* title: Stream L2 blocks from a known blockNumber via bookmark
+  steps:
+
+  * "Construct bookmark bytes = little‑endian blockNumber. "
+  * "Send StartBookmark(streamType=1, bookmarkLength, bookmark). "
+  * "Read Result (expect errorNum=0) then consume entries. "
+* title: Produce a batch atomically with rollback on failure
+  steps:
+
+  * "StartAtomicOp(); add entries and a bookmark at the batch’s first block. "
+  * "Validate end‑to‑end; on error RollbackAtomicOp(); else CommitAtomicOp(). "
+* title: Bridge ERC‑20 from L1 to zkEVM (bridgeAsset)
+  steps:
+
+  * "Approve or pass permitData to bridgeAsset for single‑tx UX. "
+  * "Call bridgeAsset(destinationNetwork, destinationAddress, amount, token, forceUpdateGER, permitData). "
+  * "Track exit leaf; L2 recipient claims minted wrapped ERC‑20. "
+* title: Bridge an app message
+  steps:
+
+  * "Encode compact metadata; call bridgeMessage or bridgeMessageWETH. "
+  * "Listen for L2 processing via your app’s inbox/outbox handlers."
+* title: Verify a Merkle proof against on‑chain helper
+  steps:
+
+  * "Compute leaf & collect smtProof\[32], index, root. "
+  * "Call verifyMerkleProof(leaf, proof, index, root) and assert true. "
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Stream drops after issuing another start()."
+  cause: "Server treats mid‑stream start as error and closes connection."
+  fix: "Use stop() first or new connection; prefer StartBookmark for resuming. "
+* symptom: "Claim/exit not visible on L1 immediately."
+  cause: "Global exit root not updated yet."
+  fix: "Set forceUpdateGlobalExitRoot=true on the originating bridge call, or wait for next GER update. "
+* symptom: "Unexpected token lock when bridging reentrant tokens."
+  cause: "Reentrant beforeTransfer can trigger claimTokens and alter supply/locking."
+  fix: "Avoid external calls in token hooks; follow bridge’s reentrancy guidance. "
+
+faq:
+
+* q: "When should I use StartBookmark instead of start(fromEntryNumber)?"
+  a: "Use StartBookmark when you know an app‑level position (e.g., L2 blockNumber) but not the entryNumber; the server resolves it via the Bookmarks DB and streams from there. "
+* q: "Can I rollback after commit?"
+  a: "No. RollbackAtomicOp is only valid before commit; header/visibility are updated only on commit. "
+* q: "Difference between bridgeMessage and bridgeMessageWETH?"
+  a: "Both bridge messages; the WETH variant lets you specify amountWETH explicitly, useful when funding recipients. "
+* q: "How many signatures must verifyMessage check?"
+  a: "Exactly the configured requiredAmountOfSignatures out of the committee set; pass concatenated signatures followed by ordered addresses. "
+
+external\_resources:
+
+* label: "Polygon zkEVM Contracts (Bridge v2)"
+  url: "[https://github.com/0xPolygonHermez/zkevm-contracts](https://github.com/0xPolygonHermez/zkevm-contracts)"
+* label: "Polygon zkEVM Data Streamer"
+  url: "[https://github.com/0xPolygonHermez/zkevm-data-streamer](https://github.com/0xPolygonHermez/zkevm-data-streamer)"
+* label: "Open Agent Spec v0.3.0"
+  url: "[https://agenthub.dev/schema/open-agent-spec-0.3.json](https://agenthub.dev/schema/open-agent-spec-0.3.json)"
+

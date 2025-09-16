@@ -14,7 +14,7 @@ Return ONE valid YAML document *only* (no Markdown fences, no chatty text)
 conforming to the “Open Agent Spec v0.3” supplied below.
 
 ### 3 · Inputs  (replace placeholders before running)
-<OPEN_AGENT_SPEC>      ← full text of the schema (v0.3.0)
+<OPEN_AGENT_SPEC> (open-agent-spec-v0.3.0.yaml)      ← full text of the schema (v0.3.0)
 <API_DOCUMENTATION>    ← authoritative docs: README, .d.ts, REST spec, OpenAPI JSON, etc.
 
 ### 4 · Workflow  (follow in order)

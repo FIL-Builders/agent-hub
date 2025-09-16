@@ -1,0 +1,891 @@
+meta:
+spec\_name: selfxyz/contracts+sdk
+spec\_version: 0.3.0
+generated: '2025-09-16'
+library\_version: '>=0.0.0'
+purpose: Teach an LLM to integrate with Self.xyz identity verification: using the JS/TS utilities for passport parsing & config, and the Solidity interfaces/libraries for on-chain verification and disclosure workflows.
+guiding\_principles:
+
+* Start with `IIdentityVerificationHubV2` and `ISelfVerificationRoot` to understand the on-chain flow; wire contracts against interfaces first.
+* Prefer interface-driven development; keep contracts testable by mocking the hub and verifiers.
+* Validate relayer payload formats explicitly; reject malformed user data before external calls.
+* When parsing MRZ or DSC data in JS/TS, normalize date formats and names using the provided helpers to align with on-chain expectations.
+* Cache configuration (e.g., forbidden countries, age gates) via a `ConfigStore`; avoid recomputing config IDs.
+* Use `CircuitConstantsV2.getDiscloseIndices` rather than hardcoding public-signal indices.
+* Guard callback surfaces (`onVerificationSuccess`) with strict caller checks (hub-only) and consider reentrancy risks.
+* Keep attestation IDs typed as `bytes32` on-chain and a small enum-like module in app code; do not magic-number them.
+* Write property-based tests for proof verifiers: invalid inputs must fail closed.
+  design\_notes: Built from uploaded sources: selfxyz\_common.out, selfxyz\_core.out, and concatenated Solidity sources in selfxyz\_contracts.out. Grouped by JS/TS utilities ("common"), app/core services ("core"), and Solidity contracts ("contracts"). Every symbol includes an authoritative signature as present in the inputs (some upstream docs elide bodies; retained ellipses match source).
+  language: typescript, solidity
+  tags:
+* selfxyz
+* identity
+* zkp
+* solidity
+* typescript
+* verification
+  groups:
+* name: common (JS/TS utilities)
+  exports:
+
+  * initElliptic
+  * getSKIPEM
+  * formatMrz
+  * getCircuitNameFromPassportData
+  * PassportData
+  * UserIdType
+  * initPassportDataParsing
+  * genAndInitMockPassportData
+  * generateCircuitInputsDSC
+    symbols:
+    initElliptic:
+    kind: function
+    summary: Initialize and return the Elliptic library instance.
+    definition:
+    code: export declare function initElliptic(): typeof elliptic;
+    lang: typescript
+    source: selfxyz\_common.out
+    guidance:
+
+    * Call once at startup and reuse the returned instance; avoid re-initializing per request.
+    * Scope the elliptic curve you need (e.g., secp256k1) right after init to prevent misconfiguration.
+      example:
+      code: |-
+      import { initElliptic } from '@selfxyz/common';
+      const ec = initElliptic(); // e.g., ec.ec('secp256k1')
+      const key = ec.genKeyPair();
+      console.log(key.getPublic().encode('hex'));
+      getSKIPEM:
+      kind: function
+      summary: Fetch SKI (Subject Key Identifier) PEMs for a given environment.
+      definition:
+      code: |-
+      export declare function getSKIPEM(environment: 's... | 'production'): Promise<{
+      \[key: string]: string;
+      }>;
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Use the correct environment string (e.g., 'staging' or 'production') to avoid signature mismatches.
+    * Cache the returned PEM map in memory or a KV store; it rarely changes and improves performance.
+      example:
+      code: |-
+      import { getSKIPEM } from '@selfxyz/common';
+      async function bootstrap() {
+      const pems = await getSKIPEM('production');
+      console.log(Object.keys(pems));
+      }
+      bootstrap();
+      formatMrz:
+      kind: function
+      summary: Format a raw MRZ string into an array of numeric codes/fields.
+      definition:
+      code: export declare function formatMrz(mrz: string): number\[];
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Strip whitespace and non-ICAO characters before calling; MRZ requires strict character set.
+    * Pair with `formatDate` (Solidity) expectations: date strings should be normalized as YYYYMMDD for cross-boundary consistency.
+      example:
+      code: |-
+      import { formatMrz } from '@selfxyz/common';
+      const codes = formatMrz('P\<UTOERIKSSON<\<ANNA\<MARIA<<<<<<<<<<<<<<<<<<<\nL898902C36UTO7408122F1204159ZE184226B<<<<<10');
+      console.log(codes.length);
+      getCircuitNameFromPassportData:
+      kind: function
+      summary: Return the circuit name ('register' | 'dsc') for the given passport payload.
+      definition:
+      code: export declare function getC...tData: PassportData, circuitType: 'register' | 'dsc'): string;
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Feed a fully-populated `PassportData`; missing DSC/MRZ sections can misclassify the circuit.
+    * Use this as a router for proof generation UI—derive which inputs to request from the user.
+      example:
+      code: |-
+      import { getCircuitNameFromPassportData } from '@selfxyz/common';
+      const circuit = getCircuitNameFromPassportData({ mrz: '...', dsc\_raw: \['...'] }, 'dsc');
+      console.log(circuit);
+      PassportData:
+      kind: type
+      summary: Structured passport input data shape used for circuit input generation.
+      definition:
+      code: |-
+      export type PassportData = {
+      mrz: string...sportMetadata;
+      dsc\_parsed?: CertificateData;
+      csca\_
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Prefer strongly-typed construction and validate MRZ/DSC presence according to selected circuit.
+    * Keep raw DSC arrays stable—do not reorder; ordering is part of the proof semantics.
+      example:
+      code: |-
+      /\*\* @typedef {import('@selfxyz/common').PassportData} PassportData */
+      /*\* @type {PassportData} \*/
+      const pd = { mrz: '...', metadata: { issuingState: 'UTO' }, dsc\_parsed: undefined };
+      console.log(pd.issuingState ?? pd?.metadata?.issuingState);
+      lang: javascript
+      UserIdType:
+      kind: type
+      summary: Identifier type for off-chain user contexts ('hex' | 'uuid').
+      definition:
+      code: export type UserIdType = 'hex' | 'uuid';
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Use 'uuid' for human-facing systems; use 'hex' when interfacing directly with on-chain (bytes32) identifiers.
+    * Persist the chosen scheme; do not switch types mid-session.
+      example:
+      code: |-
+      import type { UserIdType } from '@selfxyz/common';
+      const scheme: UserIdType = 'uuid';
+      console.log('scheme', scheme);
+      initPassportDataParsing:
+      kind: function
+      summary: Parse and normalize MRZ/DSC fields on a PassportData object.
+      definition:
+      code: export declare function initPasspor...rsing(passportData: PassportData, skiPem?: any): PassportData;
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Pass a `skiPem` bundle that matches your environment; parsing may validate signatures.
+    * Run this once per user document and cache normalized structure to avoid recomputation.
+      example:
+      code: |-
+      import { initPassportDataParsing } from '@selfxyz/common';
+      const parsed = initPassportDataParsing({ mrz: '...' });
+      console.log(parsed);
+      genAndInitMockPassportData:
+      kind: function
+      summary: Generate deterministic mock passport data and run the parser.
+      definition:
+      code: export declare function genAndIn... string, lastName?: string, firstName?: string): PassportData;
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Use for local development and CI; never ship mock data paths in production builds.
+    * Seed names/dates to cover edge cases like leap days and hyphenated surnames.
+      example:
+      code: |-
+      import { genAndInitMockPassportData } from '@selfxyz/common';
+      const sample = genAndInitMockPassportData('UTO', 'DOE', 'JANE');
+      console.log(sample.mrz);
+      generateCircuitInputsDSC:
+      kind: function
+      summary: Build DSC circuit input object from normalized passport data.
+      definition:
+      code: |-
+      export declare function generateCi...   raw\_dsc: string\[];
+      raw\_dsc\_padded\_length: string;
+
+      lang: typescript
+      source: selfxyz\_common.out
+      guidance:
+    * Call after `initPassportDataParsing` to ensure fields are clean and padded as expected.
+    * Keep the resulting object immutable; downstream hashing assumes stable ordering and content.
+      example:
+      code: |-
+      import { generateCircuitInputsDSC } from '@selfxyz/common';
+      const inputs = generateCircuitInputsDSC({ mrz: '...', dsc\_raw: \['...'] });
+      console.log(Object.keys(inputs));
+* name: core (JS/TS core services)
+  exports:
+
+  * countries
+  * AllIds
+  * IConfigStorage
+  * InMemoryConfigStore
+  * DefaultConfigStore
+    symbols:
+    countries:
+    kind: constant
+    summary: Map of ISO-like country names to 3-letter codes.
+    definition:
+    code: |-
+    countries: {
+    readonly AFGHANISTAN:&#x20;
+    lang: typescript
+    source: selfxyz\_core.out
+    guidance:
+
+    * Use as a canonical source for issuing state normalization; keep UI select options derived from this map.
+    * Prefer 3-letter codes across the stack to match MRZ/ICAO conventions.
+      example:
+      code: |-
+      import { countries } from '@selfxyz/core';
+      console.log(countries.AFGHANISTAN, countries.ANGUILLA);
+      AllIds:
+      kind: constant
+      summary: Set-like Map of attestation type IDs used internally.
+      definition:
+      code: AllIds: Map<1 | 2, boolean>
+      lang: typescript
+      source: selfxyz\_core.out
+      guidance:
+    * Treat as read-only; use helper accessors instead of mutating.
+    * Use for quick membership checks when routing incoming attestations.
+      example:
+      code: |-
+      import { AllIds } from '@selfxyz/core';
+      console.log(AllIds.has(1));
+      IConfigStorage:
+      kind: interface
+      summary: Abstract storage interface for verification configuration and action IDs.
+      definition:
+      code: |-
+      interface IConfigStorage {
+      /\*\*
+      \* ...e<VerificationConfig>;
+      /\*\*
+      \* Set the verification c
+      lang: typescript
+      source: selfxyz\_core.out
+      guidance:
+    * Implement both read and write paths; callers expect atomic `setConfig` semantics.
+    * If persisting in remote KV/DB, debounce writes and cache `getConfig` in-memory.
+      example:
+      code: |-
+      import type { IConfigStorage } from '@selfxyz/core';
+      const store: IConfigStorage = {
+      async getConfig() { return undefined; },
+      async setConfig(id, cfg) { /\* persist \*/ },
+      async getActionId(uid, d) { return `act:${uid}`; }
+      };
+      void store.getActionId('user-123', {});
+      InMemoryConfigStore:
+      kind: class
+      summary: Simple in-memory implementation of the `IConfigStorage` interface.
+      definition:
+      code: |-
+      declare class InMemoryConfigStore imple...): Promise<string>;
+      setConfig(configId: string, config:
+      lang: typescript
+      source: selfxyz\_core.out
+      guidance:
+    * Use for tests and ephemeral workers; do not rely on it for multi-process deployments.
+    * Serialize config structs to JSON deterministically if you mirror to logs or disk.
+      example:
+      code: |-
+      import { InMemoryConfigStore } from '@selfxyz/core';
+      const s = new InMemoryConfigStore(async () => 'act\:dummy');
+      (async () => {
+      const id = await s.getActionId('uid', {});
+      console.log(id);
+      })();
+      DefaultConfigStore:
+      kind: class
+      summary: Default production-ready config store wrapper.
+      definition:
+      code: |-
+      declare class DefaultConfigStore impleme...romise<boolean>;
+      getActionId(\_userIdentifier: string, \_d
+      lang: typescript
+      source: selfxyz\_core.out
+      guidance:
+    * Wire it to your platform secrets/DB; inject a stable `getActionId` derivation function.
+    * Measure cold-start latency and warm it up at service boot to avoid first-request stalls.
+      example:
+      code: |-
+      import { DefaultConfigStore } from '@selfxyz/core';
+      const store = new DefaultConfigStore(async () => 'act\:uid');
+      // store.setConfig('cfg:1', {...})
+* name: contracts (Solidity)
+  exports:
+
+  * ISelfVerificationRoot
+  * SelfVerificationRoot
+  * IIdentityVerificationHubV2
+  * IDscCircuitVerifier
+  * IRegisterCircuitVerifier
+  * SelfStructs
+  * CircuitConstantsV2
+  * AttestationId
+  * Formatter
+    symbols:
+    ISelfVerificationRoot:
+    kind: interface
+    summary: Base interface for contracts integrating Self verification/disclosure.
+    definition:
+    code: |-
+    interface ISelfVerificationRoot {
+    /\*\*
+    \* @notice Structure containing proof data for disclose circuits
+    \* @dev Contains the proof elements required for zero-knowledge verification
+    \* @param a First proof element
+    \* @param b Second proof element (2x2 matrix)
+    \* @param c Third proof element
+    \* @param pubSignals Array of 21 public signals for the circuit
+    \*/
+    struct DiscloseCircuitProof {
+    uint256\[2] a;
+    uint256\[2]\[2] b;
+    uint256\[2] c;
+    uint256\[21] pubSignals;
+    }
+
+    ```
+      ...
+           * @param idNumber The identity document number
+           * @param nationality The nationality of the document holder
+           * @param dateOfBirth Date of birth in string format
+           * @param gender Gender of the document holder
+           * @param expiryDate Expiry date of the identity document
+           * @param olderThan Verified age threshold (e.g., 18 for adult verification)
+           * @param ofac Array of OFAC (Office of Foreign Assets Control) compliance flags
+           */
+          struct GenericDiscloseOutputV2 {
+              bytes32 attestationId;
+              uint256 userIdentifier;
+              uint256 nullifier;
+              uint256[4] forbiddenCountriesListPacked;
+              string issuingState;
+              string[] name;
+              string idNumber;
+              string nationality;
+              string dateOfBirth;
+              string gender;
+              string expiryDate;
+              uint256 olderThan;
+              bool[3] ofac;
+          }
+      
+          /**
+           * @notice Verifies a self-proof using the bytes-based interface
+           * @dev Parses relayer data format and validates against contract settings before calling hub V2
+           * @param proofPayload Packed data from relayer in format: | 32 bytes attestationId | proof data |
+           * @param userContextData User-defined data in format: | 32 ...nfigId | 32 bytes destChainId | 32 bytes userIdentifier | data |
+           */
+          function verifySelfProof(bytes calldata proofPayload, bytes calldata userContextData) external;
+      
+          /**
+           * @notice Callback function called upon successful verification
+           * @dev Only the identity verification hub V2 contract should call this function
+           * @param output The verification output data containing disclosed identity information
+           * @param userData The user-defined data passed through the verification process
+           */
+          function onVerificationSuccess(bytes memory output, bytes memory userData) external;
+      }
+    lang: solidity
+    source: contracts/interfaces/ISelfVerificationRoot.sol
+    ```
+
+    guidance:
+
+    * Implement `onVerificationSuccess` defensively: restrict to the authorized hub and minimize external effects.
+    * Prefer forwarding bytes payloads as-is to minimize decoding ambiguity; keep decoding logic centralized.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/interfaces/ISelfVerificationRoot.sol";
+      contract ExampleSink is ISelfVerificationRoot {
+      function verifySelfProof(bytes calldata, bytes calldata) external {}
+      function onVerificationSuccess(bytes memory, bytes memory) external {}
+      }
+      lang: solidity
+      SelfVerificationRoot:
+      kind: class
+      summary: Abstract base implementing common verification flow and hooks.
+      definition:
+      code: |-
+      abstract contract SelfVerificationRoot is ISelfVerificationRoot {
+      // ... see source for full implementation
+      function scope() public view returns (uint256);
+      function \_setScope(uint256 newScope) internal;
+      function verifySelfProof(bytes calldata proofPayload, bytes calldata userContextData) public;
+      function onVerificationSuccess(bytes memory output, bytes memory userData) public;
+      function getConfigId(
+      bytes32 destinationChainId,
+      ... userDefinedData
+      ) public view virtual returns (bytes32);
+      function customVerificationHook(
+      ISelfVerificationRoo...utput,
+      bytes memory userData
+      ) internal virtual;
+      }
+      lang: solidity
+      source: contracts/abstract/SelfVerificationRoot.sol
+      guidance:
+    * Override `getConfigId` to bind business rules (age gates, country lists) into the config hash.
+    * Override `customVerificationHook` to apply post-verify policy (e.g., mint, grant, or emit).
+    * Use `scope()`/`_setScope()` to partition verification contexts per feature or product.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/abstract/SelfVerificationRoot.sol";
+      contract MyVerifier is SelfVerificationRoot {
+      function getConfigId(bytes32 dst, bytes32 cfg, bytes32 userDefinedData)
+      public view override returns (bytes32) {
+      return keccak256(abi.encode(dst, cfg, userDefinedData));
+      }
+      function customVerificationHook(GenericDiscloseOutputV2 memory, bytes memory) internal override {
+      // custom policy
+      }
+      }
+      lang: solidity
+      description: Minimal override wiring configId and post-verify hook.
+      IIdentityVerificationHubV2:
+      kind: interface
+      summary: Hub entrypoint for verification, registry access, and config/hash helpers.
+      definition:
+      code: |-
+      interface IIdentityVerificationHubV2 {
+      // ====================================================
+      // External Functions
+      ...
+      \* @param configId The configuration identifier
+      \* @return exists Whether the config exists
+      \*/
+      function verificationConfigV2Exists(bytes32 configId) external view returns (bool exists);
+
+      ```
+        // ====================================================
+        // Public Functions
+        // ====================================================
+
+        /**
+         * @notice Generates a config ID from a verification config
+         * @param config The verification configuration
+         * @return The generated config ID (sha256 hash of encoded config)
+         */
+        function generateConfigId(SelfStructs.VerificationConfigV2 memory config) external pure returns (bytes32);
+      ```
+
+      lang: solidity
+      source: contracts/interfaces/IIdentityVerificationHubV2.sol
+      guidance:
+    * Treat the hub as the sole trusted caller of your `onVerificationSuccess`.
+    * Avoid hard-coding hub addresses; inject via constructor and allow upgrades via governance.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/interfaces/IIdentityVerificationHubV2.sol";
+      contract UsesHub {
+      IIdentityVerificationHubV2 public immutable hub;
+      constructor(IIdentityVerificationHubV2 \_hub){ hub = \_hub; }
+      function hasConfig(bytes32 id) external view returns (bool) { return hub.verificationConfigV2Exists(id); }
+      }
+      lang: solidity
+      IDscCircuitVerifier:
+      kind: interface
+      summary: Verifier interface for DSC zero-knowledge proofs.
+      definition:
+      code: |-
+      interface IDscCircuitVerifier {
+      /\*\*
+      \* @notice Represents a DSC circuit proof.
+      \* @param a An array of two unsigned integers representing the proof component 'a'.
+      \* @param b A 2x2 array of unsigned integers representing the proof component 'b'.
+      \* @param c An array of two unsigned integers representing the proof component 'c'.
+      \* @param pubSignals An array of two unsigned integers representing the public signals associated with the proof.
+      \*/
+      struct DscCircuitProof {
+      uint\[2] a;
+      uint\[2]\[2] b;
+      uint\[2] c;
+      uint\[2] pubSignals;
+      }
+
+      ```
+        /**
+         * @notice Verifies a given DSC circuit zero-knowledge proof.
+         * @dev This function checks the validity of the provided DSC proof parameters.
+         * @param pA The 'a' component of the proof.
+         * @param pB The 'b' component of the proof.
+         * @param pC The 'c' component of the proof.
+         * @param pubSignals The public signals associated with the proof.
+         * @return A boolean value indicating whether the provided proof is valid (true) or not (false).
+         */
+        function verifyProof(
+            uint[2] calldata pA,
+            uint[2][2] calldata pB,
+            uint[2] calldata pC,
+            uint[2] calldata pubSignals
+        ) external view returns (bool);
+      ```
+
+      }
+      lang: solidity
+      source: contracts/interfaces/IDscCircuitVerifier.sol
+      guidance:
+    * Keep verifiers upgradeable via the hub registry; deploy new circuits alongside old until phased out.
+    * Benchmark gas on-chain vs pre-verification off-chain; use calldata types as in the interface to minimize copy.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/interfaces/IDscCircuitVerifier.sol";
+      contract DscClient {
+      IDscCircuitVerifier verifier;
+      constructor(IDscCircuitVerifier v){ verifier = v; }
+      function verify(uint\[2] memory a, uint\[2]\[2] memory b, uint\[2] memory c, uint\[2] memory sigs)
+      external view returns (bool) {
+      return verifier.verifyProof(a,b,c,sigs);
+      }
+      }
+      lang: solidity
+      IRegisterCircuitVerifier:
+      kind: interface
+      summary: Verifier interface for 'register' circuit proofs.
+      definition:
+      code: |-
+      interface IRegisterCircuitVerifier {
+      /\*\*
+      \* @notice Represents a register circuit proof.
+      \* @dev This structure encapsulates the required proof elements.
+      \* @param a An array of two unsigned integers representing the proof component 'a'.
+      \* @param b A 2x2 array of unsigned integers representing the proof component 'b'.
+      \* @param c An array of two unsigned integers representing the proof component 'c'.
+      \* @param pubSignals An array of three unsigned integers representing the public signals associated with the proof.
+      \*/
+      struct RegisterCircuitProof {
+      uint\[2] a;
+      uint\[2]\[2] b;
+      uint\[2] c;
+      uint\[3] pubSignals;
+      }
+
+      ...
+      \* @notice Verifies a given register circuit proof.
+      \* @dev This function checks the validity of the provided proof parameters.
+      \* @param a The 'a' component of the proof.
+      \* @param b The 'b' component of the proof.
+      \* @param c The 'c' component of the proof.
+      \* @param pubSignals The public signals associated with the proof.
+      \* @return isValid A boolean value indicating whether the provided proof is valid (true) or not (false).
+      \*/
+      function verifyProof(
+      uint\[2] calldata a,
+      uint\[2]\[2] calldata b,
+      uint\[2] calldata c,
+      uint\[3] calldata pubSignals
+      ) external view returns (bool isValid);
+      }
+      lang: solidity
+      source: contracts/interfaces/IRegisterCircuitVerifier.sol
+      guidance:
+    * Use consistent input ordering—a,b,c,pubSignals—matching the circuit generator.
+    * Avoid memory-to-calldata copies in call sites; accept calldata arrays in external functions.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/interfaces/IRegisterCircuitVerifier.sol";
+      contract RegClient {
+      IRegisterCircuitVerifier verifier;
+      constructor(IRegisterCircuitVerifier v){ verifier = v; }
+      function ok(uint\[2] calldata a, uint\[2]\[2] calldata b, uint\[2] calldata c, uint\[3] calldata sigs)
+      external view returns (bool) {
+      return verifier.verifyProof(a,b,c,sigs);
+      }
+      }
+      lang: solidity
+      SelfStructs:
+      kind: object
+      summary: Library of shared structs and constants used by hub/root contracts.
+      definition:
+      code: |-
+      library SelfStructs {
+      /\*\*
+      \* @dev Header structure for Hub input containing contract version and scope information
+      \* @param contractVersion Version of the contract being used
+      \* @param scope Scope identifier for the verification request
+      \* @param attestationId Unique identifier for the attestation
+      \*/
+      struct HubInputHeader {
+      uint8 contractVersion;
+      uint256 scope;
+      bytes32 attestationId;
+      }
+
+      ```
+        /**
+         * @dev Output structure for passport verification results
+         * @param attestationId Unique identifier for the attestation
+      ```
+
+      ...
+      \* @param forbiddenCountriesListPacked Packed list of forbidden countries (4 uint256 array)
+      \*/
+      struct EuIdOutput {
+      uint256 attestationId;
+      bytes revealedDataPacked;
+      uint256 userIdentifier;
+      uint256 nullifier;
+      uint256\[4] forbiddenCountriesListPacked;
+      }
+
+      ```
+        /// @dev OFAC verification mode: Passport number only
+        uint256 constant passportNoOfac = 0;
+        /// @dev OFAC verification mode: Name and date of birth
+        uint256 constant nameAndDobOfac = 1;
+        /// @dev OFAC verification mode: Name and year of birth
+        uint256 constant nameAndYobOfac = 2;
+
+        /**
+         * @dev Generic disclosure output structure (Version 2) with detailed personal information
+         * @param attestationId Unique identifier for the attestation
+         * @param userIdentifier Unique identifier for the user
+         * @param nullifier Cryptographic nullifier to prevent double-spending
+         * @param forbiddenCountriesListPacked Packed list of forbidden countries (4 uint256 array)
+         * @param issuingState Country or state that issued the document
+         * @param name Array of name components (first, middle, last names)
+         * @param idNumber Government-issued identification number
+         * @param nationality Nationality of the document holder
+         * @param dateOfBirth Date of birth in string format
+         * @param gender Gender of the document holder
+         * @param expiryDate Document expiration date in string format
+      ```
+
+      ...
+      \* @dev Verification configuration structure (Version 2)
+      \* @param olderThanEnabled Whether minimum age verification is enabled
+      \* @param olderThan Minimum age requirement
+      \* @param forbiddenCountriesEnabled Whether forbidden countries check is enabled
+      \* @param forbiddenCountriesListPacked Packed list of forbidden countries (4 uint256 array)
+      \* @param ofacEnabled Array of boolean flags for different OFAC verification modes
+      \*/
+      struct VerificationConfigV2 {
+      bool olderThanEnabled;
+      uint256 olderThan;
+      bool forbiddenCountriesEnabled;
+      uint256\[4] forbiddenCountriesListPacked;
+      bool\[3] ofacEnabled;
+      }
+      }
+      lang: solidity
+      source: contracts/libraries/SelfStructs.sol
+      guidance:
+    * Always serialize/deserialize structs using the same field order; ABI encoding is positional.
+    * Prefer `VerificationConfigV2` across the stack and derive its hash via the hub to compute `configId`.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/libraries/SelfStructs.sol";
+      contract UsesStructs {
+      using SelfStructs for \*;
+      SelfStructs.VerificationConfigV2 cfg;
+      function setCfg() external { cfg = SelfStructs.VerificationConfigV2(true,18,false,\[uint256(0),0,0,0],\[false,true,false]); }
+      }
+      lang: solidity
+      CircuitConstantsV2:
+      kind: object
+      summary: Indices/constants for public signals across supported circuits.
+      definition:
+      code: |-
+      library CircuitConstantsV2 {
+      // ---------------------------
+      // Register Circuit Constants
+      // ---------------------------
+
+      ```
+        /**
+         * @notice Index to access the nullifier in the register circuit public signals.
+         */
+        uint256 constant REGISTER_NULLIFIER_INDEX = 0;
+
+        /**
+         * @notice Index to access the commitment in the register circuit public signals.
+         */
+        uint256 constant REGISTER_COMMITMENT_INDEX = 1;
+
+        /**
+         * @notice Index to access the Merkle root in the register circuit public signals.
+         */
+        uint256 constant REGISTER_MERKLE_ROOT_INDEX = 2;
+
+        // ---------------------------
+        // DSC Circuit Constants
+        // ---------------------------
+
+        /**
+         * @notice Index to access the tree leaf in the DSC circuit public signals.
+         */
+        uint256 constant DSC_TREE_LEAF_INDEX = 0;
+
+        /**
+         * @notice Index to access the CSCA root in the DSC circuit public signals.
+         */
+        uint256 constant DSC_CSCA_ROOT_INDEX = 1;
+
+        // -------------------------------------
+        // VC and Disclose Circuit Constants
+        // -------------------------------------
+
+        /**
+         * @notice Structure containing circuit indices for a specific attestation type.
+         */
+        struct DiscloseIndices {
+            uint256 revealedDataPackedIndex;
+      ```
+
+      ...
+      uint256 userIdentifierIndex;
+      uint256 passportNoSmtRootIndex; // Only for passport, 99 for ID card
+      }
+
+      ```
+        /**
+         * @notice Returns the circuit indices for a given attestation type.
+         * @param attestationId The attestation identifier.
+         * @return indices The DiscloseIndices struct containing all relevant indices.
+         */
+        function getDiscloseIndices(bytes32 attestationId) internal pure returns (DiscloseIndices memory indices) {
+            if (attestationId == AttestationId.E_PASSPORT) {
+                return
+                    DiscloseIndices({
+                        revealedDataPackedIndex: 0,
+                        
+                        
+                        forbiddenCountriesListPackedIndex: 3,
+                        nullifierIndex: 7,
+                        attestationIdIndex: 8,
+                        merkleRootIndex: 9,
+                        currentDateIndex: 10,
+                        namedobSmtRootIndex: 17,
+                        nameyobSmtRootIndex: 18,
+                        scopeIndex: 19,
+                        userIdentifierIndex: 20,
+                        passportNoSmtRootIndex: 16
+                    });
+            } else if (attestationId == AttestationId.EU_ID_CARD) {
+                return
+                    DiscloseIndices({
+                        revealedDataPackedIndex: 0,
+                        forbiddenCountriesListPackedIndex: 4,
+                        nullifierIndex: 8,
+                        attestationIdIndex: 9,
+                        merkleRootIndex: 10,
+                        currentDateIndex: 11,
+                        namedobSmtRootIndex: 17,
+                        nameyobSmtRootIndex: 18,
+                        scopeIndex: 19,
+                        userIdentifierIndex: 20,
+                        passportNoSmtRootIndex: 99
+                    });
+            } else {
+                revert("Invalid attestation ID");
+            }
+        }
+      ```
+
+      }
+      lang: solidity
+      source: contracts/constants/CircuitConstantsV2.sol
+      guidance:
+    * Call `getDiscloseIndices(attestationId)` to retrieve the correct indices; do not assume passport vs. ID have the same layout.
+    * Keep attestation IDs from `AttestationId` to avoid mismatched branches.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/constants/CircuitConstantsV2.sol";
+      import "@selfxyz/contracts/constants/AttestationId.sol";
+      contract UsesIndices {
+      function idx(bytes32 attId) external pure returns (uint256) {
+      return CircuitConstantsV2.getDiscloseIndices(attId).userIdentifierIndex;
+      }
+      }
+      lang: solidity
+      AttestationId:
+      kind: object
+      summary: Tiny library defining canonical attestation IDs.
+      definition:
+      code: |-
+      library AttestationId {
+      /\*\*
+      \* @notice Identifier for an E-PASSPORT attestation.
+      \* @dev The identifier is computed based on the hash of "E-PASSPORT" using the Poseidon hash function.
+      \* Here it is hardcoded as bytes32(uint256(1)) for demonstration purposes.
+      \*/
+      bytes32 constant E\_PASSPORT = bytes32(uint256(1));
+      bytes32 constant EU\_ID\_CARD = bytes32(uint256(2));
+      }
+      lang: solidity
+      source: contracts/constants/AttestationId.sol
+      guidance:
+    * Do not inline magic numbers; always import these constants for readability and safety.
+    * Treat IDs as stable protocol values; changing them breaks proof compatibility.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/constants/AttestationId.sol";
+      contract UsesAttestationId {
+      function isPassport(bytes32 att) external pure returns (bool) { return att == AttestationId.E\_PASSPORT; }
+      }
+      lang: solidity
+      Formatter:
+      kind: object
+      summary: Library for formatting names, dates, and proof-related data.
+      definition:
+      code: |-
+      function formatName(string memory input) internal pure returns (string\[] memory) ;
+      function formatDate(string memory date) internal pure returns (string memory) ;
+      function dateToUnixTimestamp(string memory date) internal pure returns (uint256) ;
+      function proofDateToUnixTimestamp(uint256\[6] memory dateNum) internal pure returns (uint256) ;
+      lang: solidity
+      source: contracts/libraries/Formatter.sol
+      guidance:
+    * Normalize date strings off-chain to match `dateToUnixTimestamp` expectations before hashing.
+    * Use the array-returning `formatName` to compare against MRZ components deterministically.
+      example:
+      code: |-
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+      import "@selfxyz/contracts/libraries/Formatter.sol";
+      contract Dates {
+      function dob(string memory yyyymmdd) external pure returns (uint256) {
+      return Formatter.dateToUnixTimestamp(yyyymmdd);
+      }
+      }
+      lang: solidity
+      common\_workflows:
+* title: Verify a user's passport and run custom policy
+  steps:
+
+  * Collect MRZ/DSC in the app; normalize via `initPassportDataParsing`.
+  * Build circuit inputs (e.g., `generateCircuitInputsDSC`) and submit proof to the relayer.
+  * Compute/derive `configId` server-side and pass through as user context `bytes`.
+  * On-chain, implement `SelfVerificationRoot` and override `getConfigId` and `customVerificationHook`.
+  * Only accept `onVerificationSuccess` from the configured Hub V2 address.
+  * Emit events or mint/grant on success; revert on policy violation.
+* title: Enforce age and geography restrictions
+  steps:
+
+  * Create a `VerificationConfigV2` with `olderThanEnabled` and `forbiddenCountriesEnabled` set as needed.
+  * Persist config via a `ConfigStore` and use the hub to derive the `configId`.
+  * In `customVerificationHook`, read `GenericDiscloseOutputV2` fields and enforce policy.
+* title: Swap out a circuit verifier
+  steps:
+
+  * Deploy new verifier implementing `IDscCircuitVerifier` or `IRegisterCircuitVerifier`.
+  * Register it against the Hub V2 for the target `attestationId`.
+  * Leave the old verifier in place until traffic is fully drained.
+    troubleshooting\_cheatsheet:
+* symptom: Valid proofs fail with index out of range when reading pubSignals.
+  likely\_cause: Hardcoded indices for a different attestation type.
+  fix: Use `CircuitConstantsV2.getDiscloseIndices(attestationId)` to fetch indices dynamically.
+* symptom: Callback hit by unexpected caller.
+  likely\_cause: `onVerificationSuccess` not gated to hub address.
+  fix: Add a strict `require(msg.sender == hubAddress)` check before decoding.
+* symptom: JS parsing succeeds locally but fails in production.
+  likely\_cause: Using SKI PEMs from the wrong environment.
+  fix: Fetch PEMs via `getSKIPEM('production')` and cache; add environment asserts in boot code.
+  faq:
+* q: How do I generate the `configId` used on-chain?
+  a: Construct `VerificationConfigV2` off-chain, ABI-encode it, and call the hub's `generateConfigId` (pure) or replicate its hashing (sha256 of encoded struct) if necessary.
+* q: Can I use different attestation types with one contract?
+  a: Yes. Scope them with `_setScope()` and branch logic on `attestationId`; keep indices via `CircuitConstantsV2.getDiscloseIndices`.
+  external\_resources:
+* label: Solidity NatSpec
+  url: [https://docs.soliditylang.org/en/latest/natspec-format.html](https://docs.soliditylang.org/en/latest/natspec-format.html)
+* label: ERC‑165 Interface Detection
+  url: [https://eips.ethereum.org/EIPS/eip-165](https://eips.ethereum.org/EIPS/eip-165)
+

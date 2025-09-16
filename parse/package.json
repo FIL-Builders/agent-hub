@@ -10,6 +10,10 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@0glabs/0g-serving-broker": "^0.4.1",
+    "@lighthouse-web3/sdk": "^0.4.2",
+    "@selfxyz/contracts": "^1.2.0",
+    "@selfxyz/core": "^1.0.8",
     "@types/react": "^19.1.8",
     "docusaurus": "^1.14.7",
     "ethers": "^6.15.0",
