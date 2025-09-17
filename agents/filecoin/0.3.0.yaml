@@ -1,0 +1,984 @@
+meta:
+spec\_name: filecoin/lotus-json-rpc
+spec\_version: "0.3.0"
+library\_version: "^4.2.0 (@filecoin-shipyard/lotus-client-schema) / ^1.2.0 (@filecoin-shipyard/lotus-client-rpc)"
+generated: "2025-09-17"
+purpose: >
+Provide an LLM‑ready expert reference for the Filecoin Lotus JSON‑RPC and FEVM Ethereum‑compatible RPC,
+pairing authoritative TypeScript contracts (from the Lotus JS Client) with practical guidance and runnable
+examples for common dApp and tools workflows (querying tipsets, estimating gas, submitting messages, wallet
+ops, and calling FEVM smart contracts).
+guiding\_principles:
+\- Prefer the Lotus JS Client with the `mainnet.fullNode` schema for Filecoin RPC (`/rpc/v0`); use raw JSON‑RPC for FEVM (`/rpc/v1`). ([filecoin-shipyard.github.io][1])
+\- Many `State.*` calls require a `TipSetKey`; pass `[]` (nil) to target the current head from `chainHead()`. ([filecoin-shipyard.github.io][2])
+\- For transactions, *always* call `gasEstimateMessageGas` (or, at minimum, `gasEstimateGasLimit` + `gasEstimateFeeCap`/`gasEstimateGasPremium`) before pushing to the mempool. ([filecoin-shipyard.github.io][3])
+\- Use `mpoolPushMessage` for nonce assignment + signing + submission; `mpoolGetNonce` is not atomic. ([filecoin-shipyard.github.io][4])
+\- On public endpoints, expect read‑only access except `MPoolPush` and `eth_sendRawTransaction`; run your own node for broader write methods. ([Filecoin Docs][5])
+\- FEVM “blocks” map to Filecoin *tipsets*; think “block hash → tipset hash”, “block number → epoch”. ([Filecoin Docs][6])
+\- For FEVM, hit the Lotus `eth_rpc` at `/rpc/v1` (default `http://127.0.0.1:1234/rpc/v1`); for Filecoin JSON‑RPC use `/rpc/v0`. ([Lotus Docs][7])
+\- Prefer WebSockets (where possible) for streaming (`chainNotify`, `mpoolSub`) and head tracking. ([filecoin-shipyard.github.io][2])
+design\_notes: >
+Type signatures are extracted from the Lotus JS Client docs (generated from `index.d.ts`) and mirror the
+underlying Lotus JSON‑RPC (`Filecoin.*`) methods. FEVM `eth_*` method shapes are documented in the Filecoin
+Docs “Ethereum JSON‑RPC” page. Connection patterns for the JS client and the `/rpc/v1` ETH endpoint come
+from Lotus docs. Sources: Lotus JS Client (Full Node API pages for Chain, Gas, Mpool, Wallet, State) and
+Intro/JSON‑RPC quick start; Filecoin Docs JSON‑RPC, FEVM Ethereum RPC config, public RPC notes, and FEVM tipset
+semantics. ([filecoin-shipyard.github.io][2])
+language: javascript
+homepage: [https://docs.filecoin.io/reference/json-rpc](https://docs.filecoin.io/reference/json-rpc)
+tags: \[filecoin, lotus, json-rpc, fevm, ethereum-compatibility, typescript, web3]
+
+groups:
+
+* name: Chain
+  summary: Read‑only blockchain queries (tipsets, blocks, messages, head tracking).
+  exports:
+
+  * chainHead
+  * chainGetTipSetByHeight
+  * chainGetBlock
+  * chainGetBlockMessages
+  * chainGetMessage
+  * chainNotify
+    symbols:
+    chainHead:
+    kind: function
+    summary: Return the current head tipset.
+    definition:
+    code: |
+    chainHead (): Promise<TipSet>
+    lang: typescript
+    source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainHead) — /rpc/v0"
+    guidance:
+
+    * Use this to anchor state queries; pass its `TipSetKey` into `State.*` calls when you need deterministic reads. ([filecoin-shipyard.github.io][2])
+    * On public RPCs, head history may be pruned (latest \~2k blocks); run your own node for deep history. ([Lotus Docs][8])
+      example:
+      lang: javascript
+      description: Fetch the head and print its height.
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+
+      async function main() {
+      const provider = new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)')
+      const client = new LotusRPC(provider, { schema: mainnet.fullNode })
+      const head = await client.chainHead()
+      console.log('Height:', head.Height)
+      }
+      main().catch(console.error)
+      chainGetTipSetByHeight:
+      kind: function
+      summary: Return the closest tipset at or before a target epoch.
+      definition:
+      code: |
+      chainGetTipSetByHeight (chainEpoch: number, tipSetKey: Cid\[]): Promise<TipSet>
+      lang: typescript
+      source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainGetTipSetByHeight)"
+      guidance:
+    * Pass `[]` as `tipSetKey` to resolve relative to the current head; otherwise resolution is from the supplied anchor. ([filecoin-shipyard.github.io][2])
+    * Useful for historical reads (balance at time T, miner power at T) when paired with `State.*`.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const ts = await client.chainGetTipSetByHeight(1000000, \[]) // epoch 1,000,000
+      console.log(ts.Cids.map(c => c\['/']))
+      }
+      main().catch(console.error)
+      chainGetBlock:
+      kind: function
+      summary: Fetch a block header by CID.
+      definition:
+      code: |
+      chainGetBlock (cid: Cid): Promise<BlockHeader>
+      lang: typescript
+      source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainGetBlock)"
+      guidance:
+    * Combine with `chainGetBlockMessages` to enumerate included messages.
+    * To fetch the canonical set, prefer tipset‑level reads (`chainGetTipSet`) when multiple blocks exist at a height.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const header = await client.chainGetBlock({ '/': 'bafy...' })
+      console.log(header)
+      }
+      main().catch(console.error)
+      chainGetBlockMessages:
+      kind: function
+      summary: Return messages included in a specific block.
+      definition:
+      code: |
+      chainGetBlockMessages (cid: Cid): Promise<BlockMessages>
+      lang: typescript
+      source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainGetBlockMessages)"
+      guidance:
+    * For logical execution order across a height, prefer tipset‑wide traversal (deduplicated across blocks). ([Filecoin Docs][6])
+    * Pair with `stateGetReceipt` to read outcomes for returned CIDs.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const msgs = await client.chainGetBlockMessages({ '/': 'bafy...' })
+      console.log('Secp:', msgs.SecpkMessages.length, 'BLS:', msgs.BlsMessages.length)
+      }
+      main().catch(console.error)
+      chainGetMessage:
+      kind: function
+      summary: Read a signed or unsigned message by CID from the chain blockstore.
+      definition:
+      code: |
+      chainGetMessage (cid: Cid): Promise<Message>
+      lang: typescript
+      source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainGetMessage)"
+      guidance:
+    * Use `stateGetReceipt` to get the execution result (exit code, return, gas used).
+    * If the message is not yet on chain, inspect mempool (`mpoolPending`) or wait for inclusion (e.g., `stateSearchMsg`/receipt polling).
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const msg = await client.chainGetMessage({ '/': 'bafy...' })
+      console.log(msg.To, msg.Value)
+      }
+      main().catch(console.error)
+      chainNotify:
+      kind: function
+      summary: Subscribe to chain head updates (WebSocket recommended).
+      definition:
+      code: |
+      chainNotify (handler: (data: Array<HeadChange>) => void): \[() => void, Promise<void>]
+      lang: typescript
+      source: "Lotus JS Client — Chain / index.d.ts (Filecoin.ChainNotify)"
+      guidance:
+    * First callback batch is a single `current` item; then you’ll receive `apply`/`revert` deltas. ([filecoin-shipyard.github.io][2])
+    * Keep the unsubscribe function and call it on shutdown to avoid leaks.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const provider = new NodejsProvider('ws\://127.0.0.1:1234/rpc/v0')
+      const client = new LotusRPC(provider, { schema: mainnet.fullNode })
+      const \[unsub] = client.chainNotify((changes) => console.log(changes))
+      // later:
+      // unsub()
+      }
+      main().catch(console.error)
+
+* name: State
+  summary: Deterministic reads over on‑chain state (actors, receipts, deals, miner info).
+  exports:
+
+  * stateGetActor
+  * stateGetReceipt
+  * stateListMessages
+  * stateLookupID
+  * stateMarketDeals
+  * stateMinerInfo
+    symbols:
+    stateGetActor:
+    kind: function
+    summary: Get balance and nonce for an address’ actor state at a tipset.
+    definition:
+    code: |
+    stateGetActor (address: string, tipSetKey: Cid\[]): Promise<Actor>
+    lang: typescript
+    source: "Lotus JS Client — State / index.d.ts (Filecoin.StateGetActor)"
+    guidance:
+
+    * Use `[]` for the latest state; pass a historical `TipSetKey` for time‑travel reads. ([filecoin-shipyard.github.io][9])
+    * Actor code CID identifies the actor type; combine with `stateReadState` (not shown here) for actor‑specific fields when needed.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const act = await client.stateGetActor('f1abc...', \[])
+      console.log(act.Balance, act.Nonce)
+      }
+      main().catch(console.error)
+      stateGetReceipt:
+      kind: function
+      summary: Fetch a message receipt (exit code, return data, gas used).
+      definition:
+      code: |
+      stateGetReceipt (cid: Cid, tipSetKey: Cid\[]): Promise<MessageReceipt>
+      lang: typescript
+      source: "Lotus JS Client — State / index.d.ts (Filecoin.StateGetReceipt)"
+      guidance:
+    * Pair with `chainGetMessage` to inspect both the envelope and execution result.
+    * Non‑existent receipts imply the message is not yet on chain at that tipset.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const r = await client.stateGetReceipt({ '/': 'bafy-msg...' }, \[])
+      console.log(r.ExitCode, r.GasUsed)
+      }
+      main().catch(console.error)
+      stateListMessages:
+      kind: function
+      summary: Find messages matching to/from over a lookback window.
+      definition:
+      code: |
+      stateListMessages (messageMatch: MessageMatch, tipSetKey: Cid\[], chainEpoch: number): Promise\<Array<Cid>>
+      lang: typescript
+      source: "Lotus JS Client — State / index.d.ts (Filecoin.StateListMessages)"
+      guidance:
+    * Use to search pending/included messages from an address up to a cutoff epoch.
+    * Helpful for “await inclusion” loops when combined with periodic `chainHead()` checks.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const cids = await client.stateListMessages({ From: 'f1abc...' }, \[], 0)
+      console.log(cids)
+      }
+      main().catch(console.error)
+      stateLookupID:
+      kind: function
+      summary: Resolve a robust (f\*) address to its ID address at a tipset.
+      definition:
+      code: |
+      stateLookupID (address: string, tipSetKey: Cid\[]): Promise<string>
+      lang: typescript
+      source: "Lotus JS Client — State / index.d.ts (Filecoin.StateLookupID)"
+      guidance:
+    * ID addresses are stable indices; prefer them for low‑level actor interactions.
+    * Pair with `stateAccountKey` to resolve the public key address when needed. ([filecoin-shipyard.github.io][9])
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.stateLookupID('f1abc...', \[]))
+      }
+      main().catch(console.error)
+      stateMarketDeals:
+      kind: function
+      summary: Snapshot of all storage market deals.
+      definition:
+      code: |
+      stateMarketDeals (tipSetKey: Cid\[]): Promise<{ \[k: string]: MarketDeal }>
+      lang: typescript
+      source: "Lotus JS Client — State / index.d.ts (Filecoin.StateMarketDeals)"
+      guidance:
+    * On public endpoints this may be served via pre‑baked data/S3; expect periodic refreshes. ([Lotus Docs][8])
+    * For a single deal, prefer `stateMarketStorageDeal(dealID, ts)`.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const deals = await client.stateMarketDeals(\[])
+      console.log(Object.keys(deals).length, 'deals')
+      }
+      main().catch(console.error)
+      stateMinerInfo:
+      kind: function
+      summary: Read a storage provider’s on‑chain identity and control addresses.
+      definition:
+      code: |
+      stateMinerInfo (address: string, tipSetKey: Cid\[]): Promise<MinerInfo>
+      lang: typescript
+      source: "Lotus JS Client — State / index.d.ts (Filecoin.StateMinerInfo)"
+      guidance:
+    * Use to discover `Worker`/`Owner`/`Control` addresses and peer ID.
+    * For balances available to withdraw, see `stateMinerAvailableBalance`.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const info = await client.stateMinerInfo('f01234', \[])
+      console.log(info.Owner, info.Worker)
+      }
+      main().catch(console.error)
+
+* name: Gas
+  summary: Gas limit/fee estimation helpers (critical before message submission).
+  exports:
+
+  * gasEstimateFeeCap
+  * gasEstimateGasLimit
+  * gasEstimateGasPremium
+  * gasEstimateMessageGas
+    symbols:
+    gasEstimateFeeCap:
+    kind: function
+    summary: Estimate a suitable `GasFeeCap` for a message.
+    definition:
+    code: |
+    gasEstimateFeeCap (message: Message, int: number, tipSetKey: Cid\[]): Promise<string>
+    lang: typescript
+    source: "Lotus JS Client — Gas / index.d.ts (Filecoin.GasEstimateFeeCap)"
+    guidance:
+
+    * Use alongside `gasEstimateGasPremium` to construct EIP‑1559‑style fee params.
+    * Provide a realistic max fee ceiling; or rely on `gasEstimateMessageGas` to fill everything. ([filecoin-shipyard.github.io][3])
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const feeCap = await client.gasEstimateFeeCap({ To: 'f1...', From: 'f1...' }, 20, \[])
+      console.log(feeCap)
+      }
+      main().catch(console.error)
+      gasEstimateGasLimit:
+      kind: function
+      summary: Estimate gas limit for message execution.
+      definition:
+      code: |
+      gasEstimateGasLimit (message: Message, tipSetKey: Cid\[]): Promise<number>
+      lang: typescript
+      source: "Lotus JS Client — Gas / index.d.ts (Filecoin.GasEstimateGasLimit)"
+      guidance:
+    * Useful for dry‑running actor method calls (via `stateCall`) to size gas.
+    * Always re‑estimate if you modify message params/value.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.gasEstimateGasLimit({ To: 'f1...', From: 'f1...' }, \[]))
+      }
+      main().catch(console.error)
+      gasEstimateGasPremium:
+      kind: function
+      summary: Estimate a `GasPremium` to win inclusion.
+      definition:
+      code: |
+      gasEstimateGasPremium (uint: number, address: string, int: number, tipSetKey: Cid\[]): Promise<string>
+      lang: typescript
+      source: "Lotus JS Client — Gas / index.d.ts (Filecoin.GasEstimateGasPremium)"
+      guidance:
+    * Provide target inclusion rounds; premium trades cost for speed.
+    * For simple sends, a modest premium + correct fee cap is usually sufficient.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const prem = await client.gasEstimateGasPremium(1, 'f1...', 0, \[])
+      console.log(prem)
+      }
+      main().catch(console.error)
+      gasEstimateMessageGas:
+      kind: function
+      summary: Fill in missing gas fields and return a ready‑to‑send message.
+      definition:
+      code: |
+      gasEstimateMessageGas (message: Message, messageSendSpec: MessageSendSpec, tipSetKey: Cid\[]): Promise<Message>
+      lang: typescript
+      source: "Lotus JS Client — Gas / index.d.ts (Filecoin.GasEstimateMessageGas)"
+      guidance:
+    * Preferred API before `mpoolPushMessage`; lets Lotus set gas limit/fee cap/premium and other sensible defaults. ([filecoin-shipyard.github.io][3])
+    * You can still override fields after estimation if you know what you’re doing.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const draft = { From: 'f1...', To: 'f1...', Value: '10000000000000000' }
+      const filled = await client.gasEstimateMessageGas(draft, {}, \[])
+      console.log(filled.GasLimit, filled.GasFeeCap, filled.GasPremium)
+      }
+      main().catch(console.error)
+
+* name: Mpool
+  summary: Submit and observe pending messages.
+  exports:
+
+  * mpoolGetNonce
+  * mpoolPushMessage
+  * mpoolPush
+  * mpoolPending
+    symbols:
+    mpoolGetNonce:
+    kind: function
+    summary: Return the next expected nonce for a sender (not atomic).
+    definition:
+    code: |
+    mpoolGetNonce (address: string): Promise<number>
+    lang: typescript
+    source: "Lotus JS Client — Mpool / index.d.ts (Filecoin.MpoolGetNonce)"
+    guidance:
+
+    * Prefer `mpoolPushMessage` when possible to avoid nonce races; this API is informational. ([filecoin-shipyard.github.io][4])
+    * If constructing offline, fetch again just before signing/pushing to reduce collision risk.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.mpoolGetNonce('f1abc...'))
+      }
+      main().catch(console.error)
+      mpoolPushMessage:
+      kind: function
+      summary: Atomically set nonce, sign, and push a message.
+      definition:
+      code: |
+      mpoolPushMessage (message: Message, messageSendSpec: MessageSendSpec): Promise<SignedMessage>
+      lang: typescript
+      source: "Lotus JS Client — Mpool / index.d.ts (Filecoin.MpoolPushMessage)"
+      guidance:
+    * Provide a max fee in `MessageSendSpec` when not setting `GasFeeCap`/`GasPremium`; Lotus will fill fees. ([filecoin-shipyard.github.io][4])
+    * Returns the signed message; persist it if you need to re‑broadcast.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const msg = { From: 'f1...', To: 'f1...', Value: '0', Method: 0 }
+      const smsg = await client.mpoolPushMessage(msg, { MaxFee: '30000000000' })
+      console.log(smsg.CID)
+      }
+      main().catch(console.error)
+      mpoolPush:
+      kind: function
+      summary: Push a pre‑signed message to the mempool.
+      definition:
+      code: |
+      mpoolPush (signedMessage: SignedMessage): Promise<Cid>
+      lang: typescript
+      source: "Lotus JS Client — Mpool / index.d.ts (Filecoin.MpoolPush)"
+      guidance:
+    * Use when you sign externally (HSM/ledger or FEVM flow producing `SignedMessage`).
+    * On public RPCs, this is often the only Filecoin write method allowed. ([Filecoin Docs][5])
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const cid = await client.mpoolPush({ Message: { From:'f1...', To:'f1...', Value:'0' }, Signature: { Type: 1, Data: '...' } })
+      console.log(cid)
+      }
+      main().catch(console.error)
+      mpoolPending:
+      kind: function
+      summary: List messages currently pending in the mempool.
+      definition:
+      code: |
+      mpoolPending (tipSetKey: Cid\[]): Promise\<Array<SignedMessage>>
+      lang: typescript
+      source: "Lotus JS Client — Mpool / index.d.ts (Filecoin.MpoolPending)"
+      guidance:
+    * Use to monitor congestion and detect your message before inclusion.
+    * For streaming updates, see `mpoolSub` (WebSocket). ([filecoin-shipyard.github.io][4])
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const list = await client.mpoolPending(\[])
+      console.log(list.length)
+      }
+      main().catch(console.error)
+
+* name: Wallet
+  summary: Local Lotus wallet operations (addresses, signing, validation).
+  exports:
+
+  * walletBalance
+  * walletNew
+  * walletList
+  * walletSign
+  * walletValidateAddress
+  * walletVerify
+    symbols:
+    walletBalance:
+    kind: function
+    summary: Return balance (attoFIL) for an address at the current head.
+    definition:
+    code: |
+    walletBalance (address: string): Promise<string>
+    lang: typescript
+    source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletBalance)"
+    guidance:
+
+    * Balance reflects the head state; to time‑travel, use `stateGetActor` at a prior tipset.
+    * Values are strings (big integers); use a big‑int capable library for arithmetic.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.walletBalance('f1abc...'))
+      }
+      main().catch(console.error)
+      walletNew:
+      kind: function
+      summary: Create a new key/address in the Lotus wallet.
+      definition:
+      code: |
+      walletNew (keyType: string): Promise<string>
+      lang: typescript
+      source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletNew)"
+      guidance:
+    * Use `bls` or `secp256k1` (strings). Numeric types are deprecated. ([filecoin-shipyard.github.io][3])
+    * Consider external signers for production; export/import keys as needed.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.walletNew('secp256k1'))
+      }
+      main().catch(console.error)
+      walletList:
+      kind: function
+      summary: List all addresses managed by the Lotus wallet.
+      definition:
+      code: |
+      walletList (): Promise\<Array<string>>
+      lang: typescript
+      source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletList)"
+      guidance:
+    * The first entry is not guaranteed to be the default; use `walletDefaultAddress` if needed. ([filecoin-shipyard.github.io][3])
+    * Addresses include robust (`f1`,`f3`,`f4`) and ID (`f0`) forms depending on context.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.walletList())
+      }
+      main().catch(console.error)
+      walletSign:
+      kind: function
+      summary: Sign arbitrary bytes with a wallet address.
+      definition:
+      code: |
+      walletSign (address: string, bytes: string): Promise<Signature>
+      lang: typescript
+      source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletSign)"
+      guidance:
+    * For message signing, see `walletSignMessage` which hashes canonical fields and returns a `SignedMessage`. ([filecoin-shipyard.github.io][3])
+    * Verify with `walletVerify` (works even if the address is not in the local wallet).
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const sig = await client.walletSign('f1abc...', Buffer.from('hello').toString('base64'))
+      console.log(sig)
+      }
+      main().catch(console.error)
+      walletValidateAddress:
+      kind: function
+      summary: Validate an input string as a well‑formed Filecoin address.
+      definition:
+      code: |
+      walletValidateAddress (str: string): Promise<string>
+      lang: typescript
+      source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletValidateAddress)"
+      guidance:
+    * Useful for user input sanity checks (accept `f4` and `0x` in FEVM contexts). ([pl-strflt.notion.site][10])
+    * For FEVM, addresses may be converted to/from `0x` (see `EthAddressToFilecoinAddress`/`FilecoinAddressToEthAddress`).
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      console.log(await client.walletValidateAddress('f1abc...'))
+      }
+      main().catch(console.error)
+      walletVerify:
+      kind: function
+      summary: Verify a signature against bytes and an address.
+      definition:
+      code: |
+      walletVerify (address: string, bytes: string, signature: Signature): Promise<boolean>
+      lang: typescript
+      source: "Lotus JS Client — Wallet / index.d.ts (Filecoin.WalletVerify)"
+      guidance:
+    * Works for any well‑formed address, not just local wallet entries. ([filecoin-shipyard.github.io][3])
+    * Ensure the `bytes` are exactly the preimage used for `walletSign`.
+      example:
+      lang: javascript
+      code: |
+      import { LotusRPC } from '@filecoin-shipyard/lotus-client-rpc'
+      import { NodejsProvider } from '@filecoin-shipyard/lotus-client-provider-nodejs'
+      import { mainnet } from '@filecoin-shipyard/lotus-client-schema'
+      async function main() {
+      const client = new LotusRPC(new NodejsProvider('[http://127.0.0.1:1234/rpc/v0](http://127.0.0.1:1234/rpc/v0)'), { schema: mainnet.fullNode })
+      const ok = await client.walletVerify('f1abc...', Buffer.from('hello').toString('base64'), { Type: 1, Data: '...' })
+      console.log(ok)
+      }
+      main().catch(console.error)
+
+* name: FEVM / Ethereum JSON‑RPC
+  summary: Ethereum‑compatible JSON‑RPC surface for FEVM (served by Lotus at /rpc/v1).
+  exports:
+
+  * eth\_chainId
+  * eth\_blockNumber
+  * eth\_getBalance
+  * eth\_call
+  * eth\_sendRawTransaction
+  * EthAddressToFilecoinAddress
+  * FilecoinAddressToEthAddress
+    symbols:
+    eth\_chainId:
+    kind: function
+    summary: Return the current chain ID as a hex quantity.
+    definition:
+    code: |
+    // JSON-RPC 2.0
+    {
+    "method": "eth\_chainId",
+    "params": \[],
+    "result": "0xNN" // hex quantity
+    }
+    lang: json
+    source: "Filecoin Docs — Ethereum JSON‑RPC; Lotus ETH RPC at /rpc/v1"
+    guidance:
+
+    * Default local endpoint: `http://127.0.0.1:1234/rpc/v1`. Public endpoints available via providers (e.g., Glif). ([Lotus Docs][7])
+    * When using ethers/web3, just construct a `JsonRpcProvider` with `/rpc/v1`. ([Filecoin Docs][11])
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const res = await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth\_chainId', params: \[] })
+      })
+      const out = await res.json()
+      console.log(out.result) // e.g., 0x13a (314)
+      }
+      main().catch(console.error)
+      eth\_blockNumber:
+      kind: function
+      summary: Return the current tipset epoch as a hex “block number”.
+      definition:
+      code: |
+      {
+      "method": "eth\_blockNumber",
+      "params": \[],
+      "result": "0xHEIGHT" // hex quantity (tipset epoch)
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC"
+      guidance:
+    * FEVM maps “block” to Filecoin tipset; height is the epoch number. ([Filecoin Docs][6])
+    * For finalized/safe semantics, Lotus supports F3‑aware resolution in modern releases. ([GitHub][12])
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const out = await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth\_blockNumber', params: \[] })
+      })).json()
+      console.log(parseInt(out.result, 16))
+      }
+      main().catch(console.error)
+      eth\_getBalance:
+      kind: function
+      summary: Return account balance (wei/attoFIL) at a block/tag.
+      definition:
+      code: |
+      {
+      "method": "eth\_getBalance",
+      "params": \["0x<address>", "latest" | "finalized" | "safe" | "0xHEIGHT"],
+      "result": "0xBALANCE" // hex quantity
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC (balances via FEVM provider)"
+      guidance:
+    * For Filecoin addresses, convert to `0x` or use native Filecoin RPC `walletBalance`/`stateGetActor`.
+    * Use `finalized`/`safe` tags for F3‑aware reads on recent Lotus versions. ([GitHub][12])
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const address = '0xFf...'
+      const body = { jsonrpc: '2.0', id: 1, method: 'eth\_getBalance', params: \[address, 'latest'] }
+      const out = await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
+      console.log(out.result)
+      }
+      main().catch(console.error)
+      eth\_call:
+      kind: function
+      summary: Execute a read‑only call against a smart contract.
+      definition:
+      code: |
+      {
+      "method": "eth\_call",
+      "params": \[
+      { "to": "0x<contract>", "data": "0x<calldata>", "from": "0x<optional>", "value": "0x0" },
+      "latest" | "finalized" | "safe" | "0xHEIGHT"
+      ],
+      "result": "0x<returndata>"
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC"
+      guidance:
+    * Calldata and return data are ABI‑encoded; use ethers/web3 interfaces for encoding/decoding.
+    * Use a concrete height for fully reproducible reads; prefer `finalized` for stronger consistency. ([GitHub][12])
+      example:
+      lang: javascript
+      code: |
+      import { Interface } from 'ethers'
+      async function main () {
+      const iface = new Interface(\['function decimals() view returns (uint8)'])
+      const data = iface.encodeFunctionData('decimals', \[])
+      const body = { jsonrpc: '2.0', id: 1, method: 'eth\_call', params: \[{ to: '0xToken...', data }, 'latest'] }
+      const out = await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
+      console.log(iface.decodeFunctionResult('decimals', out.result)\[0])
+      }
+      main().catch(console.error)
+      eth\_sendRawTransaction:
+      kind: function
+      summary: Broadcast a signed Ethereum‑style transaction (FEVM).
+      definition:
+      code: |
+      {
+      "method": "eth\_sendRawTransaction",
+      "params": \["0x\<SIGNED\_TX>"],
+      "result": "0x\<TX\_HASH>"
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC"
+      guidance:
+    * On public providers, this is typically the only ETH write method allowed. ([Filecoin Docs][5])
+    * Use `eth_getTransactionReceipt` to await inclusion (not shown here).
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const raw = '0x02f901...' // RLP-encoded signed tx
+      const body = { jsonrpc: '2.0', id: 1, method: 'eth\_sendRawTransaction', params: \[raw] }
+      const out = await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json()
+      console.log(out.result)
+      }
+      main().catch(console.error)
+      EthAddressToFilecoinAddress:
+      kind: function
+      summary: Convert an `0x` address to a Filecoin f4 robust address.
+      definition:
+      code: |
+      {
+      "method": "EthAddressToFilecoinAddress",
+      "params": \["0x<address>"],
+      "result": "f4<robust-address>"
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC conversions"
+      guidance:
+    * Use when taking `0x` user input but interacting with Filecoin native RPCs/actors. ([Filecoin Docs][13])
+    * Conversion is deterministic; no network call beyond the JSON‑RPC method itself.
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const body = { jsonrpc: '2.0', id: 1, method: 'EthAddressToFilecoinAddress', params: \['0xFf...'] }
+      console.log(await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })).json())
+      }
+      main().catch(console.error)
+      FilecoinAddressToEthAddress:
+      kind: function
+      summary: Convert a Filecoin address to `0x` (optionally at a block/tag).
+      definition:
+      code: |
+      {
+      "method": "FilecoinAddressToEthAddress",
+      "params": \["f1|f3|f4|f0...","latest" | "finalized" | "safe" | "0xHEIGHT"],
+      "result": "0x<address>"
+      }
+      lang: json
+      source: "Filecoin Docs — Ethereum JSON‑RPC conversions"
+      guidance:
+    * Provide a block tag/height to disambiguate historical mappings (recommended). ([Filecoin Docs][13])
+    * For ID (`f0`) addresses, conversion resolves through the actor key at the given tipset.
+      example:
+      lang: javascript
+      code: |
+      async function main () {
+      const body = { jsonrpc: '2.0', id: 1, method: 'FilecoinAddressToEthAddress', params: \['f410...', 'finalized'] }
+      const out = await (await fetch('[http://127.0.0.1:1234/rpc/v1](http://127.0.0.1:1234/rpc/v1)', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) })).json()
+      console.log(out.result)
+      }
+      main().catch(console.error)
+
+common\_workflows:
+
+* title: Send FIL with proper gas estimation (native Filecoin)
+  steps:
+
+  * Create or select a `From` address (Wallet → `walletList`/`walletNew`).
+  * Draft a message `{From, To, Value}`; leave gas fields empty.
+  * Call Gas → `gasEstimateMessageGas(draft, {}, [])` to fill gas fields. ([filecoin-shipyard.github.io][3])
+  * Submit with Mpool → `mpoolPushMessage(filled, { MaxFee: ... })`. ([filecoin-shipyard.github.io][4])
+  * Poll State → `stateListMessages({From}, [], 0)` and then `stateGetReceipt(cid, [])` for outcome.
+* title: Read a smart‑contract variable via FEVM
+  steps:
+
+  * Encode calldata with your ABI (e.g., `ethers.Interface`).
+  * POST to `/rpc/v1` `eth_call` with `{to, data}` and block tag `'finalized'` for consistency. ([Lotus Docs][7])
+  * Decode the hex return using the same ABI.
+* title: Convert between Filecoin and Ethereum addresses
+  steps:
+
+  * To accept `0x` input for native Filecoin calls, call `EthAddressToFilecoinAddress(0x...)`. ([Filecoin Docs][13])
+  * To display a Filecoin address to EVM users, call `FilecoinAddressToEthAddress(f4..., 'latest')`. ([Filecoin Docs][13])
+* title: Track head updates in real time
+  steps:
+
+  * Connect via WebSocket provider to `/rpc/v0`. ([filecoin-shipyard.github.io][14])
+  * Subscribe with Chain → `chainNotify(handler)`; process `apply`/`revert` deltas. ([filecoin-shipyard.github.io][2])
+* title: List current mempool messages and detect your tx
+  steps:
+
+  * Call Mpool → `mpoolPending([])` periodically. ([filecoin-shipyard.github.io][4])
+  * Cross‑reference against your `From` and expected nonces to detect broadcast.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Method not found or 404 when calling FEVM methods"
+  cause: "Hitting `/rpc/v0` (Filecoin) instead of `/rpc/v1` (FEVM)"
+  fix: "Point your client to `http://127.0.0.1:1234/rpc/v1` or your provider's `/rpc/v1` endpoint."
+* symptom: "Nonce too low / message replaced"
+  cause: "Manual nonce management with `mpoolGetNonce` race"
+  fix: "Use `mpoolPushMessage` so Lotus assigns the nonce atomically." ([filecoin-shipyard.github.io][4])
+* symptom: "Out of gas / insufficient fee cap"
+  cause: "Skipping estimation or copying gas values from another network"
+  fix: "Call `gasEstimateMessageGas` (or limit + feecap/premium estimates) right before submission." ([filecoin-shipyard.github.io][3])
+* symptom: "Public endpoint rejects write calls"
+  cause: "Public RPCs are read‑only except for `MPoolPush` / `eth_sendRawTransaction`"
+  fix: "Run your own Lotus node or use a provider that allows the needed write method." ([Filecoin Docs][5])
+
+faq:
+
+* q: What's the difference between Filecoin RPC (`/rpc/v0`) and FEVM RPC (`/rpc/v1`)?
+  a: "`/rpc/v0` exposes native `Filecoin.*` methods; `/rpc/v1` exposes Ethereum‑compatible `eth_*` plus FEVM bridges (address conversions). Use `/rpc/v1` with ethers/web3."
+* q: How do I get a stable notion of “block” on Filecoin?
+  a: "FEVM maps blocks to tipsets. Treat block hash as tipset hash and block number as epoch for ETH RPC semantics."
+* q: Can I submit transactions on public endpoints?
+  a: "Usually no, except `MPoolPush` (Filecoin) and `eth_sendRawTransaction` (FEVM). For more, run your own node."
+* q: Do I need to pass a `TipSetKey` to State methods?
+  a: "Yes, most State calls require it. Pass `[]` for head, or supply a historical key from `chainGetTipSetByHeight`."
+
+external\_resources:
+
+* label: Lotus JS Client — Full Node API (Chain)
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/chain.html](https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/chain.html)
+* label: Lotus JS Client — Full Node API (Gas)
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/gas.html](https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/gas.html)
+* label: Lotus JS Client — Full Node API (Mpool)
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/mpool.html](https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/mpool.html)
+* label: Lotus JS Client — Full Node API (Wallet)
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/wallet.html](https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/wallet.html)
+* label: Lotus JS Client — Full Node API (State)
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/state.html](https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/state.html)
+* label: Lotus JS Client — JSON‑RPC Intro & Curl
+  url: [https://filecoin-shipyard.github.io/js-lotus-client/intro/json-rpc.html](https://filecoin-shipyard.github.io/js-lotus-client/intro/json-rpc.html)
+* label: Filecoin Docs — JSON‑RPC Reference
+  url: [https://docs.filecoin.io/reference/json-rpc](https://docs.filecoin.io/reference/json-rpc)
+* label: Filecoin Docs — Ethereum JSON‑RPC on Lotus (FEVM)
+  url: [https://lotus.filecoin.io/lotus/configure/ethereum-rpc/](https://lotus.filecoin.io/lotus/configure/ethereum-rpc/)
+* label: Filecoin Docs — Public RPCs (Mainnet)
+  url: [https://docs.filecoin.io/networks/mainnet/rpcs](https://docs.filecoin.io/networks/mainnet/rpcs)
+* label: Filecoin Docs — Chain‑Data Query (ethers provider example)
+  url: [https://docs.filecoin.io/builder-cookbook/dapps/chain-data-query](https://docs.filecoin.io/builder-cookbook/dapps/chain-data-query)
+
+[1]: https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/index.html?utm_source=chatgpt.com "Full Node API - Lotus JS Client"
+[2]: https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/chain.html "Chain - Lotus JS Client"
+[3]: https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/wallet.html "Wallet - Lotus JS Client"
+[4]: https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/mpool.html "Mpool - Lotus JS Client"
+[5]: https://docs.filecoin.io/networks/mainnet/rpcs?utm_source=chatgpt.com "RPCs"
+[6]: https://docs.filecoin.io/basics/the-blockchain/blocks-and-tipsets?utm_source=chatgpt.com "Blocks and tipsets"
+[7]: https://lotus.filecoin.io/lotus/configure/ethereum-rpc/?utm_source=chatgpt.com "Ethereum RPC - Lotus Docs - Filecoin"
+[8]: https://lotus.filecoin.io/lotus/developers/glif-nodes/?utm_source=chatgpt.com "Glif nodes - Lotus Docs - Filecoin"
+[9]: https://filecoin-shipyard.github.io/js-lotus-client/api/full-node-api/state.html "State - Lotus JS Client"
+[10]: https://pl-strflt.notion.site/Exchange-Integration-Guide-FEVM-Edition-9fe9158360cf423da256b1bb1f47ff26?utm_source=chatgpt.com "Exchange Integration Guide - FEVM Edition"
+[11]: https://docs.filecoin.io/builder-cookbook/dapps/chain-data-query?utm_source=chatgpt.com "Chain-Data Query"
+[12]: https://github.com/filecoin-project/lotus/releases?utm_source=chatgpt.com "Releases · filecoin-project/lotus"
+[13]: https://docs.filecoin.io/reference/json-rpc/eth "Eth | Filecoin Docs"
+[14]: https://filecoin-shipyard.github.io/js-lotus-client/intro/json-rpc.html "JSON-RPC API - Lotus JS Client"
+

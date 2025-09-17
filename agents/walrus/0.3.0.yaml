@@ -1,0 +1,220 @@
+meta:
+spec\_name: walrus/http-api
+spec\_version: 0.3.0
+generated: '2025-09-17'
+library\_version: ^1.9.0
+language: http
+homepage: [https://github.com/MystenLabs/walrus](https://github.com/MystenLabs/walrus)
+tags:
+
+* storage
+* Sui
+* decentralized
+* HTTP
+* OpenAPI
+  purpose: Teach LLMs and developers to store and retrieve immutable blobs using the
+  Walrus HTTP API exposed by publisher/daemon for writes and aggregator/daemon for
+  reads.
+  guiding\_principles:
+* Use a publisher (or daemon) for PUT writes; use an aggregator (or daemon) for
+  GET reads.
+* Prefer application/octet-stream or raw body for large files; text/plain is fine
+  for short strings.
+* Control retention with the 'epochs' query parameter; omit for the default (1 epoch)
+  or set to a higher integer.
+* Set 'deletable=true' if the blob should be deletable rather than permanent.
+* Set 'send\_object\_to=<Sui address>' to receive the on-chain blob object in your
+  Sui wallet.
+* For parallel writes, the publisher uses sub-wallets funded from your main Sui
+  Testnet wallet; ensure sufficient SUI/WAL balances.
+* Inspect live machine-readable API description at GET /v1/api before integrating
+  against a specific deployment.
+* For browsers, be aware that the aggregator prevents content sniffing to executable
+  types (e.g., JS/CSS); serve via your own origin if you need custom headers.
+  design\_notes: Derived from Walrus docs (client HTTP API, JSON examples, troubleshooting).
+  Endpoints and response examples mirror docs/usage/web-api.md with Sui object fields
+  taken from docs/dev-guide/sui-struct.md. Live deployments expose an OpenAPI spec
+  at /v1/api.&#x20;
+  groups:
+* name: HTTP API
+  exports:
+
+  * PUT /v1/blobs
+  * GET /v1/blobs/{blobId}
+  * GET /v1/api
+    symbols:
+    PUT /v1/blobs:
+    kind: function
+    summary: Store a blob; returns either 'newlyCreated' details or 'alreadyCertified'
+    if an identical certified blob exists.
+    definition:
+    lang: openapi
+    source: docs/usage/web-api.md (Store)&#x20;
+    code: "paths:\n  /v1/blobs:\n    put:\n      summary: Store a blob in Walrus
+    \ (publisher or daemon)\n      parameters:\n        - name: epochs\n  &#x20;
+    \       in: query\n          required: false\n          schema: { type:
+    \ integer, minimum: 1 }\n          description: Number of storage epochs
+    \ to retain the blob.\n        - name: send\_object\_to\n          in: query\n
+    \          required: false\n          schema: { type: string }\n      &#x20;
+    \   description: Sui address to receive the on-chain blob object.\n   &#x20;
+    \    - name: deletable\n          in: query\n          required: false\n
+    \          schema: { type: boolean, default: false }\n          description:
+    \ If true, creates a deletable blob rather than a permanent one.\n    &#x20;
+    \ requestBody:\n        required: true\n        content:\n          application/octet-stream:\n
+    \            schema: { type: string, format: binary }\n          text/plain:\n
+    \            schema: { type: string }\n      responses:\n        "200"
+    :\n          description: Store result\n          content:\n          &#x20;
+    \ application/json:\n              schema:\n                oneOf:\n  &#x20;
+    \               - type: object\n                    properties:\n     &#x20;
+    \                newlyCreated:\n                        type: object\n&#x20;
+    \                       properties:\n                          blobObject:\n
+    \                            type: object\n                            properties:\n
+    \                              id: { type: string }\n                 &#x20;
+    \            registeredEpoch: { type: integer }\n                     &#x20;
+    \        blobId: { type: string }\n                              size: {
+    \ type: integer }\n                              encodingType: { type: string
+    \ }\n                              certifiedEpoch: { type: integer }\n&#x20;
+    \                             storage:\n                                type:
+    \ object\n                                properties:\n               &#x20;
+    \                  id: { type: string }\n                             &#x20;
+    \    startEpoch: { type: integer }\n                                  endEpoch:
+    \ { type: integer }\n                                  storageSize: { type:
+    \ integer }\n                              deletable: { type: boolean }\n
+    \                            required: \[id, blobId, size]\n           &#x20;
+    \            resourceOperation:\n                            type: object\n
+    \                            properties:\n                              registerFromScratch:\n
+    \                                type: object\n                       &#x20;
+    \        properties:\n                                  encodedLength: {
+    \ type: integer }\n                                  epochsAhead: { type:
+    \ integer }\n                          cost: { type: integer }\n      &#x20;
+    \         - type: object\n                    properties:\n            &#x20;
+    \         alreadyCertified:\n                        type: object\n   &#x20;
+    \                    properties:\n                          blobId: { type:
+    \ string }\n                          event:\n                         &#x20;
+    \  type: object\n                            properties:\n            &#x20;
+    \                 txDigest: { type: string }\n                         &#x20;
+    \      eventSeq: { type: string }\n                          endEpoch: {
+    \ type: integer }\n                    required: \[alreadyCertified]"
+    guidance:
+
+    * Set the publisher base URL (e.g., [https://publisher.walrus-testnet.walrus.space](https://publisher.walrus-testnet.walrus.space))
+      and send the body with PUT; for files use curl --upload-file or an HTTP client
+      that streams.&#x20;
+    * If you re-PUT identical content with sufficient validity remaining, expect
+      an 'alreadyCertified' response instead of a new registration.&#x20;
+    * Use higher 'epochs' for longer retention; storage cost (cost) scales with
+      encodedLength and epochsAhead as reported in the response.&#x20;
+    * When automating high concurrency, ensure the publisher has funded sub-wallets
+      (since v1.4.0) or throttle requests to avoid object conflicts.&#x20;
+      example:
+      lang: bash
+      description: Store a file for 5 epochs and send the blob object to a Sui
+      address.
+      code: "PUBLISHER="[https://publisher.walrus-testnet.walrus.space\\"\nADDRESS=\\"\\](https://publisher.walrus-testnet.walrus.space\%22\nADDRESS=\%22\)
+      0xabc123..."\ncurl -sS -X PUT "\$PUBLISHER/v1/blobs?epochs=5\&send\_object\_to=\$ADDRESS"
+      \ --upload-file ./some.file"
+      since: '>=1.0.0'
+      GET /v1/blobs/{blobId}:
+      kind: function
+      summary: Read raw blob content by blob ID from an aggregator or daemon.
+      definition:
+      lang: openapi
+      source: docs/usage/web-api.md (Read)&#x20;
+      code: "paths:\n  /v1/blobs/{blobId}:\n    get:\n      summary: Read blob
+      \ content (aggregator or daemon)\n      parameters:\n        - name: blobId\n
+      \          in: path\n          required: true\n          schema: { type:
+      \ string }\n      responses:\n        "200":\n          description: Raw
+      \ blob bytes\n          content:\n            application/octet-stream:\n
+      \              schema: { type: string, format: binary }"
+      guidance:
+    * Point to an aggregator base URL (e.g., [https://aggregator.walrus-testnet.walrus.space](https://aggregator.walrus-testnet.walrus.space))
+      for reads; daemons also serve reads.&#x20;
+    * Browsers may try content sniffing, but aggregators prevent sniffing to executable
+      types (JS/CSS); serve via your own origin if you need specific headers.&#x20;
+      example:
+      lang: bash
+      description: Fetch a blob and save to disk.
+      code: "AGGREGATOR="[https://aggregator.walrus-testnet.walrus.space\\"\nBLOB\_ID=\\"\\](https://aggregator.walrus-testnet.walrus.space\%22\nBLOB_ID=\%22\)
+      Cmh2LQEGJwBYfmIC8duzK8FUE2UipCCrshAYjiUheZM"\ncurl -sS "\$AGGREGATOR/v1/blobs/\$BLOB\_ID"
+      \ -o ./out.bin"
+      since: '>=1.0.0'
+      GET /v1/api:
+      kind: function
+      summary: Retrieve the machine-readable API specification exposed by aggregators/publishers.
+      definition:
+      lang: openapi
+      source: docs/usage/web-api.md (API specification)&#x20;
+      code: "paths:\n  /v1/api:\n    get:\n      summary: Return this deployment's
+      \ API description\n      responses:\n        "200":\n          description:
+      \ OpenAPI JSON for the Walrus HTTP API\n          content:\n          &#x20;
+      \ application/json:\n              schema:\n                type: object"
+      guidance:
+    * Use GET /v1/api to introspect exact parameters and schemas for the specific
+      deployment you target (testnet/mainnet/public).&#x20;
+    * Cache the spec during session to avoid per-request overhead; refresh if you
+      see 4xx due to drift.
+      example:
+      lang: bash
+      code: "AGGREGATOR="[https://aggregator.walrus-testnet.walrus.space\\"\ncurl\\](https://aggregator.walrus-testnet.walrus.space\%22\ncurl\)
+      \ -sS "\$AGGREGATOR/v1/api" | jq '.paths | keys'"
+      description: List available paths in the live API.
+      since: '>=1.0.0'
+      common\_workflows:
+* title: Store then read a blob (Testnet public services)
+  steps:
+
+  * Set base URLs: export PUBLISHER=[https://publisher.walrus-testnet.walrus.space](https://publisher.walrus-testnet.walrus.space)
+    and AGGREGATOR=[https://aggregator.walrus-testnet.walrus.space](https://aggregator.walrus-testnet.walrus.space).&#x20;
+  * PUT your content: curl -X PUT "\$PUBLISHER/v1/blobs?epochs=2" --upload-file ./photo.jpg
+  * Record the blobId from the JSON response (either in newlyCreated.blobObject.blobId
+    or alreadyCertified.blobId).&#x20;
+  * GET to retrieve: curl "\$AGGREGATOR/v1/blobs/\$BLOB\_ID" -o ./photo.jpg
+* title: Create a deletable blob
+  steps:
+
+  * Use the publisher or daemon endpoint.
+  * PUT with ?deletable=true to create a deletable blob rather than a permanent one.
+
+* title: Send the on-chain blob object to your Sui wallet
+  steps:
+
+  * Ensure your wallet is on Sui Testnet and funded with SUI/WAL per docs.
+  * PUT with ?send\_object\_to=<your Sui address>; check the response event.txDigest
+    to trace creation on Sui.&#x20;
+    troubleshooting\_cheatsheet:
+* symptom: 'Error: ''the specified Walrus system object does not exist'' when using
+  the client or publisher.'
+  cause: Wallet/network misconfiguration (not on Sui Testnet) or outdated Walrus configuration.
+  fix: Configure wallet for Sui Testnet and update to the latest Walrus configuration;
+  verify with `walrus` startup logs.&#x20;
+* symptom: Operations fail intermittently under load (concurrent uploads).
+  cause: Object conflicts on Sui when using a single wallet; insufficient funded sub-wallets.
+  fix: Run publisher/daemon with multiple sub-wallets (default 8 since v1.4.0) and
+  ensure sufficient SUI/WAL balances; otherwise throttle concurrency.&#x20;
+* symptom: Unexpected content type or blocked execution when serving from aggregator.
+  cause: Aggregator intentionally prevents content sniffing to executable types for
+  safety.
+  fix: Proxy or re-serve content behind your own origin with explicit headers if you
+  need JS/CSS execution.&#x20;
+* symptom: Old binary cannot interact with current Testnet.
+  cause: Binary is out of date for this deployment.
+  fix: Install the latest walrus binary (>= 1.9) and ensure your shell uses it (check
+  with `which walrus`).&#x20;
+  faq:
+* q: Do I need to run a node to try the HTTP API?
+  a: No. Use the public Testnet aggregator and publisher endpoints; set AGGREGATOR
+  and PUBLISHER environment variables as shown in the docs.&#x20;
+* q: Where do I find the exact API schema for a deployment?
+  a: Call GET /v1/api on the aggregator/publisher; it returns the live API specification
+  you can codegen from.&#x20;
+* q: What determines storage cost?
+  a: Cost correlates with encodedLength and the number of epochs requested (epochsAhead);
+  both are reported in the store response.&#x20;
+  external\_resources:
+* label: Walrus GitHub (source, issues)
+  url: [https://github.com/MystenLabs/walrus](https://github.com/MystenLabs/walrus)
+* label: Public Testnet Aggregator
+  url: [https://aggregator.walrus-testnet.walrus.space/v1/api](https://aggregator.walrus-testnet.walrus.space/v1/api)
+* label: Public Testnet Publisher
+  url: [https://publisher.walrus-testnet.walrus.space/v1/api](https://publisher.walrus-testnet.walrus.space/v1/api)
+

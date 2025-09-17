@@ -1,0 +1,390 @@
+meta:
+spec\_name: rootstock/json-rpc-bridge
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "\*"
+language: "http+json, solidity"
+homepage: "[https://dev.rootstock.io/](https://dev.rootstock.io/)"
+tags: \[rootstock, rsk, json-rpc, evm, bridge, bitcoin, web3]
+purpose: >
+Senior‑level reference for building on Rootstock via its Ethereum‑compatible JSON‑RPC
+and the native Bridge precompile. Pairs exact call signatures with Rootstock‑specific
+guidance (e.g., negotiated minimum gas price in block headers, chain ids, and Bridge
+queries for the federation address).
+guiding\_principles:
+\- Always pass hex‑quantities with 0x prefix and no leading zeros for JSON‑RPC (e.g., "0x1a").
+\- On Rootstock, miners enforce a negotiated minimum gas price per block; transactions below it are invalid—read it from the latest block header and use it as a floor for gasPrice. ([Rootstock Improvement Proposals][1])
+\- Use the correct chain IDs (30 for Mainnet, 31 for Testnet) in wallets/providers to avoid signing on the wrong network. ([Rootstock Developers Portal][2])
+\- Prefer eth\_call/eth\_estimateGas before sending state‑changing transactions; simulate with realistic gasPrice ≥ current minimum.
+\- When interacting with the Bridge, use the published precompiled ABIs or call the precompile address directly; read methods (e.g., getFederationAddress) are free via eth\_call. ([Rootstock Developers Portal][3])
+\- For peg‑in UX, surface the current federation address programmatically from the Bridge rather than hard‑coding it. ([Rootstock Developers Portal][4])
+\- Treat node suggestions (eth\_gasPrice) as hints—not guarantees—and clamp to at least the per‑block minimum.
+design\_notes: >
+This pack combines Rootstock JSON‑RPC conventions with key Bridge precompile queries.
+Core sources: the Rootstock Developers Portal (Metamask setup and precompiled ABIs)
+and RSKIP‑09 (minimum gas price in block headers). JSON‑RPC method shapes follow
+the standard Ethereum JSON‑RPC v2.0 with Rootstock’s block header extension
+`minimumGasPrice`. ([Rootstock Developers Portal][2])
+
+groups:
+
+* name: json-rpc core
+  exports:
+
+  * eth\_blockNumber
+  * eth\_getBlockByNumber
+  * eth\_estimateGas
+  * eth\_call
+  * eth\_sendRawTransaction
+  * eth\_gasPrice
+  * eth\_getTransactionReceipt
+    symbols:
+    eth\_blockNumber:
+    kind: function
+    summary: Returns the current block height as a hex‑quantity.
+    definition:
+    lang: typescript
+    code: |
+    type HexQuantity = `0x${string}`; // hex integer, no leading zeros
+    declare function eth\_blockNumber(): HexQuantity;
+    guidance:
+
+    * Use this to fetch the tip height before range queries; convert hex to number client‑side.
+    * Polling interval of 2–6s is typical; avoid overpolling public RPCs.
+      example:
+      lang: bash
+      code: |
+      curl -s -X POST [https://public-node.rsk.co](https://public-node.rsk.co)&#x20;
+      -H "content-type: application/json"&#x20;
+      \--data '{"jsonrpc":"2.0","id":1,"method":"eth\_blockNumber","params":\[]}'
+      description: Minimal JSON‑RPC request over HTTP.
+
+  eth\_getBlockByNumber:
+  kind: function
+  summary: Fetch a block by tag/height; on Rootstock the block object includes `minimumGasPrice`.
+  definition:
+  lang: typescript
+  code: |
+  type HexQuantity = `0x${string}`;
+  type DefaultBlock = "latest" | "earliest" | "pending" | HexQuantity;
+  interface Block {
+  number: HexQuantity | null;
+  hash: `0x${string}` | null;
+  parentHash: `0x${string}`;
+  // … standard Ethereum block fields …
+  minimumGasPrice: HexQuantity; // Rootstock extension (RSKIP-09)
+  }
+  declare function eth\_getBlockByNumber(
+  block: DefaultBlock,
+  includeTransactions: boolean
+  ): Block;
+  guidance:
+  \- Set includeTransactions=false for lighter responses; true returns full tx objects.
+  \- Read `minimumGasPrice` from the latest block and use it as a required floor for tx gasPrice. ([Rootstock Improvement Proposals][1])
+  example:
+  lang: bash
+  code: |
+  curl -s -X POST [https://public-node.rsk.co](https://public-node.rsk.co)&#x20;
+  -H "content-type: application/json"&#x20;
+  \--data '{"jsonrpc":"2.0","id":1,"method":"eth\_getBlockByNumber","params":\["latest",false]}'
+
+  eth\_estimateGas:
+  kind: function
+  summary: Simulates a transaction and returns the gas required for execution.
+  definition:
+  lang: typescript
+  code: |
+  interface CallRequest {
+  from?: `0x${string}`;
+  to?: `0x${string}`;
+  gas?: HexQuantity;
+  gasPrice?: HexQuantity;
+  value?: HexQuantity;
+  data?: `0x${string}`;
+  }
+  type HexQuantity = `0x${string}`;
+  declare function eth\_estimateGas(
+  tx: CallRequest,
+  block?: "latest" | "earliest" | "pending" | HexQuantity
+  ): HexQuantity;
+  guidance:
+  \- Provide realistic calldata/value and set gasPrice ≥ current `minimumGasPrice` when you later send the tx; the estimate itself doesn’t enforce it but inclusion will. ([Rootstock Improvement Proposals][1])
+  \- Add a safety margin (e.g., +15%) on the returned estimate to reduce out‑of‑gas risk in production.
+  example:
+  lang: javascript
+  code: |
+  import fetch from "node-fetch";
+  const body = {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "eth\_estimateGas",
+  params: \[{ to: "0x0000000000000000000000000000000001000006", data: "0x" }]
+  };
+  const res = await fetch("[https://public-node.rsk.co](https://public-node.rsk.co)", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" }});
+  console.log(await res.json());
+
+  eth\_call:
+  kind: function
+  summary: Executes a new message call immediately without creating a transaction.
+  definition:
+  lang: typescript
+  code: |
+  interface CallRequest {
+  from?: `0x${string}`;
+  to: `0x${string}`;
+  gas?: HexQuantity;
+  gasPrice?: HexQuantity;
+  value?: HexQuantity;
+  data?: `0x${string}`;
+  }
+  type HexData = `0x${string}`;
+  declare function eth\_call(
+  tx: CallRequest,
+  block?: "latest" | "earliest" | "pending" | HexQuantity
+  ): HexData;
+  guidance:
+  \- Use for view/pure methods (e.g., Bridge read calls); encode ABI properly and decode the return. ([Rootstock Developers Portal][3])
+  \- Prefer targeting a concrete block tag for reproducibility in off‑chain verification.
+  example:
+  lang: bash
+  code: |
+  \# Read-only call (data must be ABI-encoded)
+  curl -s -X POST [https://public-node.rsk.co](https://public-node.rsk.co)&#x20;
+  -H "content-type: application/json"&#x20;
+  \--data '{"jsonrpc":"2.0","id":1,"method":"eth\_call","params":\[{"to":"0x0000000000000000000000000000000001000006","data":"0x"},"latest"]}'
+
+  eth\_sendRawTransaction:
+  kind: function
+  summary: Broadcasts a signed transaction; will be rejected if gasPrice < block `minimumGasPrice`.
+  definition:
+  lang: typescript
+  code: |
+  type HexData = `0x${string}`;
+  declare function eth\_sendRawTransaction(signedTx: HexData): `0x${string}`; // tx hash
+  guidance:
+  \- Ensure the transaction’s gasPrice is ≥ the latest block’s `minimumGasPrice` or it will be invalid. ([Rootstock Improvement Proposals][1])
+  \- Re-broadcast with a higher gasPrice (same nonce) if the tx stalls; keep the same gas limit and payload.
+  example:
+  lang: bash
+  code: |
+  curl -s -X POST [https://public-node.rsk.co](https://public-node.rsk.co)&#x20;
+  -H "content-type: application/json"&#x20;
+  \--data '{"jsonrpc":"2.0","id":1,"method":"eth\_sendRawTransaction","params":\["0x\<SIGNED\_TX>"]}'
+
+  eth\_gasPrice:
+  kind: function
+  summary: Returns the node’s suggested gas price (hex‑quantity).
+  definition:
+  lang: typescript
+  code: |
+  type HexQuantity = `0x${string}`;
+  declare function eth\_gasPrice(): HexQuantity;
+  guidance:
+  \- Treat as a heuristic; clamp to at least the latest block’s `minimumGasPrice` to avoid invalid transactions. ([Rootstock Improvement Proposals][1])
+  \- Cache the value short‑term; refresh when blocks advance or tx conditions change.
+  example:
+  lang: bash
+  code: |
+  curl -s -X POST [https://public-node.rsk.co](https://public-node.rsk.co)&#x20;
+  -H "content-type: application/json"&#x20;
+  \--data '{"jsonrpc":"2.0","id":1,"method":"eth\_gasPrice","params":\[]}'
+
+  eth\_getTransactionReceipt:
+  kind: function
+  summary: Returns the receipt of a transaction by hash.
+  definition:
+  lang: typescript
+  code: |
+  type HexData = `0x${string}`;
+  interface Log { /\* standard Ethereum log fields \*/ }
+  interface TxReceipt {
+  transactionHash: HexData;
+  blockHash: HexData | null;
+  blockNumber: HexQuantity | null;
+  status?: HexQuantity; // 0x1 success, 0x0 failure
+  logs: Log\[];
+  // Rootstock receipts follow Ethereum semantics
+  }
+  declare function eth\_getTransactionReceipt(txHash: HexData): TxReceipt | null;
+  guidance:
+  \- A null result means the transaction isn’t yet mined or was dropped; retry with backoff.
+  \- Consider watching for confirmations based on your app’s risk tolerance.
+
+* name: bridge precompile (0x…01000006)
+  exports:
+
+  * getFederationAddress
+  * getFederationSize
+  * getFederationThreshold
+    symbols:
+    getFederationAddress:
+    kind: function
+    summary: Returns the current Rootstock Federation Bitcoin address (string).
+    definition:
+    lang: solidity
+    code: |
+    interface Bridge {
+    function getFederationAddress() external view returns (string memory);
+    }
+    // Precompile address (constant): 0x0000000000000000000000000000000001000006
+    guidance:
+
+    * Resolve the federation address at run time instead of hard‑coding to tolerate rotations. ([Rootstock Developers Portal][4])
+    * Easiest integration path is via the official precompiled ABIs helper. ([Rootstock Developers Portal][3])
+      example:
+      lang: javascript
+      code: |
+      // npm i web3 @rsksmart/rsk-precompiled-abis
+      const Web3 = require('web3');
+      const pre = require('@rsksmart/rsk-precompiled-abis');
+      const web3 = new Web3('[https://public-node.rsk.co](https://public-node.rsk.co)');
+      const bridge = pre.bridge.build(web3);
+      bridge.methods.getFederationAddress().call().then(console.log);
+
+  getFederationSize:
+  kind: function
+  summary: Size (member count) of the active federation.
+  definition:
+  lang: solidity
+  code: |
+  interface Bridge {
+  function getFederationSize() external view returns (uint256);
+  }
+  guidance:
+  \- Combine with threshold to understand multi‑sig policy (e.g., M‑of‑N).
+  \- Query at a specific block for historical audits using eth\_call with a block tag.
+  example:
+  lang: javascript
+  code: |
+  const n = await bridge.methods.getFederationSize().call();
+  console.log(Number(n));
+
+  getFederationThreshold:
+  kind: function
+  summary: Signature threshold (M) required by the federation.
+  definition:
+  lang: solidity
+  code: |
+  interface Bridge {
+  function getFederationThreshold() external view returns (uint256);
+  }
+  guidance:
+  \- Use alongside `getFederationSize()` to display M‑of‑N policy to users.
+  \- Cache in app state; re‑read on governance events or on long‑running sessions.
+  example:
+  lang: javascript
+  code: |
+  const m = await bridge.methods.getFederationThreshold().call();
+  console.log(Number(m));
+
+* name: network constants
+  exports:
+
+  * ROOTSTOCK\_MAINNET\_CHAIN\_ID
+  * ROOTSTOCK\_TESTNET\_CHAIN\_ID
+  * BRIDGE\_CONTRACT\_ADDRESS
+    symbols:
+    ROOTSTOCK\_MAINNET\_CHAIN\_ID:
+    kind: constant
+    summary: EVM chain ID for Rootstock Mainnet.
+    definition:
+    lang: typescript
+    code: |
+    export const ROOTSTOCK\_MAINNET\_CHAIN\_ID: number = 30;
+    guidance:
+
+    * Configure providers/wallets with chainId=30 to sign/broadcast on Rootstock Mainnet. ([Rootstock Developers Portal][2])
+      example:
+      lang: javascript
+      code: |
+      import { ethers } from "ethers";
+      const provider = new ethers.JsonRpcProvider("[https://public-node.rsk.co](https://public-node.rsk.co)", { chainId: 30, name: "rootstock" });
+
+  ROOTSTOCK\_TESTNET\_CHAIN\_ID:
+  kind: constant
+  summary: EVM chain ID for Rootstock Testnet.
+  definition:
+  lang: typescript
+  code: |
+  export const ROOTSTOCK\_TESTNET\_CHAIN\_ID: number = 31;
+  guidance:
+  \- Use chainId=31 for Testnet endpoints (e.g., [https://public-node.testnet.rsk.co](https://public-node.testnet.rsk.co)). ([Rootstock Developers Portal][2])
+  example:
+  lang: javascript
+  code: |
+  import { ethers } from "ethers";
+  const provider = new ethers.JsonRpcProvider("[https://public-node.testnet.rsk.co](https://public-node.testnet.rsk.co)", { chainId: 31, name: "rootstock-testnet" });
+
+  BRIDGE\_CONTRACT\_ADDRESS:
+  kind: constant
+  summary: Native Bridge precompile contract address.
+  definition:
+  lang: typescript
+  code: |
+  export const BRIDGE\_CONTRACT\_ADDRESS = "0x0000000000000000000000000000000001000006";
+  guidance:
+  \- This is a precompile; no deployment bytecode—call via ABI against this fixed address. ([Rootstock Developers Portal][3])
+  \- You can also locate it and derive the federation address via the explorer as a fallback. ([Rootstock Developers Portal][4])
+  example:
+  lang: javascript
+  code: |
+  const addr = "0x0000000000000000000000000000000001000006";
+  console.log("Bridge:", addr);
+
+common\_workflows:
+
+* title: Send a transaction honoring Rootstock’s minimum gas price
+  steps:
+
+  * Call eth\_getBlockByNumber("latest", false) and read `minimumGasPrice`. ([Rootstock Improvement Proposals][1])
+  * Compute gasPrice = max(eth\_gasPrice(), minimumGasPrice).
+  * Build, sign, and broadcast with eth\_sendRawTransaction.
+* title: Display the current federation address in a dApp
+  steps:
+
+  * Instantiate the Bridge precompile helper from @rsksmart/rsk-precompiled-abis. ([Rootstock Developers Portal][3])
+  * Call bridge.methods.getFederationAddress().call() and cache for the session.
+* title: Estimate gas for a contract method then send
+  steps:
+
+  * Encode calldata and run eth\_estimateGas with the same `to`, `data`, and `value`.
+  * Add a safety margin (e.g., +15%) to gas; set gasPrice ≥ latest `minimumGasPrice`. ([Rootstock Improvement Proposals][1])
+  * Sign and submit with eth\_sendRawTransaction.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "transaction underpriced" or tx rejected
+  cause: gasPrice is below the block’s negotiated minimum
+  fix: Read `minimumGasPrice` from the latest block and resend with gasPrice ≥ that value. ([Rootstock Improvement Proposals][1])
+* symptom: Wallet shows wrong network or rejects signature
+  cause: Incorrect chain ID configuration
+  fix: Set chainId=30 (Mainnet) or 31 (Testnet) in provider/wallet settings. ([Rootstock Developers Portal][2])
+* symptom: Federation address hard‑coded and now invalid
+  cause: Federation rotated
+  fix: Query `getFederationAddress()` from the Bridge at runtime instead of hard‑coding. ([Rootstock Developers Portal][3])
+
+faq:
+
+* q: How do I find Rootstock’s current federation address?
+  a: Call Bridge.getFederationAddress() at the precompile address 0x…01000006 via eth\_call or the precompiled‑abis helper. ([Rootstock Developers Portal][3])
+* q: Does Rootstock support EIP‑1559 base fees?
+  a: Rootstock enforces a negotiated per‑block `minimumGasPrice` (via RSKIP‑09), not an EIP‑1559 base fee; set your gasPrice ≥ the block minimum for validity. ([Rootstock Improvement Proposals][1])
+* q: What are Rootstock’s chain IDs?
+  a: 30 (Mainnet) and 31 (Testnet). Configure your provider/wallet accordingly. ([Rootstock Developers Portal][2])
+
+external\_resources:
+
+* label: Rootstock – Pre‑compiled ABIs (Bridge helper & examples)
+  url: [https://dev.rootstock.io/developers/libraries/rsk-precompiled-abis/](https://dev.rootstock.io/developers/libraries/rsk-precompiled-abis/)
+* label: Configure MetaMask for Rootstock (Chain IDs & RPC)
+  url: [https://dev.rootstock.io/dev-tools/wallets/metamask/](https://dev.rootstock.io/dev-tools/wallets/metamask/)
+* label: RSKIP‑09 – Negotiated Minimum Gas Price (minGasPrice in block header)
+  url: [https://ips.rsk.co/IPs/RSKIP09.html](https://ips.rsk.co/IPs/RSKIP09.html)
+* label: Federation Address (concepts & explorer path)
+  url: [https://dev.rootstock.io/concepts/rbtc/networks/](https://dev.rootstock.io/concepts/rbtc/networks/)
+
+[1]: https://ips.rsk.co/IPs/RSKIP09.html?utm_source=chatgpt.com "Negotiated Minimum Gas Price"
+[2]: https://dev.rootstock.io/dev-tools/wallets/metamask/?utm_source=chatgpt.com "Configure MetaMask Wallet for Rootstock"
+[3]: https://dev.rootstock.io/developers/libraries/rsk-precompiled-abis/?utm_source=chatgpt.com "Pre-compiled ABIs | Rootstock Developers Portal"
+[4]: https://dev.rootstock.io/concepts/rbtc/networks/?utm_source=chatgpt.com "Converting BTC to rBTC and vice versa"
+

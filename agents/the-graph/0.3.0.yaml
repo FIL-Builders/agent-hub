@@ -1,0 +1,492 @@
+meta:
+spec\_name: the-graph/indexer-management-and-cli
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: ">=0.0.0"
+language: javascript
+homepage: [https://thegraph.com/docs](https://thegraph.com/docs)
+tags:
+\- the-graph
+\- indexer
+\- graphql
+\- cli
+\- agora
+purpose: >
+This pack equips an LLM to operate The Graph Indexer stack at a senior‑developer level:
+managing indexing rules and allocations via the Indexer Management GraphQL API and
+the Indexer CLI, and authoring cost models in the Agora language. It blends the
+authoritative contracts (types/usage) with practical guidance and runnable examples.
+guiding\_principles:
+\- Always connect the CLI to the running Indexer Agent before issuing commands (usually the agent’s management port forwarded to localhost).
+\- Understand rule precedence: global → subgraph → deployment; more specific rules override broader ones.
+\- Prefer “maybe”/rules‑driven decisions for scalable operations; reserve “always/never/offchain” for explicit overrides or maintenance windows.
+\- Treat the actions queue as a safety buffer: queue → review → approve → (optional) force‑execute when appropriate.
+\- Provide POIs for close/reallocate only when necessary; use `force` sparingly and document why.
+\- Keep allocation sizing bounded with `maxAllocationPercentage` and lifetime controls; avoid unbounded growth during market volatility.
+\- Version and test Agora models offline; keep variables (e.g., `$SYSTEM_LOAD`) explicit and source‑controlled.
+\- Monitor Graph Node/Agent/Service health and ports; don’t expose management endpoints publicly.
+design\_notes: >
+Contracts and usage are extracted from the combined The Graph docs bundle
+(“the-graph-docs-combined.md”), including the Indexer Management API data model,
+CLI command usage lines, and Agora examples; Graph Node status schema is referenced
+from the docs (server/index-node/src/schema.graphql). Code blocks are taken verbatim
+or lightly normalized for completeness.
+
+groups:
+
+* name: indexer-management-api (GraphQL)
+  exports:
+
+  * IndexingRule
+  * IdentifierType
+  * IndexingDecisionBasis
+  * ActionInput
+  * ActionStatus
+  * ActionType
+    symbols:
+    IndexingRule:
+    kind: type
+    summary: GraphQL object describing how the Agent should decide and size allocations for a target (global/subgraph/deployment).
+    definition:
+    lang: graphql
+    source: the-graph-docs-combined.md
+    code: |
+    type IndexingRule {
+    identifier: string
+    identifierType: IdentifierType
+    decisionBasis: IndexingDecisionBasis!
+    allocationAmount: number | null
+    allocationLifetime: number | null
+    autoRenewal: boolean
+    parallelAllocations: number | null
+    maxAllocationPercentage: number | null
+    minSignal: string | null
+    maxSignal: string | null
+    minStake: string | null
+    minAverageQueryFees: string | null
+    custom: string | null
+    requireSupported: boolean | null
+    }
+    guidance:
+
+    * Prefer setting a sensible global rule first, then refine with subgraph/deployment‑specific rules only where needed.
+    * Keep `allocationLifetime` finite to enforce rotation and fresh POIs; combine with `autoRenewal` for seamless continuity.
+    * Use `maxAllocationPercentage` to cap risk across many deployments; avoid single‑deployment over‑exposure.
+    * If using `custom`, document the semantics and ensure your Agent/automation understands and honors it.
+      example:
+      lang: bash
+      description: Set a deployment‑specific rule overriding defaults.
+      code: |
+
+      # Set multiple fields for a deployment rule
+
+      graph indexer rules set QmDEPLOYMENT123 allocationAmount 50000&#x20;
+      decisionBasis rules allocationLifetime 14 autoRenewal false requireSupported false
+
+  IdentifierType:
+  kind: type
+  summary: Enum indicating the target granularity of an indexing rule.
+  definition:
+  lang: graphql
+  source: the-graph-docs-combined.md
+  code: |
+  IdentifierType {
+  deployment
+  subgraph
+  group
+  }
+  guidance:
+  \- Use `deployment` for the most precise control (by IPFS deployment ID).
+  \- Use `subgraph` to apply to the current version for a name; remember version upgrades may change the underlying deployment.
+
+  ```
+  example:
+    lang: graphql
+    code: |
+      # Example: a query (conceptual) filtering rules by type
+      { indexingRules(identifierType: subgraph) { identifier decisionBasis } }
+  ```
+
+  IndexingDecisionBasis:
+  kind: type
+  summary: Enum controlling whether an index target is decided by rules or forced states.
+  definition:
+  lang: graphql
+  source: the-graph-docs-combined.md
+  code: |
+  IndexingDecisionBasis {
+  rules
+  never
+  always
+  offchain
+  }
+  guidance:
+  \- Prefer `rules` for normal operations; use `always`/`never` for explicit overrides such as incident response.
+  \- `offchain` is useful for experiments or when you want to mirror external heuristics without onchain signals.
+
+  ```
+  example:
+    lang: bash
+    code: |
+      # Force a deployment to be indexed regardless of rules (maintenance window)
+      graph indexer rules start QmDEPLOYMENT123
+  ```
+
+  ActionInput:
+  kind: type
+  summary: Input shape (as documented) for actions queued to change allocations onchain.
+  definition:
+  lang: graphql
+  source: the-graph-docs-combined.md
+  code: |
+  Type ActionInput {
+  status: ActionStatus
+  type: ActionType
+  deploymentID: string | null
+  allocationID: string | null
+  amount: string | null
+  poi: string | null
+  force: boolean | null
+  source: string
+  reason: string | null
+  priority: number | null
+  }
+  guidance:
+  \- Set `priority` to order execution during bursts; leave it low for routine operations to avoid starving urgent items.
+  \- Only set `force: true` when you have independently validated the POI or accept the risk; log the `reason`.
+  \- `source` should tag your system (e.g., “optimizer/v1”) for auditability.
+  example:
+  lang: bash
+  code: |
+  \# Queue a reallocation with an explicit amount (in GRT wei) and optional POI
+  graph indexer action queue reallocate QmDEPLOYMENT123 0xALLOCIDABC 55000
+
+  ActionStatus:
+  kind: type
+  summary: Lifecycle stages for queued actions in the Agent’s execution worker.
+  definition:
+  lang: graphql
+  source: the-graph-docs-combined.md
+  code: |
+  ActionStatus {
+  queued
+  approved
+  pending
+  success
+  failed
+  canceled
+  }
+  guidance:
+  \- Use `actions get --status queued` to triage items awaiting approval.
+  \- Investigate `failed` actions for POI issues, insufficient funds, or chain RPC errors; re‑queue only after remediation.
+  example:
+  lang: bash
+  code: |
+  graph indexer actions get --status queued
+
+  ActionType:
+  kind: type
+  summary: Operation to perform on allocations for a deployment.
+  definition:
+  lang: graphql
+  source: the-graph-docs-combined.md
+  code: |
+  ActionType {
+  allocate
+  unallocate
+  reallocate
+  collect
+  }
+  guidance:
+  \- Prefer `reallocate` over separate unallocate/allocate to minimize gaps and race conditions.
+  \- Use `collect` regularly to realize accrued query fees; schedule this during low‑traffic windows if needed.
+  example:
+  lang: bash
+  code: |
+  \# Open a fresh allocation of 5,000 GRT
+  graph indexer action queue allocate QmDEPLOYMENT123 5000
+
+* name: indexer-cli
+  exports:
+
+  * connect
+  * rules.get
+  * rules.set
+  * rules.start
+  * rules.stop
+  * actions.get
+  * actions.queue.allocate
+  * actions.queue.reallocate
+  * actions.queue.unallocate
+  * actions.approve
+    symbols:
+    connect:
+    kind: function
+    summary: Connect the CLI to the Indexer Management API served by the Agent.
+    definition:
+    lang: bash
+    source: the-graph-docs-combined.md
+    code: |
+    graph indexer connect <url>
+    guidance:
+
+    * When running in Kubernetes, port‑forward the Agent pod (e.g., `kubectl port-forward pod/<agent-pod> 8000:8000`) and connect to `http://localhost:8000`.
+    * Persist the connection URL per environment/workspace; verify with `graph indexer status` before making changes.
+      example:
+      lang: bash
+      code: |
+      kubectl port-forward pod/indexer-agent-0 8000:8000
+      graph indexer connect [http://localhost:8000](http://localhost:8000)
+
+  rules.get:
+  kind: function
+  summary: Fetch one rule or resolve effective values from global/subgraph/deployment scopes.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer rules get \[options] <deployment-id> \[<key1> <key2> ...]
+  guidance:
+  \- Omit keys to print the complete rule; pass specific keys to reduce output noise.
+  \- Use this to confirm what the Agent will actually apply after precedence resolution.
+  example:
+  lang: bash
+  code: |
+  graph indexer rules get QmDEPLOYMENT123 allocationAmount allocationLifetime
+
+  rules.set:
+  kind: function
+  summary: Set one or more rule fields at a target scope.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer rules set \[options] <deployment-id> <key1> <value1> ...
+  guidance:
+  \- Group related changes (amount, lifetime, autoRenewal) in a single command to avoid intermediate inconsistent states.
+  \- Prefer numeric units consistent with your automation (e.g., GRT vs. wei); document your convention.
+  example:
+  lang: bash
+  code: |
+  graph indexer rules set QmDEPLOYMENT123 allocationAmount 7500 allocationLifetime 7 autoRenewal true
+
+  rules.start:
+  kind: function
+  summary: Force a deployment to be indexed (overrides rules for that target).
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer rules start \[options] <deployment-id>
+  guidance:
+  \- Use sparingly for incident response or benchmarking; revert back to rules afterward.
+  \- Verify with Graph Node status API that syncing/health is green after forcing.
+  example:
+  lang: bash
+  code: |
+  graph indexer rules start QmDEPLOYMENT123
+
+  rules.stop:
+  kind: function
+  summary: Stop indexing the target deployment and skip it during decision evaluation.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer rules stop \[options] <deployment-id>
+  guidance:
+  \- Combine with an `unallocate` action (queued and approved) to free stake gracefully.
+  \- Consider leaving a minimal allocation until query traffic moves elsewhere to avoid abrupt service changes.
+  example:
+  lang: bash
+  code: |
+  graph indexer rules stop QmDEPLOYMENT123
+
+  actions.get:
+  kind: function
+  summary: Inspect the actions queue; filter by status to triage approvals.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer actions get \[options] <action-id>
+  guidance:
+  \- Use `--status queued|pending|failed` to focus on work; export JSON to feed dashboards.
+  \- Keep an audit trail of who approved/canceled and why (pair with `source`/`reason` fields).
+  example:
+  lang: bash
+  code: |
+  graph indexer actions get --status queued
+
+  actions.queue.allocate:
+  kind: function
+  summary: Queue an `allocate` action for a deployment.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer action queue allocate <deployment-id> <allocation-amount>
+  guidance:
+  \- Choose a size consistent with your risk cap and liquidity; align with `maxAllocationPercentage`.
+  \- Prefer incremental increases and observe query fees/traffic before scaling further.
+  example:
+  lang: bash
+  code: |
+  graph indexer action queue allocate QmDEPLOYMENT123 5000
+
+  actions.queue.reallocate:
+  kind: function
+  summary: Atomically close an existing allocation and open a new one for the same deployment.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer action queue reallocate <deployment-id> <allocation-id> <allocationAmount>
+  guidance:
+  \- Provide a POI when closing near a reorg window; add `force` only with due diligence.
+  \- Reallocate during low‑volatility periods to minimize missed fees.
+  example:
+  lang: bash
+  code: |
+  graph indexer action queue reallocate QmDEPLOYMENT123 0xALLOCIDABC 55000
+
+  actions.queue.unallocate:
+  kind: function
+  summary: Queue an `unallocate` action to close an allocation.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer action queue unallocate <deployment-id> <allocation-id>
+  guidance:
+  \- Confirm no critical queries are in flight; coordinate with your gateway preferences.
+  \- Provide POI details if required by your compliance policy.
+  example:
+  lang: bash
+  code: |
+  graph indexer action queue unallocate QmDEPLOYMENT123 0xALLOCIDABC
+
+  actions.approve:
+  kind: function
+  summary: Approve multiple queued actions for execution.
+  definition:
+  lang: bash
+  source: the-graph-docs-combined.md
+  code: |
+  graph indexer actions approve \[<action-id> ...]
+  guidance:
+  \- Batch approvals during change windows; avoid approving blindly via `--all` without review in production.
+  \- If latency matters, follow with `actions execute approve` to nudge the worker immediately.
+  example:
+  lang: bash
+  code: |
+  graph indexer actions approve 101 102 103
+
+* name: cost-models (Agora)
+  exports:
+
+  * AgoraStatement
+  * CostModelVariables
+    symbols:
+    AgoraStatement:
+    kind: other
+    summary: A single pricing rule — predicate + cost expression — evaluated per GraphQL query.
+    definition:
+    lang: agora
+    source: the-graph-docs-combined.md
+    code: |
+    \# Predicate matches, expression yields a decimal GRT price.
+    query { pairs(skip: \$skip) { id } } when \$skip > 2000 => 0.0001 \* \$skip \* \$SYSTEM\_LOAD;
+    default => 0.1 \* \$SYSTEM\_LOAD;
+    guidance:
+
+    * Order matters: the first matching statement determines the price; put specific predicates first, defaults last.
+    * Keep predicates cheap to evaluate (avoid heavy regex or deep AST inspection); push complexity into variables when possible.
+    * Validate models with representative queries before rollout; keep a fallback `default` statement.
+      example:
+      lang: bash
+      code: |
+
+      # Load variables then apply a model file (agora)
+
+      indexer cost set variables '{ "SYSTEM\_LOAD": 1.4 }'
+      indexer cost set model my\_model.agora
+
+  CostModelVariables:
+  kind: object
+  summary: Key–value bag of runtime parameters referenced by Agora expressions.
+  definition:
+  lang: json
+  source: the-graph-docs-combined.md
+  code: |
+  { "SYSTEM\_LOAD": 1.4 }
+  guidance:
+  \- Keep variable names UPPER\_SNAKE\_CASE and document their provenance; avoid hidden time dependence.
+  \- Store variables alongside the model in source control; update via CI to keep drift visible.
+  example:
+  lang: bash
+  code: |
+  indexer cost set variables '{ "SYSTEM\_LOAD": 1.0 }'
+
+common\_workflows:
+
+* title: Bootstrap an Indexer and apply safe defaults
+  steps:
+
+  * Install/launch Graph Node, Indexer Agent, and Indexer Service; ensure ports are not exposed publicly.
+  * Port‑forward the Agent management API and `graph indexer connect http://localhost:8000`.
+  * Set a conservative global rule (small `allocationAmount`, finite `allocationLifetime`, `autoRenewal` on).
+  * Verify with `graph indexer status` and Graph Node indexing status API.
+
+* title: Scale a deployment with reallocate
+  steps:
+
+  * Inspect `graph indexer actions get --status queued` to ensure a clean queue.
+  * Queue `reallocate` with a modest increase; include a POI if closing near head.
+  * Approve the action set; optionally trigger immediate execution.
+  * Observe query fees and latency; iterate the allocation size.
+
+* title: Introduce a cost model safely
+  steps:
+
+  * Create an Agora model with a strict default and one targeted predicate.
+  * Set and commit variables (e.g., `$SYSTEM_LOAD`) and load the model via CLI.
+  * Dry‑run significant queries through a staging gateway; validate expected pricing.
+  * Roll out gradually; keep the previous model available for fallback.
+
+troubleshooting\_cheatsheet:
+
+* symptom: Actions stuck in 'queued' and never execute.
+  cause: Agent worker not connected/authorized or no approved items.
+  fix: Approve items explicitly and confirm Agent is healthy; optionally run `actions execute approve`.
+
+* symptom: Allocation closes with POI mismatch.
+  cause: Reorg window or incorrect/old POI; chain data not finalized.
+  fix: Re‑fetch POI at the correct block; re‑queue with `force` only after verifying correctness.
+
+* symptom: Query fees plateau after scaling allocations.
+  cause: Mispriced Agora model or insufficient gateway traffic to that deployment.
+  fix: Review model predicates; adjust variables; coordinate with gateway or rebalance allocations.
+
+faq:
+
+* q: How do global, subgraph, and deployment rules interact?
+  a: More specific scopes override broader ones. The Agent resolves the effective rule as global → subgraph → deployment; use `rules get` to confirm the final values.
+
+* q: When should I use 'always' vs. 'rules'?
+  a: Use `always` for temporary overrides (e.g., benchmarking, incidents). For steady‑state operations, prefer `rules` so strategy changes are centralized.
+
+* q: Is `force` safe on reallocate?
+  a: It bypasses POI checks. Only use after independent validation, ideally during low‑risk windows, and record the reason for audit.
+
+external\_resources:
+
+* label: The Graph — Indexer Docs
+  url: [https://thegraph.com/docs/en/indexing/](https://thegraph.com/docs/en/indexing/)
+* label: Graph Node — Indexing Status API schema
+  url: [https://github.com/graphprotocol/graph-node/blob/master/server/index-node/src/schema.graphql](https://github.com/graphprotocol/graph-node/blob/master/server/index-node/src/schema.graphql)
+* label: Indexer CLI (npm)
+  url: [https://www.npmjs.com/package/@graphprotocol/indexer-cli](https://www.npmjs.com/package/@graphprotocol/indexer-cli)
+* label: Indexer Service & Agent (repo)
+  url: [https://github.com/graphprotocol/indexer](https://github.com/graphprotocol/indexer)
+

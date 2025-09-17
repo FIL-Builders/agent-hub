@@ -1,0 +1,539 @@
+meta:
+spec\_name: pyth-network/entropy-express-lazer
+spec\_version: "0.3.0"
+library\_version: "entropy-sdk-solidity ^2.0.0; express-relay-js ^0.29.0; pyth-lazer (evm) 2025-09 docs"
+generated: "2025-09-17"
+language: "solidity/typescript/http"
+homepage: "[https://docs.pyth.network](https://docs.pyth.network)"
+tags:
+\- pyth
+\- oracle
+\- randomness
+\- mev
+\- low-latency
+\- solidity
+\- typescript
+\- evm
+\- rest
+purpose: >
+Expert, LLM‑ready reference for Pyth Network developer surfaces: Entropy (secure on‑chain randomness for EVM),
+Express Relay (priority auctions for protocol opportunities), and Lazer (ultra‑low latency price verification).
+Each symbol records its authoritative contract or API definition plus actionable usage guidance.
+guiding\_principles:
+\- Always compute and send the correct native‑token fee before calling on‑chain methods (e.g., Entropy getFeeV2 / Lazer verification\_fee), then include it as msg.value.
+\- Persist identifiers you get back (Entropy sequenceNumber; Express Relay bid/opportunity IDs) and key them in your storage/logs for callback and reconciliation.
+\- Keep Entropy callbacks small, gas‑bounded, and non‑reverting; use custom gas limits when your callback does more work.
+\- Treat Express Relay like an auction network: subscribe first, validate chain/opportunity params, sign with the correct key, and handle async bid status updates robustly.
+\- Verify Lazer updates before parsing or trusting any payload fields; never assume an update is valid without proof verification.
+\- Guard reentrancy and state ordering around on‑chain callbacks (e.g., Entropy callback) and external calls.
+\- Prefer typed client SDKs (express-relay-js) for signing/serialization; fall back to raw REST/WebSocket only when you need custom control.
+\- Instrument everything: log fee quotes, gas limits, submission latencies, and verification outcomes to detect drift and tune performance.
+design\_notes: >
+Definitions are extracted from the Pyth developer docs snapshot and SDK references.
+Entropy v2 request variants and debugging methods are based on the EVM “Generate random numbers” and “Callback variants” pages.
+Express Relay client method shapes follow the @pythnetwork/express-relay-js Quickstart (v0.29.0), and HTTP/WS behaviors mirror the public docs.
+Lazer EVM verification/fee usage reflects the Lazer product docs and price‑feeds API reference.
+Package/version anchors: entropy-sdk-solidity (2.0.0) and express-relay-js (0.29.0) npm pages. ([docs.pyth.network][1])
+
+groups:
+
+* name: entropy/solidity (EVM)
+  exports:
+
+  * IEntropyV2.requestV2()
+  * IEntropyV2.requestV2(gasLimit)
+  * IEntropyV2.requestV2(provider, gasLimit)
+  * IEntropyV2.requestV2(provider, userRandomNumber, gasLimit)
+  * IEntropyV2.getFeeV2(...)
+  * IEntropyV2.getDefaultProvider
+  * IEntropyV2.revealWithCallback
+  * IEntropyConsumer.entropyCallback
+    symbols:
+    IEntropyV2.requestV2():
+    kind: function
+    summary: Request a random number using the default provider and default callback gas limit; returns the assigned sequence number.
+    definition:
+    lang: solidity
+    source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+    code: |-
+    function requestV2() external payable returns (uint64 assignedSequenceNumber);
+    guidance:
+
+    * Call getFeeV2() first and send it as msg.value; otherwise the request will revert.
+    * Persist the returned sequenceNumber; you will need it to correlate the asynchronous callback.
+      example:
+      lang: solidity
+      description: Minimal request with defaults; emits your own tracking event.
+      code: |-
+      IEntropyV2 entropy = IEntropyV2(ENTROPY\_ADDRESS);
+      function request() external payable {
+      uint256 fee = entropy.getFeeV2();
+      uint64 seq = entropy.requestV2{ value: fee }();
+      emit RandomRequested(seq);
+      }
+      since: "Entropy v2 (PIP‑008, 2024‑07)"  # ([Messari][2])
+      IEntropyV2.requestV2(gasLimit):
+      kind: function
+      summary: Request randomness with a custom callback gas limit (useful when your callback does more work).
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+      code: |-
+      function requestV2(
+      uint32 gasLimit
+      ) external payable returns (uint64 assignedSequenceNumber);
+      guidance:
+    * Tune gasLimit to the worst‑case callback path; under‑estimating will cause callback failure.
+    * Use getFeeV2(gasLimit) to compute the matching fee for this custom limit.
+      example:
+      lang: solidity
+      code: |-
+      uint32 customGas = 150\_000;
+      uint256 fee = entropy.getFeeV2(customGas);
+      uint64 seq = entropy.requestV2{ value: fee }(customGas);
+      since: "Entropy v2"
+      IEntropyV2.requestV2(provider, gasLimit):
+      kind: function
+      summary: Request randomness from a specific provider with a custom callback gas limit.
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+      code: |-
+      function requestV2(
+      address provider,
+      uint32 gasLimit
+      ) external payable returns (uint64 assignedSequenceNumber);
+      guidance:
+    * Choose providers that are deployed on your chain and supported by Pyth; fees may vary per provider.
+    * Compute fees with getFeeV2(provider, gasLimit) to avoid underpayment.
+      example:
+      lang: solidity
+      code: |-
+      address provider = entropy.getDefaultProvider();
+      uint32 gasLimit = 120\_000;
+      uint256 fee = entropy.getFeeV2(provider, gasLimit);
+      uint64 seq = entropy.requestV2{ value: fee }(provider, gasLimit);
+      since: "Entropy v2"
+      IEntropyV2.requestV2(provider, userRandomNumber, gasLimit):
+      kind: function
+      summary: Commit‑and‑combine variant; supply your own 32‑byte userRandomNumber to be mixed with provider/chain entropy.
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+      code: |-
+      function requestV2(
+      address provider,
+      bytes32 userRandomNumber,
+      uint32 gasLimit
+      ) external payable returns (uint64 assignedSequenceNumber);
+      guidance:
+    * Use a cryptographically secure RNG off‑chain to produce userRandomNumber; never reuse it across requests.
+    * Store sequenceNumber and the commitment linkage if you must audit later.
+      example:
+      lang: solidity
+      code: |-
+      bytes32 userRnd = keccak256(abi.encodePacked(msg.sender, block.prevrandao, address(this)));
+      uint32 gasLimit = 140\_000;
+      uint256 fee = entropy.getFeeV2(provider, gasLimit);
+      uint64 seq = entropy.requestV2{ value: fee }(provider, userRnd, gasLimit);
+      since: "Entropy v2"
+      IEntropyV2.getFeeV2(...):
+      kind: function
+      summary: Return the fee (in wei) required for a request under the specified provider/gas configuration.
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+      code: |-
+      function getFeeV2() external view returns (uint256 fee);
+      function getFeeV2(uint32 gasLimit) external view returns (uint256 fee);
+      function getFeeV2(address provider, uint32 gasLimit) external view returns (uint256 fee);
+      guidance:
+    * Call the overload that matches your request path (default vs custom gas/provider) and pass the same gasLimit to avoid underpayment.
+    * Cache fee quotes briefly if batching many requests in the same block to reduce RPC calls.
+      example:
+      lang: solidity
+      code: |-
+      uint32 gasLimit = 120\_000;
+      uint256 fee = entropy.getFeeV2(gasLimit);
+      since: "Entropy v2"
+      IEntropyV2.getDefaultProvider:
+      kind: function
+      summary: Return the chain’s configured default randomness provider address.
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – Entropy v2 EVM docs"
+      code: |-
+      function getDefaultProvider() external view returns (address provider);
+      guidance:
+    * Use as a sane default for requestV2 when you don’t need provider specialization.
+    * Providers can differ across networks; don’t hardcode across chains.
+      example:
+      lang: solidity
+      code: |-
+      address provider = entropy.getDefaultProvider();
+      since: "Entropy v2"
+      IEntropyV2.revealWithCallback:
+      kind: function
+      summary: Debug helper to manually trigger a reveal + callback for a given request; useful when diagnosing callback failures.
+      definition:
+      lang: solidity
+      source: "Debugging callback failures – Entropy docs"
+      code: |-
+      function revealWithCallback(
+      address provider,
+      uint64 sequenceNumber,
+      bytes32 userRandomNumber,
+      bytes32 providerRevelation
+      ) external;
+      guidance:
+    * Only for testnets/admin flows; do not rely on manual reveal paths in production.
+    * Ensure arguments match the RequestedWithCallback event you observed; mismatches will revert.
+      example:
+      lang: solidity
+      code: |-
+      entropy.revealWithCallback(provider, seq, userRnd, providerRevelation);
+      since: "Entropy v2"
+      IEntropyConsumer.entropyCallback:
+      kind: hook
+      summary: Entropy consumer hook that receives the final random number for a prior request.
+      definition:
+      lang: solidity
+      source: "@pythnetwork/entropy-sdk-solidity – IEntropyConsumer"
+      code: |-
+      // Implemented by your contract (override)
+      function entropyCallback(
+      uint64 sequenceNumber,
+      address provider,
+      bytes32 randomNumber
+      ) internal virtual;
+      guidance:
+    * Keep gas usage low; heavy logic increases your required callback gas and fee.
+    * Always validate and clear state tied to sequenceNumber in a checks‑effects‑interactions pattern.
+      example:
+      lang: solidity
+      code: |-
+      contract Raffle is IEntropyConsumer {
+      IEntropyV2 entropy;
+      mapping(uint64 => address) public requester;
+      constructor(address entropyAddr) { entropy = IEntropyV2(entropyAddr); }
+      function getEntropy() internal view override returns (address) { return address(entropy); }
+      function entropyCallback(uint64 seq, address, bytes32 rnd) internal override {
+      address user = requester\[seq];
+      delete requester\[seq];
+      \_settle(user, rnd);
+      }
+      }
+      since: "Entropy v2"
+
+* name: express-relay/js-sdk
+  exports:
+
+  * Client
+  * Client.subscribeChains
+  * Client.signOpportunityBid
+  * Client.submitOpportunityBid
+    symbols:
+    Client:
+    kind: class
+    summary: Typed client for Express Relay auctions; handles subscriptions, signing, and bid submissions.
+    definition:
+    lang: typescript
+    source: "@pythnetwork/express-relay-js v0.29.0"
+    code: |-
+    export type ClientOptions = { baseUrl: string };
+    export type ChainId = string;
+
+    ```
+    export class Client {
+      constructor(opts: ClientOptions,
+                  onBidStatus: (u: BidStatusUpdate) => void,
+                  onOpportunity?: (o: Opportunity) => void);
+
+      subscribeChains(chainIds: ChainId[]): Promise<void>;
+      signOpportunityBid(o: Opportunity, p: BidParams, privateKey: string): Promise<SignedOpportunityBid>;
+      submitOpportunityBid(b: SignedOpportunityBid): Promise<BidSubmissionResult>;
+    }
+    ```
+
+    guidance:
+
+    * Use one Client per auction baseUrl; reuse it to maintain a single WS connection and backoff policy.
+    * Always subscribeChains() before signing/submitting; your callbacks won’t fire until subscription is active. ([npm][3])
+      example:
+      lang: javascript
+      code: |-
+      import { Client } from "@pythnetwork/express-relay-js";
+      const client = new Client({ baseUrl: "[https://per-staging.dourolabs.app/](https://per-staging.dourolabs.app/)" },
+      (s) => console.log("bid status", s),
+      (o) => console.log("opportunity", o));
+      await client.subscribeChains(\["op\_sepolia"]);
+      since: "0.29.0"  # ([npm][3])
+      Client.subscribeChains:
+      kind: function
+      summary: Subscribe to one or more chain streams; required to start receiving opportunities and status updates.
+      definition:
+      lang: typescript
+      source: "@pythnetwork/express-relay-js v0.29.0"
+      code: |-
+      subscribeChains(chainIds: string\[]): Promise<void>;
+      guidance:
+    * Validate the chain IDs you pass; mismatched environments (e.g., localhost vs staging) will yield no data.
+    * Implement idempotent subscription logic; calling it multiple times should not duplicate listeners.
+      example:
+      lang: javascript
+      code: |-
+      await client.subscribeChains(\["solana", "op\_sepolia"]);
+      since: "0.29.0"
+      Client.signOpportunityBid:
+      kind: function
+      summary: Create a signed bid for a received opportunity using your private key.
+      definition:
+      lang: typescript
+      source: "@pythnetwork/express-relay-js v0.29.0"
+      code: |-
+      signOpportunityBid(o: Opportunity, p: BidParams, privateKey: string): Promise<SignedOpportunityBid>;
+      guidance:
+    * Keep your signing key isolated and rotate regularly; never log raw private keys.
+    * Ensure BidParams match the opportunity’s chain and asset requirements; the server validates these.
+      example:
+      lang: javascript
+      code: |-
+      const signed = await client.signOpportunityBid(opportunity, { amountBps: 25 }, process.env.PER\_KEY!);
+      since: "0.29.0"
+      Client.submitOpportunityBid:
+      kind: function
+      summary: Submit a previously signed bid to Express Relay.
+      definition:
+      lang: typescript
+      source: "@pythnetwork/express-relay-js v0.29.0"
+      code: |-
+      submitOpportunityBid(bid: SignedOpportunityBid): Promise<BidSubmissionResult>;
+      guidance:
+    * Handle non‑200 responses and asynchronous status updates; submission only enqueues the bid.
+    * Retry with exponential backoff on transient network errors; do not re‑sign identical bids unless required.
+      example:
+      lang: javascript
+      code: |-
+      const res = await client.submitOpportunityBid(signed);
+      console.log("submitted bid id:", res.id);
+      since: "0.29.0"
+
+* name: express-relay/http
+  exports:
+
+  * GET /v1/opportunities
+  * POST /v1/bids
+    symbols:
+    GET /v1/opportunities:
+    kind: function
+    summary: List active opportunities to bid on for a given chain.
+    definition:
+    lang: openapi
+    source: "Express Relay HTTP API (summarized from docs)"
+    code: |-
+    openapi: 3.0.3
+    info: { title: Express Relay HTTP, version: "0.1.0" }
+    paths:
+    /v1/opportunities:
+    get:
+    parameters:
+    \- in: query
+    name: chain\_id
+    required: true
+    schema: { type: string }
+    responses:
+    "200":
+    description: OK
+    content:
+    application/json:
+    schema:
+    type: array
+    items: { \$ref: "#/components/schemas/Opportunity" }
+    components:
+    schemas:
+    Opportunity:
+    type: object
+    properties:
+    id: { type: string }
+    chain\_id: { type: string }
+    payload: { type: object }
+    guidance:
+
+    * Prefer the JS SDK to stream opportunities; use HTTP as a fallback or for polling in simple integrations.
+    * Filter by specific chain\_id to reduce payloads and server‑side throttling.
+      example:
+      lang: javascript
+      code: |-
+      const r = await fetch(`${BASE}/v1/opportunities?chain_id=op_sepolia`);
+      const ops = await r.json();
+      console.log(ops.length, "opportunities");
+      since: "public docs (2025‑06)"  # ([docs.pyth.network][4])
+      POST /v1/bids:
+      kind: function
+      summary: Submit a signed bid for an opportunity.
+      definition:
+      lang: openapi
+      source: "Express Relay HTTP API (summarized from docs)"
+      code: |-
+      openapi: 3.0.3
+      info: { title: Express Relay HTTP, version: "0.1.0" }
+      paths:
+      /v1/bids:
+      post:
+      requestBody:
+      required: true
+      content:
+      application/json:
+      schema:
+      \$ref: "#/components/schemas/SignedOpportunityBid"
+      responses:
+      "202":
+      description: Accepted
+      content:
+      application/json:
+      schema:
+      \$ref: "#/components/schemas/BidSubmissionResult"
+      components:
+      schemas:
+      SignedOpportunityBid: { type: object, additionalProperties: true }
+      BidSubmissionResult:
+      type: object
+      properties:
+      id: { type: string }
+      status: { type: string }
+      guidance:
+    * The server only acknowledges receipt; the eventual outcome arrives via your subscribed status stream or polling.
+    * Ensure your signature domain/chain parameters match the target chain; bad domains are a common rejection reason.
+      example:
+      lang: javascript
+      code: |-
+      await fetch(`${BASE}/v1/bids`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(signedBid),
+      });
+      since: "public docs (2025‑06)"  # ([docs.pyth.network][4])
+
+* name: lazer/evm
+  exports:
+
+  * PythLazer.verification\_fee
+  * PythLazer.verifyUpdate
+    symbols:
+    PythLazer.verification\_fee:
+    kind: function
+    summary: Returns the native‑token fee required to verify an update.
+    definition:
+    lang: solidity
+    source: "Pyth Lazer EVM"
+    code: |-
+    function verification\_fee() external view returns (uint256);
+    guidance:
+
+    * Always query this just before submitting verifyUpdate; fees may change with payload size and cryptography.
+    * Forward the fee as msg.value in the subsequent verifyUpdate call.
+      example:
+      lang: solidity
+      code: |-
+      uint256 fee = pythLazer.verification\_fee();
+      since: "Lazer (2025‑01)"  # ([docs.pyth.network][5])
+      PythLazer.verifyUpdate:
+      kind: function
+      summary: Verifies a signed Lazer update and returns the verified payload for downstream parsing.
+      definition:
+      lang: solidity
+      source: "Pyth Lazer EVM"
+      code: |-
+      function verifyUpdate(bytes calldata update)
+      external
+      payable
+      returns (bytes calldata payload, bytes calldata remainder);
+      guidance:
+    * Call with { value: verification\_fee() }; reject unverified updates to avoid trusting spoofed data.
+    * Only parse fields from the returned payload after successful verification; never parse unverified input. ([docs.pyth.network][5])
+      example:
+      lang: solidity
+      code: |-
+      (bytes memory payload, ) = pythLazer.verifyUpdate{ value: pythLazer.verification\_fee() }(updateBlob);
+      // parse payload with your own library or helpers…
+      since: "Lazer (2025‑01)"
+
+common\_workflows:
+
+* title: Entropy v2 – Request and consume randomness (default provider)
+  steps:
+
+  * Query fee = entropy.getFeeV2(); then call entropy.requestV2{ value: fee }().
+  * Store the returned sequenceNumber in contract storage (e.g., mapping) keyed by caller or purpose.
+  * Implement entropyCallback to consume the bytes32 randomNumber and finalize your app logic; keep it under your chosen gas limit.
+  * Emit events at request and at callback for observability and off‑chain indexing. ([docs.pyth.network][1])
+* title: Entropy v2 – Heavier callbacks with custom gas limits
+  steps:
+
+  * Estimate worst‑case gas for your callback path; pick a conservative uint32 gasLimit.
+  * Compute fee with entropy.getFeeV2(gasLimit) (or with provider, gasLimit).
+  * Call entropy.requestV2{ value: fee }(gasLimit) and monitor the callback; adjust gasLimit based on measured usage over time. ([docs.pyth.network][6])
+* title: Express Relay – Minimal searcher loop with JS SDK
+  steps:
+
+  * Instantiate new Client({ baseUrl }, onBidStatus, onOpportunity) and await client.subscribeChains(\[chain\_id]).
+  * In your onOpportunity handler, produce BidParams and call signOpportunityBid(opportunity, params, privateKey).
+  * Submit with submitOpportunityBid(signed) and handle async status updates in onBidStatus. ([npm][3])
+* title: Lazer (EVM) – Verify and parse an update
+  steps:
+
+  * Fetch update bytes off‑chain (e.g., Hermes) and send verifyUpdate with msg.value = verification\_fee().
+  * On success, parse the returned payload to extract timestamp and feed values; reject if verifyUpdate reverts or returns unexpected channel. ([api-reference.pyth.network][7])
+
+troubleshooting\_cheatsheet:
+
+* symptom: Entropy callback never fires.
+  cause: Callback ran out of gas or reverted; requested gasLimit too low for actual logic.
+  fix: Increase gasLimit and corresponding fee via getFeeV2(gasLimit); simplify callback logic and re‑test. ([docs.pyth.network][6])
+* symptom: Entropy request reverted with “insufficient value”.
+  cause: Fee underpaid; fee depends on provider and gasLimit.
+  fix: Compute the fee with the exact overload you plan to call (with/without provider & gasLimit) and send it as msg.value.
+* symptom: Express Relay bids are never acknowledged.
+  cause: You didn’t subscribe or subscribed to the wrong chain/environment.
+  fix: Call subscribeChains() with the correct chain\_id and baseUrl; verify callbacks are wired. ([npm][3])
+* symptom: Lazer verifyUpdate reverts due to insufficient funds.
+  cause: verification\_fee increased or payload is larger than expected.
+  fix: Query verification\_fee just‑in‑time and forward it as msg.value; avoid stale cached values. ([docs.pyth.network][5])
+* symptom: Verified payload parsed but values look stale.
+  cause: You parsed without checking the channel/timestamp or verified the wrong blob.
+  fix: Ensure verifyUpdate succeeded and validate timestamp/channel before trusting fields. ([docs.pyth.network][5])
+
+faq:
+
+* q: How do I choose an Entropy provider?
+  a: Use getDefaultProvider() for a safe default on your chain. If you need bespoke SLAs or economics, requestV2 supports specifying a provider explicitly.
+* q: When should I set a custom Entropy gas limit?
+  a: When your entropyCallback performs more than minimal state updates. Start with measurements, add 20–30% headroom, and compute the matching fee via getFeeV2(gasLimit). ([docs.pyth.network][6])
+* q: Is Express Relay polling via HTTP enough?
+  a: For prototypes, yes. For production you should subscribe with the JS SDK to get real‑time opportunities and bid status updates. ([npm][3])
+* q: Can I parse Lazer payloads without verifyUpdate?
+  a: No—always verify first. Parsing unverified data opens you up to spoofing. Use verifyUpdate with msg.value = verification\_fee(). ([docs.pyth.network][5])
+
+external\_resources:
+
+* label: Entropy – Generate Random Numbers (EVM)
+  url: [https://docs.pyth.network/entropy/generate-random-numbers/evm](https://docs.pyth.network/entropy/generate-random-numbers/evm)
+* label: Entropy – Set Custom Gas Limits
+  url: [https://docs.pyth.network/entropy/set-custom-gas-limits](https://docs.pyth.network/entropy/set-custom-gas-limits)
+* label: NPM – @pythnetwork/entropy-sdk-solidity (2.0.0)
+  url: [https://www.npmjs.com/package/%40pythnetwork/entropy-sdk-solidity](https://www.npmjs.com/package/%40pythnetwork/entropy-sdk-solidity)
+* label: NPM – @pythnetwork/express-relay-js (0.29.0)
+  url: [https://www.npmjs.com/package/%40pythnetwork%2Fexpress-relay-js](https://www.npmjs.com/package/%40pythnetwork%2Fexpress-relay-js)
+* label: Lazer – Product Overview
+  url: [https://docs.pyth.network/lazer](https://docs.pyth.network/lazer)
+* label: Price Feeds API – Update & Fee (Hermes)
+  url: [https://api-reference.pyth.network/price-feeds/evm/updatePriceFeeds](https://api-reference.pyth.network/price-feeds/evm/updatePriceFeeds)
+
+[1]: https://docs.pyth.network/entropy/generate-random-numbers/evm?utm_source=chatgpt.com "How to Generate Random Numbers in EVM Contracts Using ..."
+[2]: https://messari.io/report/state-of-pyth-network-q2-2024?utm_source=chatgpt.com "State of Pyth Network Q2 2024"
+[3]: https://www.npmjs.com/package/%40pythnetwork%2Fexpress-relay-js "@pythnetwork/express-relay-js - npm"
+[4]: https://docs.pyth.network/express-relay/how-express-relay-works?utm_source=chatgpt.com "How Express Relay Works – Pyth Network Documentation"
+[5]: https://docs.pyth.network/lazer?utm_source=chatgpt.com "Pyth Lazer – Pyth Network Documentation"
+[6]: https://docs.pyth.network/entropy/set-custom-gas-limits?utm_source=chatgpt.com "Set Custom Gas Limits - Pyth Docs"
+[7]: https://api-reference.pyth.network/price-feeds/evm/updatePriceFeeds?utm_source=chatgpt.com "Price Feeds | Pyth Network API Reference"
+

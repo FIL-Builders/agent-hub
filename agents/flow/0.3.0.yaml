@@ -1,0 +1,608 @@
+meta:
+spec\_name: flow/access-stream-api
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: ">=1.0.0 <2.0.0"
+language: http+websocket
+homepage: [https://developers.flow.com](https://developers.flow.com)
+tags:
+\- flow
+\- blockchain
+\- access api
+\- websocket
+\- events
+\- blocks
+\- rest
+purpose: >
+Teach an LLM to use Flow’s Access Node WebSocket Stream API (v1) to subscribe to
+chain data (blocks, headers, events, account & transaction statuses) and, where
+useful, pair that with REST v1 lookups. Includes authoritative message formats,
+topic arguments, guardrails, and runnable examples.
+guiding\_principles:
+\- Prefer sealed/finalized data in production; subscribe to `"blocks"` with `block_status: "sealed"` for stable reads.&#x20;
+\- Keep ≤20 concurrent subscriptions per connection; each subscription yields ≤20 msgs/sec; connections idle >60s are closed—design backoff & auto-resubscribe.&#x20;
+\- Always include a client-generated `subscription_id` (≤20 chars) so you can correlate ACKs, data, and errors deterministically.&#x20;
+\- Use topic-side filters (`event_types`, `addresses`, `contracts`, `start_block_*`, `heartbeat_interval`) to minimize downstream compute.&#x20;
+\- Treat streamed `payload` as immutable ledger truth; if you need expansion (e.g., full tx result), follow up via REST v1 endpoints.&#x20;
+\- Handle partial failures gracefully: every message may include an `error` object; never crash on unexpected shapes—log and continue.&#x20;
+\- On reconnect, resume near your last processed block using `start_block_id`/`start_block_height` to avoid gaps/duplication.&#x20;
+design\_notes: >
+Derived from the Flow developer documentation’s WebSocket Stream API v1 and
+related examples (blocks, headers, events, transaction/account statuses) plus
+representative REST v1 snippets; grouped by core WS message envelopes, per-topic
+argument schemas, and endpoints/constants. Source: flow-docs-combined.md.&#x20;
+
+groups:
+
+* name: WebSocket Core
+  exports:
+
+  * SubscribeMessage
+  * UnsubscribeMessage
+  * ListSubscriptionsMessage
+  * SubscriptionAck
+  * SubscriptionDataMessage
+  * SubscriptionError
+    symbols:
+    SubscribeMessage:
+    kind: interface
+    summary: Client → server message to subscribe to a topic with optional filters.&#x20;
+    definition:
+    lang: typescript
+    source: flow-docs-combined.md (WS Stream API • Subscribe request format)
+    code: |
+    type StreamTopic =
+    \| "block\_digests"
+    \| "block\_headers"
+    \| "blocks"
+    \| "events"
+    \| "account\_statuses"
+    \| "transaction\_statuses"
+    \| "send\_and\_get\_transaction\_statuses";
+
+    ```
+    /** Client→Server: subscribe to a topic */
+    interface SubscribeMessage {
+      /** Optional; if omitted server generates one (≤ 20 chars) */
+      subscription_id?: string;
+      action: "subscribe";
+      topic: StreamTopic;
+      /** Topic-specific arguments; see per-topic schemas */
+      arguments?: Record<string, string | string[]>;
+    }
+    ```
+
+    guidance:
+
+    * Set your own short `subscription_id` to simplify correlation across ACK/data/error messages.&#x20;
+    * Provide the narrowest `arguments` possible (e.g., `event_types`, `addresses`) to reduce bandwidth and handler load.&#x20;
+      example:
+      lang: javascript
+      description: Minimal blocks subscription on testnet (sealed only).
+      code: |
+      import WebSocket from "ws";
+
+      const ws = new WebSocket("wss\://rest-testnet.onflow\.org/v1/ws");
+      ws.on("open", () => {
+      /\*\* @type {import('./types').SubscribeMessage} */
+      const msg = {
+      subscription\_id: "sub-blocks-1",
+      action: "subscribe",
+      topic: "blocks",
+      arguments: { block\_status: "sealed" }
+      };
+      ws.send(JSON.stringify(msg));
+      });
+      ws.on("message", (data) => console.log(String(data)));
+      UnsubscribeMessage:
+      kind: interface
+      summary: Client → server message to stop a specific subscription.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Unsubscribe)
+      code: |
+      /*\* Client→Server: cancel an existing subscription \*/
+      interface UnsubscribeMessage {
+      subscription\_id: string;
+      action: "unsubscribe";
+      }
+      guidance:
+    * Always `unsubscribe` before closing a long-lived connection to prevent dangling work server-side.&#x20;
+    * On reconnect, reissue needed subscriptions with fresh `subscription_id`s—do not assume server state persists.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({ subscription\_id: "sub-blocks-1", action: "unsubscribe" }));
+      ListSubscriptionsMessage:
+      kind: interface
+      summary: Client → server message to enumerate active subscriptions on this connection.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • List subscriptions)
+      code: |
+      /\*\* Client→Server: list active subscriptions \*/
+      interface ListSubscriptionsMessage {
+      action: "list\_subscriptions";
+      }
+
+      /\*\* Server→Client response \*/
+      interface ListSubscriptionsResponse {
+      subscriptions: Array<{
+      subscription\_id: string;
+      topic: StreamTopic;
+      arguments?: Record\<string, string | string\[]>;
+      }>;
+      }
+      guidance:
+    * Use during recovery to reconcile which subscriptions the server still considers active.&#x20;
+    * If your client is the authority, prefer recreating subscriptions from local state after reconnects.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({ action: "list\_subscriptions" }));
+      SubscriptionAck:
+      kind: interface
+      summary: Server ACK of a successful subscribe/unsubscribe request.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Successful Response Format)
+      code: |
+      /\*\* Server→Client: ACK \*/
+      interface SubscriptionAck {
+      subscription\_id: string;
+      action: "subscribe" | "unsubscribe";
+      }
+      guidance:
+    * Treat ACK as readiness to receive data for that `subscription_id`; begin backpressure accounting here.&#x20;
+    * If no ACK arrives within your SLA, retry with jitter and unique `subscription_id`.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // Expect: {"subscription\_id":"sub-blocks-1","action":"subscribe"}
+      ws.on("message", (raw) => {
+      const msg = JSON.parse(String(raw));
+      if (msg.action === "subscribe") console.log("Subscribed:", msg.subscription\_id);
+      });
+      SubscriptionDataMessage:
+      kind: interface
+      summary: Server data envelope for any topic; may include an error instead of payload.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Example subscription messages)
+      code: |
+      /\*\* Server→Client: stream data */
+      interface SubscriptionDataMessage {
+      subscription\_id: string;
+      topic: StreamTopic;
+      /*\* Topic-specific content (e.g., block header, events batch, tx status) */
+      payload?: unknown;
+      /*\* Message sequence index for this subscription (when provided) */
+      message\_index?: number;
+      /*\* Present if the server could not produce data for this item \*/
+      error?: { code: number; message: string };
+      }
+      guidance:
+    * Always branch on `error` first; if present, do not assume `payload` shape. Log and decide whether to resubscribe.&#x20;
+    * Use `message_index` (when provided) to detect gaps/duplicates in your handler pipeline.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.on("message", (raw) => {
+      const m = JSON.parse(String(raw));
+      if (m.error) console.warn("WS error:", m.error);
+      else if (m.payload) console.log("WS payload:", m.topic, m.message\_index);
+      });
+      SubscriptionError:
+      kind: interface
+      summary: Server error structure embedded in stream responses.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Error message examples)
+      code: |
+      interface StreamError {
+      code: number;
+      message: string;
+      }
+      guidance:
+    * Map `code` to retry strategy; e.g., 4xx → adjust request; 5xx → exponential backoff.&#x20;
+    * Persist recent errors with `subscription_id` context for auditability & incident response.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // Example: {"subscription\_id":"x","error":{"code":400,"message":"invalid message"}}
+
+* name: Topics & Arguments
+  exports:
+
+  * BlocksTopicArguments
+  * BlockHeadersTopicArguments
+  * BlockDigestsTopicArguments
+  * EventsTopicArguments
+  * AccountStatusesTopicArguments
+  * TransactionStatusesTopicArguments
+  * SendAndGetTransactionStatusesArgs
+    symbols:
+    BlocksTopicArguments:
+    kind: interface
+    summary: Arguments for the `"blocks"` topic; emits full blocks as they appear.&#x20;
+    definition:
+    lang: typescript
+    source: flow-docs-combined.md (WS Stream API • Blocks topic)
+    code: |
+    interface BlocksTopicArguments {
+    /\*\* "sealed" | "finalized" */
+    block\_status: string;
+    /*\* Mutually exclusive with start\_block\_height */
+    start\_block\_id?: string;
+    /*\* Mutually exclusive with start\_block\_id \*/
+    start\_block\_height?: string;
+    }
+    guidance:
+
+    * In prod, `"sealed"` is typical; use `"finalized"` only when you must align with finality checkpointing.&#x20;
+    * For catch-up, set `start_block_*`; otherwise, omit to start from the latest block with the chosen status.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id: "sub-blocks",
+      action: "subscribe",
+      topic: "blocks",
+      arguments: { block\_status: "sealed" }
+      }));
+      BlockHeadersTopicArguments:
+      kind: interface
+      summary: Arguments for `"block_headers"`; like `"blocks"` but header-only payloads.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Block headers topic)
+      code: |
+      interface BlockHeadersTopicArguments {
+      block\_status: string;            // "sealed" | "finalized"
+      start\_block\_id?: string;         // exclusive with height
+      start\_block\_height?: string;
+      }
+      guidance:
+    * Prefer `"block_headers"` when you only need IDs/heights/timestamps—cheaper than full blocks.&#x20;
+    * If you later need full payloads, stitch via REST lookups using returned block IDs.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id: "sub-headers",
+      action: "subscribe",
+      topic: "block\_headers",
+      arguments: { block\_status: "sealed" }
+      }));
+      BlockDigestsTopicArguments:
+      kind: interface
+      summary: Arguments for `"block_digests"`; minimal per-block digests for high-throughput consumers.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Block digests topic)
+      code: |
+      interface BlockDigestsTopicArguments {
+      block\_status: string;            // "sealed" | "finalized"
+      start\_block\_id?: string;
+      start\_block\_height?: string;
+      }
+      guidance:
+    * Use when you only need block identity and quick cadence; combine with REST for details.&#x20;
+    * Reserve for analytics and indexing pipelines where payload size matters.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({ subscription\_id:"sub-dig", action:"subscribe", topic:"block\_digests", arguments:{ block\_status:"sealed" }}));
+      EventsTopicArguments:
+      kind: interface
+      summary: Arguments for `"events"`; stream filtered Cadence events with optional heartbeat checkpoints.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Events topic)
+      code: |
+      interface EventsTopicArguments {
+      start\_block\_id?: string;         // exclusive with height
+      start\_block\_height?: string;
+      /\*\* Max blocks between synthetic progress messages */
+      heartbeat\_interval?: string;
+      /*\* e.g., \["flow\.AccountKeyAdded","A.1654653399040a61.FlowToken.TokensDeposited"] */
+      event\_types?: string\[];
+      /*\* Account addresses to filter (hex without 0x in examples) */
+      addresses?: string\[];
+      /*\* Contract identifiers e.g., \["A.1654653399040a61.FlowToken"] \*/
+      contracts?: string\[];
+      }
+      guidance:
+    * Prefer `contracts` + `event_types` over broad address filters to reduce noise.&#x20;
+    * Set a small `heartbeat_interval` during sparse filters to monitor forward progress.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id: "sub-ev",
+      action: "subscribe",
+      topic: "events",
+      arguments: {
+      start\_block\_height: "106197100",
+      heartbeat\_interval: "5",
+      event\_types: \["flow\.AccountKeyAdded"]
+      }
+      }));
+      AccountStatusesTopicArguments:
+      kind: interface
+      summary: Arguments for `"account_statuses"`; emit account status changes.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Account statuses topic)
+      code: |
+      interface AccountStatusesTopicArguments {
+      start\_block\_id?: string;
+      start\_block\_height?: string;
+      heartbeat\_interval?: string;
+      /\*\* Filter by account addresses \*/
+      addresses?: string\[];
+      }
+      guidance:
+    * Use when tracking key rotations/account changes; pair with REST account reads for full state.&#x20;
+    * If you need only key events, consider `events` with `flow.AccountKeyAdded/Removed`.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id: "sub-acc",
+      action: "subscribe",
+      topic: "account\_statuses",
+      arguments: { addresses: \["e544175ee0461c4b"] }
+      }));
+      TransactionStatusesTopicArguments:
+      kind: interface
+      summary: Arguments for `"transaction_statuses"`; stream lifecycle updates for transactions.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Transaction statuses topic)
+      code: |
+      interface TransactionStatusesTopicArguments {
+      /\*\* Transaction IDs to follow; omit to receive all */
+      transaction\_ids?: string\[];
+      /*\* Start from specific block or height \*/
+      start\_block\_id?: string;
+      start\_block\_height?: string;
+      heartbeat\_interval?: string;
+      }
+      guidance:
+    * To follow user actions, subscribe with a bounded `transaction_ids` list rather than firehose.&#x20;
+    * After receiving a sealed result, consider unsubscribing for that tx to save capacity.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id:"sub-tx",
+      action:"subscribe",
+      topic:"transaction\_statuses",
+      arguments:{ transaction\_ids:\["7d9290e5...f71322b"] }
+      }));
+      SendAndGetTransactionStatusesArgs:
+      kind: interface
+      summary: Arguments for `"send_and_get_transaction_statuses"`; submit tx and stream its status in one topic.&#x20;
+      definition:
+      lang: typescript
+      source: flow-docs-combined.md (WS Stream API • Send-and-get tx statuses topic)
+      code: |
+      interface SendAndGetTransactionStatusesArgs {
+      /\*\* RLP/JSON-encoded transaction bytes per docs */
+      transaction: string;
+      /*\* Optional: resume parameters \*/
+      start\_block\_id?: string;
+      start\_block\_height?: string;
+      heartbeat\_interval?: string;
+      }
+      guidance:
+    * Ensure transaction encoding/signing is correct before sending; server will error on invalid payloads.&#x20;
+    * Use this topic when you need immediate feedback without polling REST for tx status.&#x20;
+      example:
+      lang: javascript
+      code: |
+      ws.send(JSON.stringify({
+      subscription\_id:"sub-send-tx",
+      action:"subscribe",
+      topic:"send\_and\_get\_transaction\_statuses",
+      arguments:{ transaction:"\<encoded\_tx\_bytes>" }
+      }));
+
+* name: Endpoints & Constants
+  exports:
+
+  * WebSocketEndpoints
+  * RestHintsGetBlocks
+  * RestHintsGetTransactionResult
+    symbols:
+    WebSocketEndpoints:
+    kind: constant
+    summary: Official WebSocket endpoints for Access API v1 (mainnet & testnet).&#x20;
+    definition:
+    lang: typescript
+    source: flow-docs-combined.md (WS Stream API • Endpoints)
+    code: |
+    export const FLOW\_WEBSOCKET\_ENDPOINTS = {
+    mainnet: "wss\://rest-mainnet.onflow\.org/v1/ws",
+    testnet: "wss\://rest-testnet.onflow\.org/v1/ws"
+    } as const;
+    guidance:
+
+    * Prefer testnet for development; swap to mainnet only after integrating backoff/resubscribe logic.&#x20;
+    * If you maintain multiple subs, shard them across connections to stay under per-connection limits.&#x20;
+      example:
+      lang: javascript
+      code: |
+      import { FLOW\_WEBSOCKET\_ENDPOINTS } from "./endpoints.js";
+      const ws = new (await import("ws")).default(FLOW\_WEBSOCKET\_ENDPOINTS.testnet);
+      RestHintsGetBlocks:
+      kind: other
+      summary: REST v1 hint—fetch latest sealed block via `GET /v1/blocks?height=sealed` (shape omitted here).&#x20;
+      definition:
+      lang: openapi
+      source: flow-docs-combined.md (REST v1 • blocks example)
+      code: |
+      paths:
+      /v1/blocks:
+      get:
+      summary: Get blocks by height selector
+      parameters:
+      \- in: query
+      name: height
+      schema: { type: string, enum: \[sealed, finalized] }
+      responses:
+      "200":
+      description: JSON block list (see docs)
+      guidance:
+    * Use as a sanity check at startup to learn the current sealed height before streaming.&#x20;
+    * For full block bodies, prefer WS `"blocks"` topic + occasional REST spot checks.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const r = await fetch("[https://rest-testnet.onflow.org/v1/blocks?height=sealed](https://rest-testnet.onflow.org/v1/blocks?height=sealed)");
+      const data = await r.json();
+      console.log("sealed tip:", data?.\[0]?.height);
+      RestHintsGetTransactionResult:
+      kind: other
+      summary: REST v1 hint—lookup a transaction result by ID via `GET /v1/transaction_results/{id}`.&#x20;
+      definition:
+      lang: openapi
+      source: flow-docs-combined.md (REST v1 • transaction\_results example)
+      code: |
+      paths:
+      /v1/transaction\_results/{id}:
+      get:
+      summary: Get a transaction result
+      parameters:
+      \- in: path
+      name: id
+      required: true
+      schema: { type: string }
+      responses:
+      "200":
+      description: Transaction result JSON (status, error message, events)
+      guidance:
+    * Pair stream `"transaction_statuses"` with this endpoint for complete result details when needed.&#x20;
+    * Cache negative lookups briefly; recent txs may take time to finalize.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const txId = "92014de9...dffde04";
+      const res = await fetch(`https://rest-testnet.onflow.org/v1/transaction_results/${txId}`);
+      console.log(await res.json());
+
+common\_workflows:
+
+* name: Stream sealed blocks with reconnection
+  intent: Subscribe to `"blocks"` with sealed status; auto-resubscribe on disconnect and resume from last height.
+  steps:
+
+  * Open WS to testnet endpoint and `subscribe` to `"blocks"` with `block_status: "sealed"`.
+  * Track the highest `payload.height` seen; on disconnect, reconnect and resubscribe with `start_block_height`.
+  * Process messages idempotently using `message_index` when present.
+    code:
+    lang: javascript
+    code: |
+    import WebSocket from "ws";
+    const url = "wss\://rest-testnet.onflow\.org/v1/ws";
+    let lastHeight = null;
+
+    function subscribe(ws) {
+    const args = { block\_status: "sealed", ...(lastHeight && { start\_block\_height: String(lastHeight) }) };
+    ws.send(JSON.stringify({ subscription\_id: "sub-blocks", action: "subscribe", topic: "blocks", arguments: args }));
+    }
+
+    function connect() {
+    const ws = new WebSocket(url);
+    ws.on("open", () => subscribe(ws));
+    ws.on("message", (raw) => {
+    const m = JSON.parse(String(raw));
+    if (m.topic === "blocks" && m.payload?.height) {
+    lastHeight = Number(m.payload.height);
+    // handle block...
+    }
+    });
+    ws.on("close", () => setTimeout(connect, 1000));
+    ws.on("error", () => ws.close());
+    }
+    connect();
+* name: Filtered event stream for a contract
+  intent: Reduce noise by specifying `contracts` and `event_types` with heartbeats for liveness.
+  steps:
+
+  * Subscribe to `"events"` with `contracts` like `["A.1654653399040a61.FlowToken"]` and one or more `event_types`.
+  * Provide `heartbeat_interval` to receive progress updates when no events match.
+    code:
+    lang: javascript
+    code: |
+    ws.send(JSON.stringify({
+    subscription\_id: "sub-ev",
+    action: "subscribe",
+    topic: "events",
+    arguments: {
+    contracts: \["A.1654653399040a61.FlowToken"],
+    event\_types: \["flow\.AccountKeyAdded"],
+    heartbeat\_interval: "5"
+    }
+    }));
+* name: Follow a transaction through sealing
+  intent: Track specific transactions via `"transaction_statuses"` and finish with a REST result lookup.
+  steps:
+
+  * Subscribe to `"transaction_statuses"` with `transaction_ids`.
+  * When your tx shows sealed, call `GET /v1/transaction_results/{id}` for full details.
+    code:
+    lang: javascript
+    code: |
+    ws.send(JSON.stringify({
+    subscription\_id:"sub-tx",
+    action:"subscribe",
+    topic:"transaction\_statuses",
+    arguments:{ transaction\_ids:\["7d9290e5...f71322b"] }
+    }));
+* name: Graceful shutdown of many subscriptions
+  intent: Ensure server cleans up work when your service deploys or scales down.
+  steps:
+
+  * Iterate your client-side registry and send `unsubscribe` for each `subscription_id`.
+  * Close the socket after receiving the final ACK or a timeout, whichever comes first.
+* name: Bootstrap at startup with REST
+  intent: Seed your internal cursor with the current sealed height before streaming.
+  steps:
+
+  * Call `GET /v1/blocks?height=sealed`, read the highest height, and use it as `start_block_height` for initial subscriptions.
+
+troubleshooting\_cheatsheet:
+
+* symptom: WebSocket closes after \~60 seconds of inactivity.
+  cause: Access API closes idle connections (>1 minute) by design.&#x20;
+  fix: Send a lightweight subscription with `heartbeat_interval` or periodically `list_subscriptions`; reconnect with backoff.
+* symptom: Received `{"error":{"code":400,"message":"invalid message"}}`.
+  cause: Malformed subscribe payload (missing `topic`/`action` or bad `arguments`).&#x20;
+  fix: Validate request against the message schema; include `action:"subscribe"`, a supported `topic`, and correct argument names.
+* symptom: Data messages arrive but handlers crash on unexpected shape.
+  cause: Different topics emit different `payload` structures; not all fields are present for every message.&#x20;
+  fix: Branch by `topic`; treat `payload` as topic-specific and feature-detect fields defensively.
+* symptom: Missed blocks/events during brief outage.
+  cause: Stream resumes at “latest” by default if you don’t specify a start point.&#x20;
+  fix: On reconnect, resubscribe with `start_block_id` or `start_block_height` set to your last processed point.
+
+faq:
+
+* q: What’s the difference between sealed and finalized blocks?
+  a: Sealed blocks have passed collection consensus and are stable for most app logic; finalized blocks are checkpointed by the protocol’s finality mechanism—use when you must align with finality.&#x20;
+* q: How many subscriptions can I run per connection?
+  a: Up to 20 concurrent subscriptions; each may emit up to 20 messages per second. Beyond that, open additional connections.&#x20;
+* q: Do I have to provide a `subscription_id`?
+  a: It’s optional, but recommended. If omitted, the server generates one. Supplying your own improves correlation and debugging.&#x20;
+
+external\_resources:
+
+* label: Flow Access API WebSocket Stream (Overview)
+  url: [https://developers.flow.com](https://developers.flow.com)
+* label: Flow REST Access API (HTTP)
+  url: [https://developers.flow.com](https://developers.flow.com)
+* label: Flow Blocks & Events Concepts
+  url: [https://developers.flow.com](https://developers.flow.com)
+

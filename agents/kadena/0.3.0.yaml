@@ -1,0 +1,654 @@
+meta:
+spec\_name: kadena/pact-lang-api
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "^4.2.0"
+language: javascript
+homepage: "[https://www.npmjs.com/package/pact-lang-api](https://www.npmjs.com/package/pact-lang-api)"
+tags:
+\- kadena
+\- pact
+\- blockchain
+\- smart-contracts
+\- javascript
+\- sdk
+purpose: >
+Senior‑developer reference for the Kadena Pact JavaScript SDK (“pact‑lang‑api”).
+It teaches how to construct, sign, submit, and track Pact transactions over
+Chainweb’s REST API using the SDK’s fetch, crypto, lang, wallet, simple, and
+low‑level helpers—pairing raw function contracts with practical guidance.
+guiding\_principles:
+\- Prefer `fetch.local` for read‑only queries and `fetch.send` for state‑changing transactions; never leak secrets into `envData`.
+\- Always wait for results with `fetch.listen` (single tx) or `fetch.poll` (batch); treat request keys as your canonical correlation IDs.
+\- Build `meta` with `lang.mkMeta` and ensure `creationTime` is in **seconds** and not in the future; avoid scientific notation in decimals.
+\- On the web, avoid holding raw private keys—use the Chainweaver signing API via `wallet.sign`; on servers, secure keys and rate‑limit.
+\- Convert binary/hex using `crypto.hexToBin`/`crypto.binToHex`; compute hashes with `crypto.hash` before verification.
+\- For capability‑based auth, construct caps with `lang.mkCap` and pass them to wallet signing; don’t hardcode module guards.
+\- Cross‑chain flows require `fetch.spv` proofs; expect multi‑step orchestration and retries.
+\- For production polling, backoff with jitter and handle partial successes and chain reorg edge‑cases.
+design\_notes: >
+Function signatures and behavior summaries are extracted from the
+`pact-lang-api` 4.2.0 package documentation on npm, which lists the public
+API surface and usage prototypes. ([npm][1])  The historical GitHub
+README mirrors these contracts and provides the same prototypes for
+`crypto`, `lang`, and `fetch` helpers. ([GitHub][2])
+
+groups:
+
+* name: fetch
+  exports:
+
+  * Pact.fetch.send
+  * Pact.fetch.local
+  * Pact.fetch.poll
+  * Pact.fetch.listen
+  * Pact.fetch.spv
+    symbols:
+    Pact.fetch.send:
+    kind: function
+    summary: Submit one or more exec/cont commands to a Pact node; returns request key(s).
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    /\*\*
+    \* An execCmd Object to Execute at /send or /local endpoint.
+    \* @typedef {Object} execCmd
+    \* @property type {string} - "cont" or "exec" (default "exec")
+    \* @property pactCode {string} - pact code to execute (exec)
+    \* @property nonce {string} - unique hash salt (default now)
+    \* @property envData {object} - JSON data (optional)
+    \* @property meta {object} - public meta (see mkMeta)
+    \* @property networkId {string} - network identifier
+    */
+    /*\*
+    \* A contCmd to Execute at /send endpoint.
+    \* @typedef {Object} contCmd
+    \* @property type {string} - "cont"
+    \* @property pactId {string}
+    \* @property nonce {string}
+    \* @property step {number}
+    \* @property proof {string} - SPV proof (xchain)
+    \* @property rollback {bool}
+    \* @property envData {object}
+    \* @property meta {object}
+    \* @property networkId {string}
+    \*/
+    // Make API request to execute commands and retrieve request keys.
+    Pact.fetch.send(\[<execCmd> | <contCmd>], [apiHost\:string](apiHost:string)) -> {"requestKeys": string\[]}
+    guidance:
+
+    * Collect and persist every returned request key; it’s your handle for `poll`/`listen`.
+    * Ensure `meta.sender` has sufficient funds/caps to pay gas or it will fail during validation.
+    * Prefer batching homogeneous commands per chain/network to minimize partial failures.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const NETWORK\_ID = 'testnet04';
+      const CHAIN\_ID = '1';
+      const API\_HOST = `https://api.testnet.chainweb.com/chainweb/0.0/${NETWORK_ID}/chain/${CHAIN_ID}/pact`;
+      const now = Math.floor(Date.now()/1000)-5;
+      const keyPair = Pact.crypto.genKeyPair();
+      const meta = Pact.lang.mkMeta(keyPair.publicKey, CHAIN\_ID, 0.0000001, 600, now, 600);
+      (async () => {
+      const cmd = {
+      networkId: NETWORK\_ID,
+      keyPairs: keyPair,
+      pactCode: `(coin.get-balance "${'k:'+keyPair.publicKey}")`,
+      envData: {},
+      meta
+      };
+      const { requestKeys } = await Pact.fetch.send(\[cmd], API\_HOST);
+      console.log('reqKeys:', requestKeys);
+      })().catch(console.error);
+      Pact.fetch.local:
+      kind: function
+      summary: Execute a single read‑only command on a node without submitting to the mempool.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      // Make API request to execute a single command locally and retrieve the result.
+      Pact.fetch.local([execCmd\:object](execCmd:object), [apiHost\:string](apiHost:string)) -> {
+      gas: number,
+      result: { status: 'success' | 'failure', data?: any, error?: any },
+      reqKey: string,
+      logs: string | null,
+      metaData: object | null,
+      continuation: any | null,
+      txId: number | null
+      }
+      guidance:
+    * Use `local` for queries (`(coin.details ...)`, reads); it never changes chain state.
+    * Provide only fields relevant to execution (`pactCode`, `envData`, `meta` if needed).
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const host = '[https://api.testnet.chainweb.com/chainweb/0.0/testnet04/chain/0/pact](https://api.testnet.chainweb.com/chainweb/0.0/testnet04/chain/0/pact)';
+      (async () => {
+      const cmd = { pactCode: '(+ 1 2)', envData: {} };
+      const res = await Pact.fetch.local(cmd, host);
+      console.log(res.result);
+      })();
+      Pact.fetch.poll:
+      kind: function
+      summary: Poll for multiple request keys and return a mapping of key → transaction result.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      // Retrieve results for a set of request keys.
+      Pact.fetch.poll({ requestKeys: string\[] }, [apiHost\:string](apiHost:string)) -> {
+      \[reqKey: string]: {
+      gas: number,
+      result: { status: 'success' | 'failure', data?: any, error?: any },
+      reqKey: string,
+      logs: string | null,
+      metaData: object | null,
+      continuation: any | null,
+      txId: number | null
+      }
+      }
+      guidance:
+    * Use exponential backoff between polls (e.g., 2–10s); stop on first full resolution.
+    * Treat missing keys as “not yet mined” rather than failure; retry until TTL expiry.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      async function waitAll(host, keys) {
+      let out = {};
+      while (Object.keys(out).length < keys.length) {
+      out = await Pact.fetch.poll({ requestKeys: keys }, host);
+      if (Object.keys(out).length < keys.length) await new Promise(r => setTimeout(r, 4000));
+      }
+      return out;
+      }
+      Pact.fetch.listen:
+      kind: function
+      summary: Block until a single request key is mined and return its full result.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      // Retrieve result of a tx with a single request key.
+      Pact.fetch.listen({ listen: string }, [apiHost\:string](apiHost:string)) -> {
+      gas: number,
+      result: { status: 'success' | 'failure', data?: any, error?: any },
+      reqKey: string,
+      logs: string | null,
+      metaData: object | null,
+      continuation: any | null,
+      txId: number | null
+      }
+      guidance:
+    * Ideal for UI “await tx” flows; avoid for batches (prefer `poll`).
+    * Time out on the client side to prevent infinite wait if a tx is orphaned.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      async function waitOne(host, reqKey) {
+      return Pact.fetch.listen({ listen: reqKey }, host);
+      }
+      Pact.fetch.spv:
+      kind: function
+      summary: Retrieve a base64url‑encoded SPV proof for a cross‑chain request key.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      /\*\*
+
+      * @typedef {Object} spvCmd
+      * @property requestKey {string}
+      * @property targetChainId {string}
+        \*/
+        Pact.fetch.spv([spvCmd\:object](spvCmd:object), [apiHost\:string](apiHost:string)) -> "\[proof base64url value]"
+        guidance:
+    * Use only after source tx is mined and finalized; proofs are chain/height sensitive.
+    * Cache proofs for replays; they’re deterministic for a given finalized tx.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      async function getProof(host, requestKey, targetChainId) {
+      return Pact.fetch.spv({ requestKey, targetChainId }, host);
+      }
+
+* name: crypto
+  exports:
+
+  * Pact.crypto.genKeyPair
+  * Pact.crypto.sign
+  * Pact.crypto.hash
+  * Pact.crypto.hexToBin
+  * Pact.crypto.binToHex
+  * Pact.crypto.restoreKeyPairFromSecretKey
+    symbols:
+    Pact.crypto.genKeyPair:
+    kind: function
+    summary: Generate an Ed25519 keypair as hex strings.
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    Pact.crypto.genKeyPair() -> { "publicKey": string, "secretKey": string }
+    guidance:
+
+    * Persist keys securely; never ship `secretKey` to browsers in production.
+    * Keys are hex‑encoded; use `hexToBin`/`binToHex` for conversions.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const kp = Pact.crypto.genKeyPair();
+      console.log(kp.publicKey);
+      Pact.crypto.sign:
+      kind: function
+      summary: Sign a message string (blake2b‑hashed) with an Ed25519 keypair.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.crypto.sign([msg\:string](msg:string), \<keyPair:{publicKey\:string, secretKey\:string}>) ->
+      { "hash": string, "sig": string, "pubKey": string }
+      guidance:
+    * For tx signing, prefer `wallet.sign` (capabilities) over raw `crypto.sign` in end‑user apps.
+    * Verify signatures with `crypto.hash` + a compatible verifier when needed.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const kp = Pact.crypto.genKeyPair();
+      const sig = Pact.crypto.sign('hello', kp);
+      console.log(sig.sig);
+      Pact.crypto.hash:
+      kind: function
+      summary: Compute a blake2b hash of a string and return hex.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.crypto.hash(string) -> string
+      guidance:
+    * Hash plaintext before signature verification; use `hexToBin` to prep for libs expecting bytes.
+    * Pact request bodies specify their own command hash—don’t recompute unless you know why.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      console.log(Pact.crypto.hash('data'));
+      Pact.crypto.hexToBin:
+      kind: function
+      summary: Convert a hex string to a Uint8Array.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.crypto.hexToBin(string) -> Uint8Array
+      guidance:
+    * Validate inputs are even‑length hex; reject prefixes like `0x`.
+    * Useful when interoperating with WebCrypto or NaCl APIs.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const bytes = Pact.crypto.hexToBin('00ff');
+      console.log(bytes.length);
+      Pact.crypto.binToHex:
+      kind: function
+      summary: Convert bytes to a lowercase hex string.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.crypto.binToHex(<Uint8Array>) -> string
+      guidance:
+    * Keep canonical lowercase hex to avoid downstream mismatches.
+    * Combine with `hexToBin` during custom signing/verification flows.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const hex = Pact.crypto.binToHex(new Uint8Array(\[0,255]));
+      console.log(hex);
+      Pact.crypto.restoreKeyPairFromSecretKey:
+      kind: function
+      summary: Derive the public key from a stored secret key.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.crypto.restoreKeyPairFromSecretKey(secretKey) -> { "publicKey": string, "secretKey": string }
+      guidance:
+    * Use only in trusted environments; treat `secretKey` as highly sensitive.
+    * Useful for wallet import/migration utilities on the server.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const restored = Pact.crypto.restoreKeyPairFromSecretKey('abcd...');
+      console.log(restored.publicKey);
+
+* name: lang
+  exports:
+
+  * Pact.lang.mkMeta
+  * Pact.lang.mkCap
+  * Pact.lang.mkExp
+    symbols:
+    Pact.lang.mkMeta:
+    kind: function
+    summary: Construct a valid `meta` object for txs (sender, chain, gas, ttl, creationTime).
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    Pact.lang.mkMeta([sender\:string](sender:string), [chainId\:string](chainId:string), [gasPrice\:number](gasPrice:number), [gasLimit\:number](gasLimit:number), [creationTime\:number](creationTime:number), [ttl\:number](ttl:number)) -> {
+    sender: string, chainId: string, gasPrice: number, gasLimit: number, creationTime: number, ttl: number
+    }
+    guidance:
+
+    * `creationTime` must be unix seconds (not ms) and not in the future; subtract a few seconds from `Date.now()/1000`.
+    * Avoid scientific notation for decimals (`0.0000001`, not `1e-7`), since Pact doesn’t parse it.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const meta = Pact.lang.mkMeta('k\:pubkey', '1', 0.0000001, 600, Math.floor(Date.now()/1000)-5, 600);
+      console.log(meta.chainId);
+      Pact.lang.mkCap:
+      kind: function
+      summary: Build a capability object to request during signing.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.lang.mkCap([role\:string](role:string), [description\:string](description:string), [name\:string](name:string), \<args: any\[]>) -> {
+      role: string, description: string, cap: { name: string, args: any\[] }
+      }
+      guidance:
+    * Always scope capability args precisely (e.g., account, amount) to least privilege.
+    * Pair `mkCap` outputs with `wallet.sign` to prompt users for explicit approvals.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const cap = Pact.lang.mkCap('Coin Transfer', 'Spend from A to B', 'coin.TRANSFER', \['sender','receiver', 1.0]);
+      console.log(cap.cap.name);
+      Pact.lang.mkExp:
+      kind: function
+      summary: Create a Pact s‑expression string for function + args.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.lang.mkExp([fn\:string](fn:string), ...args\:any) -> string
+      guidance:
+    * Prefer building structured `pactCode` with `mkExp` to avoid manual quoting bugs.
+    * Keep numbers/strings aligned with Pact types; pass decimals as JS numbers (non‑scientific).
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const exp = Pact.lang.mkExp('coin.get-balance', 'k\:abc123');
+      console.log(exp);
+
+* name: wallet
+  exports:
+
+  * Pact.wallet.sign
+  * Pact.wallet.sendSigned
+    symbols:
+    Pact.wallet.sign:
+    kind: function
+    summary: Ask Chainweaver to sign a command with specified capabilities; returns a signed exec command.
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    /\*\*
+    \* @typedef {Object} signingCmd
+    \* @property pactCode {string}
+    \* @property caps {array|object}
+    \* @property envData {object}
+    \* @property sender {string}
+    \* @property chainId {string}
+    \* @property gasLimit {number}
+    \* @property gasPrice {string}
+    \* @property signingPubKey {string}
+    \* @property networkId {string}
+    \* @property nonce {string}
+    \*/
+    // Sends parameters to Chainweaver signing API and retrieves a signed Pact command.
+    Pact.wallet.sign([signingCmd\:object](signingCmd:object)) -> [execCmd\:object](execCmd:object)
+    guidance:
+
+    * In browsers, integrate with Chainweaver via its signing API and pass explicit `caps` for user consent.
+    * Don’t mutate the returned `cmd` object before sending; its hash/signatures must remain consistent.
+      example:
+      lang: javascript
+      code: |
+      // Browser-only in practice; illustrative usage:
+      const Pact = require('pact-lang-api');
+      async function prepareSigned(pactCode, caps, meta, networkId) {
+      return Pact.wallet.sign({ pactCode, caps, sender: meta.sender, chainId: meta.chainId, gasLimit: meta.gasLimit, gasPrice: String(meta.gasPrice), networkId, nonce: String(Date.now()) });
+      }
+      Pact.wallet.sendSigned:
+      kind: function
+      summary: Submit a pre‑signed exec command and receive its request key(s).
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.wallet.sendSigned([execCmd\:object](execCmd:object), [apiHost\:string](apiHost:string)) -> {"requestKeys": string\[]}
+      guidance:
+    * Use after `wallet.sign` or any external wallet flow; the payload must include `hash`, `sigs`, and `cmd`.
+    * Treat the returned request key exactly like `fetch.send` for tracking and UX.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      async function submitSigned(host, signed) {
+      const { requestKeys } = await Pact.wallet.sendSigned(signed, host);
+      return requestKeys\[0];
+      }
+
+* name: simple.exec
+  exports:
+
+  * Pact.simple.exec.createCommand
+  * Pact.simple.exec.createLocalRequest
+  * Pact.simple.exec.createPollRequest
+  * Pact.simple.exec.createListenRequest
+    symbols:
+    Pact.simple.exec.createCommand:
+    kind: function
+    summary: Create a `/send` payload from keyPairs/nonce/pactCode/envData.
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    Pact.simple.exec.createCommand(\[keyPair], [nonce\:string](nonce:string), [pactCode\:string](pactCode:string), [envData\:object](envData:object)) ->
+    { "cmds": \[ /\* mkSingleCmd output(s) \*/ ] }
+    guidance:
+
+    * Prefer `simple` helpers if you don’t need fine‑grained control over low‑level blobs.
+    * Ensure `nonce` uniqueness per command to avoid hash collisions.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const kp = Pact.crypto.genKeyPair();
+      const payload = Pact.simple.exec.createCommand(\[kp], String(Date.now()), '(+ 1 2)', {});
+      console.log(Array.isArray(payload.cmds));
+      Pact.simple.exec.createLocalRequest:
+      kind: function
+      summary: Build a `/local` request for a single command.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.simple.exec.createLocalRequest(\[keyPair], [nonce\:string](nonce:string), [pactCode\:string](pactCode:string), [envData\:object](envData:object)) ->
+      { "hash": string, "sigs": any\[], "cmd": object }
+      guidance:
+    * Use this to dry‑run your tx locally before submitting to the mempool (`/send`).
+    * Reuse the same `pactCode`/`envData` for consistency between local and send.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const kp = Pact.crypto.genKeyPair();
+      const localReq = Pact.simple.exec.createLocalRequest(\[kp], 'n1', '(+ 1 2)', {});
+      console.log(localReq.hash.length > 0);
+      Pact.simple.exec.createPollRequest:
+      kind: function
+      summary: Build the request body for `/poll` from a list of request keys.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.simple.exec.createPollRequest({ "cmds": string\[] }) -> { "requestKeys": string\[] }
+      guidance:
+    * Useful adapter when you keep keys inside a `cmds` wrapper.
+    * Validate that keys are non‑empty strings before sending.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const body = Pact.simple.exec.createPollRequest({ cmds: \['abc','def'] });
+      console.log(body.requestKeys.length);
+      Pact.simple.exec.createListenRequest:
+      kind: function
+      summary: Build the request body for `/listen` for a single request key.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.simple.exec.createListenRequest({ "cmds": string\[] }) -> { "listen": string }
+      guidance:
+    * Pass exactly one key for listen semantics; for many keys, switch to polling.
+    * Ensure the key is from the same network/chain you will query.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const body = Pact.simple.exec.createListenRequest({ cmds: \['only-one-key'] });
+      console.log(body.listen);
+
+* name: api
+  exports:
+
+  * Pact.api.mkSingleCmd
+  * Pact.api.mkPublicSend
+    symbols:
+    Pact.api.mkSingleCmd:
+    kind: function
+    summary: Construct the low‑level `{hash,sigs,cmd}` triple for a single command.
+    definition:
+    lang: text
+    source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+    code: |
+    Pact.api.mkSingleCmd(\[signatures], {cmd: object}) ->
+    { "hash": string, "sigs": any\[], "cmd": object }
+    guidance:
+
+    * Use when you need full control over how commands are wrapped and signed.
+    * Verify the `hash` matches the command payload before submitting.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const mockSig = \[{ sig: '00' }];
+      const cmd = { payload: { exec: { code: '(+ 1 2)', data: {} } } };
+      const single = Pact.api.mkSingleCmd(mockSig, { cmd });
+      console.log(single.hash);
+      Pact.api.mkPublicSend:
+      kind: function
+      summary: Wrap one or more `{hash,sigs,cmd}` into a `/send` body.
+      definition:
+      lang: text
+      source: "npm\:pact-lang-api\@4.2.0 (README prototypes)"
+      code: |
+      Pact.api.mkPublicSend(\[cmd]) -> { "cmds": \[ /\* mkSingleCmd outputs \*/ ] }
+      guidance:
+    * This is the canonical envelope for `/send`; reuse it across retries.
+    * Do not mix chains in the same envelope; one chain per request is best‑practice.
+      example:
+      lang: javascript
+      code: |
+      const Pact = require('pact-lang-api');
+      const body = Pact.api.mkPublicSend(\[{ hash:'h', sigs:\[], cmd:{} }]);
+      console.log(Array.isArray(body.cmds));
+
+common\_workflows:
+
+* title: Send a `coin.transfer` with wallet signing (browser) and await confirmation
+  steps:
+
+  * Build capabilities with `lang.mkCap('coin.TRANSFER', [sender, receiver, amount])`.
+  * Call `wallet.sign` with `pactCode`, `caps`, and meta fields; get a signed exec command.
+  * Submit with `wallet.sendSigned` and capture the request key.
+  * Call `fetch.listen({listen: <key>})` to block until mined; handle `result.status`.
+* title: Read contract state locally
+  steps:
+
+  * Create a minimal exec command with `pactCode` and `envData` for your read.
+  * Call `fetch.local(cmd, host)` and parse `result.data` on success.
+* title: Batch submit and track multiple txs
+  steps:
+
+  * Build an array of exec commands (same chain).
+  * `const { requestKeys } = await fetch.send(cmds, host)`.
+  * Loop with `fetch.poll({requestKeys}, host)` until all entries return.
+* title: Cross‑chain (SPV) proof retrieval
+  steps:
+
+  * After the source tx is mined, call `fetch.spv({ requestKey, targetChainId }, host)`.
+  * Use the returned base64url proof in your continuation step on the target chain.
+* title: Simple helpers for quick prototyping
+  steps:
+
+  * Use `simple.exec.createLocalRequest` to dry‑run, then `simple.exec.createCommand` + `fetch.send` to submit.
+  * Wrap request keys with `simple.exec.createPollRequest` or `createListenRequest` for tracking.
+
+troubleshooting\_cheatsheet:
+
+* symptom: `result.status` is `failure` with “Tx failed: Gas limit (…)"
+  cause: Gas limit too low; code ran out of gas before completion.
+  fix: Increase `gasLimit` in `mkMeta` and re‑submit; benchmark with `fetch.local` first.
+* symptom: `Tx not found` when calling `listen`
+  cause: Wrong network/chain host or request key not yet mined.
+  fix: Verify host URL matches the tx’s chain; retry with backoff or switch to `poll`.
+* symptom: Node rejects transaction with “TTL expired”
+  cause: `creationTime`/`ttl` window elapsed before mining.
+  fix: Regenerate `creationTime` (unix seconds) and a fresh nonce; re‑sign and re‑send.
+* symptom: Decimal values interpreted incorrectly
+  cause: JS serialized to scientific notation (e.g., `1e-7`) which Pact doesn’t parse.
+  fix: Pass plain decimals as numbers or strings like `"0.0000001"`; avoid scientific notation.
+* symptom: Signature invalid / unexpected `pubKey`
+  cause: Mismatched key encoding or tampered `cmd` after signing.
+  fix: Use `wallet.sign` for end‑user flows; do not mutate signed payloads; validate hex with `hexToBin`.
+
+faq:
+
+* q: Should I use `listen` or `poll`?
+  a: Use `listen` for one transaction (blocks until mined) and `poll` for batches (non‑blocking loop).
+* q: Do I need `meta` for `local`?
+  a: Only if your code reads `meta` or requires chain context; otherwise `pactCode` and `envData` are enough.
+* q: How do I avoid leaking private keys in web apps?
+  a: Use `wallet.sign` (Chainweaver) and never store raw `secretKey` in the browser; sign server‑side only if you absolutely control the environment.
+
+external\_resources:
+
+* label: NPM — pact-lang-api 4.2.0 (API & examples)
+  url: "[https://www.npmjs.com/package/pact-lang-api/v/4.2.0](https://www.npmjs.com/package/pact-lang-api/v/4.2.0)"
+* label: GitHub — kadena-io/pact-lang-api (README)
+  url: "[https://github.com/kadena-io/pact-lang-api](https://github.com/kadena-io/pact-lang-api)"
+
+[1]: https://www.npmjs.com/package/pact-lang-api/v/4.2.0 "pact-lang-api - npm"
+[2]: https://github.com/kadena-io/pact-lang-api "GitHub - kadena-io/pact-lang-api"
+

@@ -1,0 +1,425 @@
+meta:
+spec\_name: "uniswapx/integrator-apis"
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "^2.0.0"
+purpose: >-
+Senior‑level reference for building UniswapX integrations: implement a Quoter HTTP service
+with last‑look semantics, discover open orders from the Orders API, and execute fills via
+the on‑chain Reactor. Pairs authoritative request/response and Solidity signatures with
+opinionated guidance and runnable examples.
+guiding\_principles:
+\- Always echo back request identifiers (requestId, quoteId) unchanged to simplify tracing across services.
+\- Treat tokens and chain IDs as authoritative—reject mismatches early; never assume mainnet defaults.
+\- Respect last‑look: include your filler address in quotes you intend to execute and honor expiries tightly.
+\- Return 204 quickly when you won’t quote; don’t hold connections while price discovery is in flight.
+\- Validate ERC‑20 metadata (decimals) and use exact string amounts; avoid implicit float math.
+\- Before calling the Reactor, pre‑approve the exact output token allowance and cap approvals per call.
+\- Monitor circuit‑breaker status and back off when disabled; surface blockUntilTimestamp to operators.
+design\_notes: >-
+This pack consolidates the UniswapX Quoter request/response schema ("quote endpoint"),
+Orders Endpoint usage (GET /v2/orders with orderStatus/chainId/limit), and Reactor execution
+entrypoints (execute, executeWithCallback) extracted from the Uniswap Foundation docs corpus.
+The Quoter is expressed as OpenAPI 3.0 for precision; on‑chain execution uses minimal Solidity
+interfaces based on the example snippets provided in the Reactor and filler guides. Grouping
+reflects the typical integration flow: quote → discover order → execute.
+
+groups:
+
+* name: "UniswapX Quoter HTTP API"
+  exports:
+
+  * "POST /quote"
+    symbols:
+    "POST /quote":
+    kind: function
+    summary: "Quote an UniswapX swap with last‑look; respond 200 with a quote, or 204 to decline."
+    definition:
+    lang: "openapi"
+    source: "UniswapX Quoter integration – Request/Response schema"
+    code: |
+    openapi: 3.0.1
+    info:
+    title: UniswapX Quoter
+    version: "2.0.0"
+    paths:
+    /quote:
+    post:
+    summary: Return a last‑look quote or decline.
+    requestBody:
+    required: true
+    content:
+    application/json:
+    schema:
+    \$ref: '#/components/schemas/QuoteRequest'
+    responses:
+    '200':
+    description: OK — either a QuoteResponse or a CircuitBreakerDisabled payload
+    content:
+    application/json:
+    schema:
+    oneOf:
+    \- \$ref: '#/components/schemas/QuoteResponse'
+    \- \$ref: '#/components/schemas/CircuitBreakerDisabled'
+    '204':
+    description: No Content — intentionally declined to quote
+    components:
+    schemas:
+    QuoteRequest:
+    type: object
+    required:
+    \- requestId
+    \- tokenInChainId
+    \- tokenOutChainId
+    \- swapper
+    \- tokenIn
+    \- tokenOut
+    \- amount
+    \- type
+    \- quoteId
+    properties:
+    requestId:
+    type: string
+    format: uuid
+    description: Unique identifier for the swapper's request.
+    tokenInChainId:
+    type: integer
+    description: Chain ID for tokenIn.
+    tokenOutChainId:
+    type: integer
+    description: Chain ID for tokenOut.
+    swapper:
+    type: string
+    description: Swapper EOA that will sign the order (checksummed hex address).
+    tokenIn:
+    type: string
+    description: ERC‑20 address provided by the swapper.
+    tokenOut:
+    type: string
+    description: ERC‑20 address received by the swapper.
+    amount:
+    type: string
+    description: >
+    For EXACT\_INPUT, the exact amount of tokenIn being sold; for EXACT\_OUTPUT,
+    the desired amount of tokenOut to receive. String decimal per token decimals.
+    type:
+    type: string
+    enum: \[EXACT\_INPUT, EXACT\_OUTPUT]
+    quoteId:
+    type: string
+    format: uuid
+    description: Unique identifier supplied by the integrator for the quote returned.
+    QuoteResponse:
+    type: object
+    required:
+    \- chainId
+    \- amountIn
+    \- amountOut
+    \- filler
+    \- requestId
+    \- swapper
+    \- tokenIn
+    \- tokenOut
+    \- quoteId
+    properties:
+    chainId:
+    type: integer
+    amountIn:
+    type: string
+    description: >
+    For EXACT\_INPUT requests, echo the input from QuoteRequest; for EXACT\_OUTPUT,
+    provide the computed input required.
+    amountOut:
+    type: string
+    description: >
+    For EXACT\_OUTPUT requests, echo the desired output; for EXACT\_INPUT,
+    provide the computed output.
+    filler:
+    type: string
+    description: Address granted last‑look to execute the order.
+    requestId: { type: string, format: uuid }
+    swapper:   { type: string }
+    tokenIn:   { type: string }
+    tokenOut:  { type: string }
+    quoteId:   { type: string, format: uuid }
+    CircuitBreakerDisabled:
+    type: object
+    required: \[blockUntilTimestamp]
+    properties:
+    blockUntilTimestamp:
+    type: string
+    description: RFC3339 or unix timestamp until which the quoter is disabled.
+    guidance:
+
+    * Reject if tokenInChainId ≠ tokenOutChainId unless you explicitly support cross‑chain (most quoters don’t).
+    * Quote in token base units (stringified integers) to avoid rounding; never use JS floats.
+    * Set filler to the exact executor address you control for the forthcoming transaction.
+    * Use 204 for “no quote” instead of 4xx; reserve 4xx for malformed inputs.
+    * Enforce tight TTLs on quotes; if you include expiries, validate at execution time, too.
+      example:
+      lang: "javascript"
+      description: "Minimal Node.js HTTP quoter stub (EXACT\_INPUT: echo in; compute mock 1% worse out)."
+      code: |
+      import http from 'node\:http';
+
+      const server = http.createServer((req, res) => {
+      if (req.method === 'POST' && req.url === '/quote') {
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+      try {
+      const q = JSON.parse(body);
+      // Basic validation
+      if (!q || !q.requestId || !q.swapper || !q.tokenIn || !q.tokenOut || !q.amount || !q.type) {
+      res.writeHead(400, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ error: 'invalid request' }));
+      }
+      // Decline example path
+      if (q.tokenIn.toLowerCase() === q.tokenOut.toLowerCase()) {
+      res.writeHead(204); return res.end();
+      }
+      // Mock “price”: 1% fee/impact for demo
+      const mul = BigInt(99), den = BigInt(100);
+      const response = {
+      chainId: q.tokenInChainId,
+      amountIn: q.type === 'EXACT\_INPUT' ? String(q.amount) : String(BigInt(q.amount) \* den / mul),
+      amountOut: q.type === 'EXACT\_OUTPUT' ? String(q.amount) : String(BigInt(q.amount) \* mul / den),
+      filler: '0x0000000000000000000000000000000000000001',
+      requestId: q.requestId,
+      swapper: q.swapper,
+      tokenIn: q.tokenIn,
+      tokenOut: q.tokenOut,
+      quoteId: q.quoteId
+      };
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(response));
+      } catch (e) {
+      res.writeHead(400, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ error: 'bad json' }));
+      }
+      });
+      } else {
+      res.writeHead(404); res.end();
+      }
+      });
+
+      server.listen(8080, () => console.log('Quoter listening on :8080'));
+
+* name: "UniswapX Orders Discovery API"
+  exports:
+
+  * "GET /v2/orders"
+    symbols:
+    "GET /v2/orders":
+    kind: function
+    summary: "Retrieve open UniswapX orders to fill (polling API)."
+    definition:
+    lang: "openapi"
+    source: "UniswapX Orders Endpoint (Beta/Prod)"
+    code: |
+    openapi: 3.0.1
+    info:
+    title: UniswapX Orders API
+    version: "2.0.0"
+    paths:
+    /v2/orders:
+    get:
+    summary: List orders available to fill.
+    parameters:
+    \- in: query
+    name: orderStatus
+    schema: { type: string }
+    description: Filter by status (e.g., "open").
+    \- in: query
+    name: chainId
+    schema: { type: integer }
+    description: Chain ID to filter orders (e.g., 1, 42161).
+    \- in: query
+    name: limit
+    schema: { type: integer, minimum: 1, maximum: 1000, default: 100 }
+    description: Maximum number of orders to return.
+    \- in: query
+    name: cursor
+    schema: { type: string }
+    description: Opaque pagination cursor.
+    responses:
+    '200':
+    description: OK
+    content:
+    application/json:
+    schema:
+    type: object
+    properties:
+    orders:
+    type: array
+    description: Array of orders available to fill.
+    items:
+    type: object
+    additionalProperties: true
+    next:
+    type: string
+    description: Pagination cursor for the next page, if any.
+    guidance:
+
+    * Use pagination and request the maximum `limit` your pipeline can handle to reduce latency.
+    * Prefer chain‑specific polling (one request per chainId) to parallelize discovery.
+    * Decode orders with the UniswapX SDK before simulation; treat unrecognized fields as opaque.
+    * For lower latency, register for webhooks if available, and fall back to polling for resiliency.
+      example:
+      lang: "bash"
+      description: "Fetch open Arbitrum orders and pipe to jq."
+      code: |
+      curl -s "[https://api.uniswap.org/v2/orders?orderStatus=open\&chainId=42161\&limit=1000](https://api.uniswap.org/v2/orders?orderStatus=open&chainId=42161&limit=1000)" | jq '.orders | length'
+
+* name: "Reactor Execution (On‑Chain)"
+  exports:
+
+  * "IReactor.execute"
+  * "IReactor.executeWithCallback"
+    symbols:
+    "IReactor.execute":
+    kind: function
+    summary: "Execute a single UniswapX order via the Reactor."
+    definition:
+    lang: "solidity"
+    source: "Reactor interface (based on BaseReactor examples)"
+    code: |
+    interface IReactor {
+    function execute(Order calldata order) external;
+    }
+    guidance:
+
+    * Approve the output token to the Reactor immediately before the call; avoid unlimited approvals.
+    * Validate quote freshness and invariants off‑chain; revert early in your executor if preconditions fail.
+    * Read the Reactor address from the order metadata you fetched; do not hardcode.
+      example:
+      lang: "solidity"
+      description: "Direct fill pattern from an executor contract."
+      code: |
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+
+      interface IERC20 { function approve(address, uint256) external returns (bool); }
+      interface IReactor { function execute(bytes calldata order) external; }
+
+      contract Executor {
+      address public reactor;
+
+      constructor(address \_reactor) { reactor = \_reactor; }
+
+      function fill(bytes calldata order, address outputToken) external {
+      IERC20(outputToken).approve(reactor, type(uint256).max);
+      IReactor(reactor).execute(order);
+      }
+      }
+      since: "2.0.0"
+
+  "IReactor.executeWithCallback":
+  kind: function
+  summary: "Execute an order and invoke a strategy callback in your executor."
+  definition:
+  lang: "solidity"
+  source: "Reactor + callback pattern from filler guide"
+  code: |
+  interface IReactor {
+  function executeWithCallback(
+  bytes calldata order,
+  bytes calldata callbackData
+  ) external;
+  }
+
+  ```
+      interface IExecutorCallback {
+        function reactorCallback(
+          bytes calldata resolvedOrders,
+          bytes calldata callbackData
+        ) external;
+      }
+  guidance:
+    - Keep callback logic deterministic and gas‑bounded; protect against reentrancy and stale state.
+    - Encode only the minimal data required in `callbackData`; prefer on‑chain reads inside callback.
+    - Validate that callback invocations originate from your trusted Reactor address.
+  example:
+    lang: "solidity"
+    description: "Executor wrapper that routes through executeWithCallback."
+    code: |
+      // SPDX-License-Identifier: MIT
+      pragma solidity ^0.8.20;
+
+      interface IReactor {
+        function executeWithCallback(bytes calldata order, bytes calldata data) external;
+      }
+
+      contract Executor {
+        address public immutable reactor;
+        constructor(address _reactor) { reactor = _reactor; }
+
+        function execute(bytes calldata order, bytes calldata data) external {
+          IReactor(reactor).executeWithCallback(order, data);
+        }
+
+        // Reactor will call this during execution
+        function reactorCallback(bytes calldata /*resolvedOrders*/, bytes calldata /*data*/) external {
+          require(msg.sender == reactor, "unauthorized");
+          // Strategy logic here...
+        }
+      }
+  since: "2.0.0"
+  ```
+
+common\_workflows:
+
+* title: "Build & deploy a basic Quoter service"
+  steps:
+
+  * Implement POST /quote per the schema; validate addresses, chain IDs, and amount strings.
+  * Compute amountIn/amountOut deterministically; include your executor address in `filler`.
+  * Echo back requestId and quoteId; set tight expiries in your own metadata if used.
+  * Return 204 when declining; return 200 with CircuitBreakerDisabled payload when disabled.
+* title: "Discover, decode, and execute an order"
+  steps:
+
+  * Poll GET /v2/orders with `orderStatus=open` and target `chainId`.
+  * Decode the returned order with the UniswapX SDK; verify min/max amounts and deadlines.
+  * Pre‑approve the output token to the Reactor and call `execute` (or `executeWithCallback` for strategies).
+  * Record tx hash and reconciliation metadata keyed by quoteId/requestId.
+* title: "Handle circuit‑breaker downtime"
+  steps:
+
+  * If /quote returns the disabled schema, log `blockUntilTimestamp` and suspend quoting.
+  * Alert operators; resume automatically once the timestamp is reached.
+  * Keep Orders polling running; fillers may still execute outstanding orders.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Quoter intermittently 5xx under load"
+  cause: "Price discovery or upstream RPC latency blocking request threads"
+  fix: "Use 204 fast‑fail; run concurrent pricing workers and isolate HTTP from routing engines."
+* symptom: "Reactor call reverts with insufficient allowance"
+  cause: "Executor forgot to approve output token or approved wrong amount"
+  fix: "Approve exact output token on every execution path before calling the Reactor."
+* symptom: "Orders API pagination loops or misses orders"
+  cause: "Ignoring the `next` cursor or mixing chainIds in one stream"
+  fix: "Paginate until `next` is empty per chain; store and resume from last cursor."
+* symptom: "Amounts off by token decimals"
+  cause: "Using floating‑point math or human‑readable amounts"
+  fix: "Operate exclusively in base units (stringified integers) using correct decimals."
+
+faq:
+
+* q: "How do I implement last‑look?"
+  a: "Respond with your executor’s address in `filler`, enforce a short validity window, and verify invariants again immediately before execution."
+* q: "Which networks are commonly supported?"
+  a: "Mainnet (1) and Arbitrum (42161) are typical in examples; honor the chainId provided in requests and orders."
+* q: "How do I decode orders from the Orders API?"
+  a: "Use the UniswapX SDK for decoding/parsing, then simulate locally before calling the Reactor."
+
+external\_resources:
+
+* label: "Uniswap Docs — UniswapX Overview"
+  url: "[https://docs.uniswap.org/contracts/uniswapx/overview](https://docs.uniswap.org/contracts/uniswapx/overview)"
+* label: "Orders API (reference)"
+  url: "[https://api.uniswap.org/v2/orders](https://api.uniswap.org/v2/orders)"
+* label: "Reactor contract (examples)"
+  url: "[https://github.com/Uniswap/UniswapX](https://github.com/Uniswap/UniswapX)"
+

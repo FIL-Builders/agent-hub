@@ -1,0 +1,447 @@
+meta:
+spec\_name: "1inch/aggregation-fusion"
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "^5.0.0"
+language: "javascript"
+homepage: "[https://docs.1inch.io](https://docs.1inch.io)"
+tags:
+\- defi
+\- dex-aggregator
+\- swaps
+\- rest
+\- sdk
+\- ethereum
+\- bsc
+\- polygon
+purpose: >
+Senior‑level reference for building against the 1inch Aggregation REST API v5
+and the Fusion SDK: approve flows, quoting, swap transaction construction, and
+Fusion order creation & pagination. Pairs raw contracts/specs with pragmatic
+guidance and runnable examples for production bots and wallets.&#x20;
+guiding\_principles:
+\- Always check allowance before constructing swaps; prefer Permit (EIP‑2612) when supported to avoid extra approvals.&#x20;
+\- Treat all token amounts as integers in token base units (wei); never send decimals.&#x20;
+\- Use /quote to price and validate params; use /swap only to build the final on‑chain tx payload.
+\- Pin a specific chainId and RPC; mismatched chainIds are a common production failure mode.&#x20;
+\- Respect slippage conservatively; do not disable estimation unless you fully control routing.
+\- Log and surface 1inch error messages verbatim; they are diagnostic (“Src/Dst is not set”, “Amount is not set”).&#x20;
+\- For Fusion orders, start with preset fast/medium/slow and only customize auctions once monitoring is in place.&#x20;
+\- Never hard‑code spender/router addresses; always fetch from the API for the target chain, or read from the SDK.&#x20;
+design\_notes: >
+Sources: combined 1inch docs (tutorials, REST endpoints, Fusion SDK types and examples)
+consolidated into /mnt/data/1inch-1inch-docs-combined.md; this pack extracts the
+stable v5 REST paths (/approve/\*, /quote, /swap), the tx‑gateway v1.1 broadcast API,
+and Fusion SDK configuration & types (QuoteParams, OrderParams, PaginationParams).
+Symbols are grouped by REST vs SDK. Examples use Node 18+ global fetch or ethers.
+See the 1inch combined docs for full parameter matrices and edge‑case notes.&#x20;
+
+groups:
+
+* name: "Aggregation REST v5 — Core Endpoints"
+  description: "Quote pricing, approvals, and swap tx building for a given EVM chain."
+  exports:
+
+  * approveAllowance
+  * approveTransaction
+  * quote
+  * swap
+  * broadcastTransaction
+    symbols:
+    approveAllowance:
+    kind: function
+    summary: "Return current ERC‑20 allowance to the 1inch router for a wallet/token on a chain. "
+    definition:
+    lang: http
+    code: |
+    GET [https://api.1inch.io/v5.0/{chainId}/approve/allowance](https://api.1inch.io/v5.0/{chainId}/approve/allowance)
+    Query:
+    tokenAddress: string   # ERC‑20 contract
+    walletAddress: string  # EOA that will swap
+    Response:
+    { "allowance": "string" }  # decimal string in token base units
+    guidance:
+
+    * If allowance is "0" or less than the intended spend amount, request an approval (or use a Permit if available).&#x20;
+    * Use the same chainId as your signing/broadcast network; cross‑chain mismatches will 404 or mislead.&#x20;
+      example:
+      lang: javascript
+      description: "Check allowance on BSC (chainId=56)."
+      code: |
+      const chainId = 56;
+      const base = `https://api.1inch.io/v5.0/${chainId}`;
+      const tokenAddress = "0x111111111117dc0aa78b770fa6a738034120c302"; // 1INCH
+      const walletAddress = "0xYourWallet...";
+      const url = new URL(`${base}/approve/allowance`);
+      url.search = new URLSearchParams({ tokenAddress, walletAddress }).toString();
+      const { allowance } = await fetch(url).then(r => r.json());
+      console.log("allowance:", allowance);
+      since: "v5.0.0"
+      approveTransaction:
+      kind: function
+      summary: "Build an ERC‑20 approval tx payload for the 1inch router. "
+      definition:
+      lang: http
+      code: |
+      GET [https://api.1inch.io/v5.0/{chainId}/approve/transaction](https://api.1inch.io/v5.0/{chainId}/approve/transaction)
+      Query:
+      tokenAddress: string
+      amount?: string     # max uint by default if omitted
+      Response:
+      {
+      "data": "0x...",
+      "to": "0xRouterOrTokenSpender",
+      "value": "0",
+      "gasPrice"?: "string",
+      "gas"?: "string"
+      }
+      guidance:
+    * Prefer exact spend approvals over infinite approvals for bots that rotate keys or manage risk tightly.
+    * Always surface the spender address to the user for transparency and review.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const chainId = 56;
+      const base = `https://api.1inch.io/v5.0/${chainId}`;
+      const url = new URL(`${base}/approve/transaction`);
+      url.search = new URLSearchParams({
+      tokenAddress: "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3", // DAI on BSC
+      amount: "100000000000000000" // 0.1 DAI (18 decimals)
+      }).toString();
+      const tx = await fetch(url).then(r => r.json());
+      console.log(tx);
+      since: "v5.0.0"
+      quote:
+      kind: function
+      summary: "Price a swap path without generating a transaction; useful for validation and UX. "
+      definition:
+      lang: http
+      code: |
+      GET [https://api.1inch.io/v5.0/{chainId}/quote](https://api.1inch.io/v5.0/{chainId}/quote)
+      Query:
+      fromTokenAddress: string
+      toTokenAddress: string
+      amount: string                  # in fromToken base units
+      includeTokensInfo?: boolean     # default false
+      takingFeeBps?: number           # 100 == 1%
+      Response: { ...pricing fields..., "fromTokenAmount": "string", "toTokenAmount": "string" }
+      guidance:
+    * Use quote to pre‑validate token addresses, decimals, and available liquidity before showing a confirm screen.
+    * Do not submit quote results on‑chain; use /swap to obtain the final calldata for execution.
+      example:
+      lang: javascript
+      code: |
+      const chainId = 56;
+      const base = `https://api.1inch.io/v5.0/${chainId}`;
+      const params = {
+      fromTokenAddress: "0x111111111117dc0aa78b770fa6a738034120c302",
+      toTokenAddress:   "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3",
+      amount: "100000000000000000"
+      };
+      const url = new URL(`${base}/quote`);
+      url.search = new URLSearchParams(params).toString();
+      const quote = await fetch(url).then(r => r.json());
+      console.log(quote.toTokenAmount);
+      since: "v5.0.0"
+      swap:
+      kind: function
+      summary: "Create a ready‑to‑sign swap transaction (router call) for the specified trade. "
+      definition:
+      lang: http
+      code: |
+      GET [https://api.1inch.io/v5.0/{chainId}/swap](https://api.1inch.io/v5.0/{chainId}/swap)
+      Query:
+      fromTokenAddress: string
+      toTokenAddress: string
+      amount: string                  # in fromToken base units
+      fromAddress: string             # EOA executing the swap
+      slippage: number                # e.g., 1 for 1%
+      disableEstimate?: boolean
+      allowPartialFill?: boolean
+      permit?: string                 # EIP-2612 permit calldata
+      receiver?: string               # optional different recipient
+      takingFeeBps?: number
+      Response:
+      {
+      "tx": { "to":"0xRouter","data":"0x...","value":"0x..." , ... },
+      "fromToken": { ... }, "toToken": { ... }, "toTokenAmount":"string", ...
+      }
+      guidance:
+    * Always sign and submit the returned tx object as‑is; modifying calldata will likely revert on‑chain.
+    * If you must customize gas settings, do so at the transaction envelope (maxFeePerGas, maxPriorityFeePerGas), not by editing the router calldata.
+      example:
+      lang: javascript
+      code: |
+      import { ethers } from "ethers";
+      const chainId = 56;
+      const base = `https://api.1inch.io/v5.0/${chainId}`;
+      const params = {
+      fromTokenAddress: "0x111111111117dc0aa78b770fa6a738034120c302",
+      toTokenAddress:   "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3",
+      amount: "100000000000000000",
+      fromAddress: "0xYourWallet...",
+      slippage: 1
+      };
+      const url = new URL(`${base}/swap`);
+      url.search = new URLSearchParams(params).toString();
+      const { tx } = await fetch(url).then(r => r.json());
+      const provider = new ethers.JsonRpcProvider("[https://bsc-dataseed.binance.org](https://bsc-dataseed.binance.org)");
+      const signer = new ethers.Wallet(process.env.PRIVATE\_KEY, provider);
+      const receipt = await (await signer.sendTransaction(tx)).wait();
+      console.log("swap hash:", receipt.hash);
+      since: "v5.0.0"
+      broadcastTransaction:
+      kind: function
+      summary: "Push a pre‑signed raw transaction to 1inch tx‑gateway for a given chain. "
+      definition:
+      lang: http
+      code: |
+      POST [https://tx-gateway.1inch.io/v1.1/{chainId}/broadcast](https://tx-gateway.1inch.io/v1.1/{chainId}/broadcast)
+      Body: { "rawTransaction": "0xSignedTx" }
+      Response: { "transactionHash": "0x..." }
+      guidance:
+    * Use this when your infra cannot reliably propagate txs; still prefer direct RPC submit when available.
+    * Ensure the chainId in the signed envelope matches the path segment; otherwise the gateway will reject it.
+      example:
+      lang: javascript
+      code: |
+      const chainId = 56;
+      const url = `https://tx-gateway.1inch.io/v1.1/${chainId}/broadcast`;
+      const rawTransaction = "0x...";
+      const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ rawTransaction })
+      }).then(r => r.json());
+      console.log(res.transactionHash);
+      since: "v1.1.0"
+
+* name: "Fusion SDK — Orders & Types"
+  description: "High‑level TypeScript SDK for creating and managing Fusion auction orders."
+  exports:
+
+  * FusionSDK
+  * QuoteParams
+  * OrderParams
+  * PresetEnum
+  * PaginationParams
+  * TakingFeeInfo
+    symbols:
+    FusionSDK:
+    kind: class
+    summary: "Client for Fusion mode: quotes, order placement, and listing active orders. "
+    definition:
+    lang: typescript
+    code: |
+    interface HttpProviderConnector {
+    get<T>(url: string): Promise<T>
+    post<T>(url: string, data: unknown): Promise<T>
+    }
+
+    ```
+    interface BlockchainProviderConnector {
+      signTypedData(walletAddress: string, typedData: EIP712TypedData): Promise<string>
+      ethCall(contractAddress: string, callData: string): Promise<string>
+    }
+
+    type FusionSDKConfigParams = {
+      url: string
+      network: NetworkEnum
+      blockchainProvider?: BlockchainProviderConnector
+      httpProvider?: HttpProviderConnector
+    }
+
+    class FusionSDK {
+      constructor(params: FusionSDKConfigParams)
+      getQuote(params: QuoteParams): Promise<any>
+      placeOrder(params: OrderParams): Promise<any>
+      getActiveOrders(params?: PaginationParams): Promise<any>
+    }
+    ```
+
+    guidance:
+
+    * Start with the hosted endpoint `url: "https://fusion.1inch.io"` and `network` for your chain; swap in custom httpProvider only for strict environments.&#x20;
+    * Provide a blockchainProvider with EIP‑712 signing to place orders without exporting private keys.
+      example:
+      lang: javascript
+      code: |
+      import { FusionSDK, NetworkEnum } from "@1inch/fusion-sdk";
+
+      const sdk = new FusionSDK({
+      url: "[https://fusion.1inch.io](https://fusion.1inch.io)",
+      network: NetworkEnum.ETHEREUM
+      });
+
+      const quote = await sdk.getQuote({
+      fromTokenAddress: "0x6b175474e89094c44da98b954eedeac495271d0f",
+      toTokenAddress:   "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      amount: "1000000000000000000"
+      });
+
+      console.log(quote);
+      QuoteParams:
+      kind: type
+      summary: "Input shape for FusionSDK.getQuote — addresses, amount, optional permit and taking fee. "
+      definition:
+      lang: typescript
+      code: |
+      type QuoteParams = {
+      fromTokenAddress: string
+      toTokenAddress: string
+      amount: string
+      permit?: string          // EIP‑2612 calldata
+      takingFeeBps?: number    // 100 == 1%
+      }
+      guidance:
+    * Always pass `amount` in base units (ERC‑20 decimals); fetch token metadata if unsure.
+    * Use `permit` to skip prior approvals when the token supports EIP‑2612.
+      example:
+      lang: javascript
+      code: |
+      const params = {
+      fromTokenAddress: "0x6b175474e89094c44da98b954eedeac495271d0f",
+      toTokenAddress:   "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      amount: "1000000000000000000"
+      };
+      // sdk.getQuote(params)
+      OrderParams:
+      kind: type
+      summary: "Order creation payload for Fusion auctions; supports presets, receiver, and taking‑fee routing. "
+      definition:
+      lang: typescript
+      code: |
+      enum PresetEnum {
+      fast   = 'fast',
+      medium = 'medium',
+      slow   = 'slow'
+      }
+
+      type OrderParams = {
+      fromTokenAddress: string
+      toTokenAddress: string
+      amount: string
+      walletAddress: string
+      permit?: string
+      receiver?: string
+      preset?: PresetEnum
+      nonce?: OrderNonce | string | number
+      fee?: TakingFeeInfo
+      }
+
+      export type TakingFeeInfo = {
+      takingFeeBps: number
+      takingFeeReceiver: string
+      }
+      guidance:
+    * Start with presets (fast/medium/slow); tune only after measuring fill times and price impacts.
+    * Nonce lets you batch‑cancel orders; record it in your DB to manage later cancellations.
+      example:
+      lang: javascript
+      code: |
+      const order = {
+      fromTokenAddress: "0x6b175474e89094c44da98b954eedeac495271d0f",
+      toTokenAddress:   "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      amount: "1000000000000000000",
+      walletAddress: "0xYourEOA...",
+      preset: "fast"
+      };
+      // await sdk.placeOrder(order)
+      PresetEnum:
+      kind: type
+      summary: "Built‑in auction speed profiles for Fusion orders. "
+      definition:
+      lang: typescript
+      code: |
+      enum PresetEnum {
+      fast   = 'fast',
+      medium = 'medium',
+      slow   = 'slow'
+      }
+      guidance:
+    * Use fast for low‑latency UX; use slow for best expected rate when time‑insensitive.
+    * Expose presets directly in UI; it maps cleanly to user intent.
+      example:
+      lang: javascript
+      code: |
+      const preset = "medium"; // maps to PresetEnum.medium
+      PaginationParams:
+      kind: type
+      summary: "Paging parameters for listing Fusion orders (default page=1, limit=2; max 500). "
+      definition:
+      lang: typescript
+      code: |
+      type PaginationParams = {
+      page?: number   // default 1
+      limit?: number  // default 2, min 1, max 500
+      }
+      guidance:
+    * Never request >500 per page; the service enforces limits and may throttle.
+    * For bots, iterate pages until empty; store a cursor to resume after restarts.
+      example:
+      lang: javascript
+      code: |
+      // const orders = await sdk.getActiveOrders({ page: 1, limit: 50 })
+      TakingFeeInfo:
+      kind: type
+      summary: "Configure taking fee and receiver for Fusion orders. "
+      definition:
+      lang: typescript
+      code: |
+      export type TakingFeeInfo = {
+      takingFeeBps: number        // 100 == 1%
+      takingFeeReceiver: string   // EOA or contract
+      }
+      guidance:
+    * Keep fees explicit and low; large bps materially impact auction competitiveness.
+    * Route fees to a controlled address; verify receipts independently.
+
+common\_workflows:
+
+* name: "End‑to‑end legacy swap (EOA → router)"
+  intent: "Quote → check/approve → build swap tx → sign & broadcast."
+  steps:
+
+  * GET /v5.0/{chainId}/quote with from/to/amount to validate liquidity and output.
+  * GET /v5.0/{chainId}/approve/allowance; if insufficient, GET /approve/transaction and send approval.
+  * GET /v5.0/{chainId}/swap to obtain tx, sign locally, then submit to RPC or tx‑gateway.&#x20;
+* name: "Create a Fusion order"
+  intent: "Use Fusion SDK to place an auction‑based order instead of direct router swap."
+  steps:
+
+  * Initialize FusionSDK with url and NetworkEnum.
+  * Call getQuote(QuoteParams) to validate price; then placeOrder(OrderParams).
+  * Poll getActiveOrders(PaginationParams) to display status and fills.&#x20;
+* name: "Permit‑based swap (no prior approval)"
+  intent: "Attach EIP‑2612 permit to /swap so the router can spend without a separate approval."
+  steps:
+
+  * Build a permit for fromToken (domain, permit struct, typed‑data signature).
+  * Pass the encoded permit in swap query; sign and submit the returned tx.&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: "API error: 'Amount is not set'"
+  cause: "Missing amount or non‑integer amount formatting."
+  fix: "Provide an integer string in base units (wei), e.g., 1e18 for 18‑decimals." #&#x20;
+* symptom: "API error: 'Src/Dst is not set'"
+  cause: "Missing fromTokenAddress or toTokenAddress."
+  fix: "Supply both token contract addresses for the target chain." #&#x20;
+* symptom: "Allowance shows 0 despite prior swaps"
+  cause: "Wrong chainId or different router/spender than assumed."
+  fix: "Query approve/allowance and approve/transaction from the exact /v5.0/{chainId} base." #&#x20;
+
+faq:
+
+* q: "Should I call /swap directly without /quote?"
+  a: "You can, but /quote helps validate inputs and catch common errors early; prefer /quote in UX flows." #&#x20;
+* q: "Why did my Fusion order not fill immediately?"
+  a: "Auction‑based execution may wait for better conditions; choose the 'fast' preset or reduce takingFeeBps for quicker fills." #&#x20;
+
+external\_resources:
+
+* label: "1inch Docs — Aggregation & Tutorials"
+  url: "[https://docs.1inch.io](https://docs.1inch.io)"
+* label: "Fusion SDK (npm)"
+  url: "[https://www.npmjs.com/package/@1inch/fusion-sdk](https://www.npmjs.com/package/@1inch/fusion-sdk)"
+

@@ -1,0 +1,759 @@
+meta:
+spec\_name: "mopro-ffi/mobile-adapters"
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "^0.2.0"
+language: "multi (rust, swift, kotlin)"
+homepage: "[https://zkmopro.org](https://zkmopro.org)"
+tags: \["zkp", "mobile", "ffi", "circom", "halo2", "noir", "ios", "android"]
+purpose: >
+Provide an expert, LLM‑ready reference for Mopro’s FFI and mobile adapters
+(Rust core + iOS Swift + Android Kotlin) to generate and verify zero‑knowledge
+proofs for Circom, Halo2/Plonkish, and Noir circuits on device and across
+native bridges.
+guiding\_principles:
+\- Prefer deterministic circuit naming and file paths; zkey/keys must match the entries configured via `set_circom_circuits!` / `set_halo2_circuits!`.
+\- Start with Arkworks backends during development; switch to Rapidsnark/Plonkish only after parity tests pass.
+\- Keep witness generation in Rust when possible (`rust_witness::witness!`) for consistency and performance; fall back to witnesscalc variants when needed.
+\- Avoid dashes in Circom witness names; use underscores and ensure the lowercase stem aligns with the WASM filename.
+\- For Android releases, disable code/resource shrinking if you hit JNA/uniffi symbol stripping issues.
+\- Validate inputs (shape and encoding) before passing them across the FFI boundary; malformed JSON/map inputs are the most common cause of verification failures.
+\- Cache and reuse SRS/keys on device; don’t ship multiple duplicates across bundles.
+\- Keep mobile bindings thin—put cryptographic logic in Rust; Swift/Kotlin should primarily marshal inputs/outputs.
+design\_notes: >
+Definitions and signatures are extracted from the Mopro combined docs (iOS/Android
+adapters, macros, and Noir API) and aligned with crate v0.2 behavior. Grouping mirrors
+how developers structure projects: Rust setup/macros, platform APIs (iOS/Android), and
+Noir’s Rust‑only adapter.
+
+groups:
+
+* name: "Rust — Core Macros & Setup"
+  exports:
+
+  * rust.app\_macro
+  * rust.set\_circom\_circuits\_macro
+  * rust.set\_halo2\_circuits\_macro
+  * rust.graph\_macro
+  * rust.witnesscalc\_adapter.witness\_macro
+  * rust.rust\_witness.witness\_macro
+  * rust.rust\_witness.transpile\_wasm
+    symbols:
+    rust.app\_macro:
+    kind: function
+    summary: Initialize the default FFI app scaffolding for mobile bindings generation.
+    definition:
+    lang: rust
+    code: |
+    mopro\_ffi::app!();
+    source: "mopro\_ffi"
+    guidance:
+
+    * Call once in your crate root before configuring circuits; it wires up bindings for iOS/Android generators.
+    * Keep this macro in `lib.rs` so the generated bins (`src/bin/ios.rs`, `src/bin/android.rs`) can find the config.
+      example:
+      lang: rust
+      code: |
+      // src/lib.rs
+      mopro\_ffi::app!();
+      // ... then configure circuits below
+      rust.set\_circom\_circuits\_macro:
+      kind: function
+      summary: Register Circom circuits and their witness generators for FFI exposure.
+      definition:
+      lang: rust
+      code: |
+      mopro\_ffi::set\_circom\_circuits! {
+      ("multiplier2\_final.zkey", mopro\_ffi::witness::WitnessFn::RustWitness(multiplier2\_witness)),
+      ("multiplier3\_final.zkey", mopro\_ffi::witness::WitnessFn::Witnesscalc(multiplier3\_witness)),
+      ("keccak256\_256\_test\_final.zkey", mopro\_ffi::witness::WitnessFn::CircomWitnesscalc(keccak256256test\_witness)),
+      }
+      source: "mopro\_ffi"
+      guidance:
+    * The first tuple element must exactly match the zkey filename shipped with your app; mismatches cause runtime failures.
+    * Prefer `RustWitness` for performance and reproducibility; fall back to `Witnesscalc`/`CircomWitnesscalc` when you must use WASM witness flows.
+      example:
+      lang: rust
+      code: |
+      // After defining witnesses:
+      rust\_witness::witness!(multiplier2);
+      mopro\_ffi::set\_circom\_circuits! {
+      ("multiplier2\_final.zkey", mopro\_ffi::witness::WitnessFn::RustWitness(multiplier2\_witness)),
+      };
+      rust.set\_halo2\_circuits\_macro:
+      kind: function
+      summary: Register Halo2 circuits with proving/verification functions and keys for FFI.
+      definition:
+      lang: rust
+      code: |
+      mopro\_ffi::set\_halo2\_circuits! {
+      ("plonk\_fibonacci\_pk.bin", plonk\_fibonacci::prove, "plonk\_fibonacci\_vk.bin", plonk\_fibonacci::verify),
+      }
+      source: "mopro\_ffi"
+      guidance:
+    * Ensure the proving key (pk) and verifying key (vk) filenames exist on device and match entries here.
+    * Expose pure functions `prove/verify` with stable signatures; avoid capturing global state.
+      example:
+      lang: rust
+      code: |
+      mopro\_ffi::set\_halo2\_circuits! {
+      ("plonk\_fibonacci\_pk.bin", plonk::prove, "plonk\_fibonacci\_vk.bin", plonk::verify),
+      };
+      rust.graph\_macro:
+      kind: function
+      summary: Enable Circom graph‑based witness generation flow and name a witness entry.
+      definition:
+      lang: rust
+      code: |
+      const GRAPH\_PATH: \&str = "./test-vectors/circom/multiplier2.bin";
+      mopro\_ffi::graph!(multiplier2, \&GRAPH\_PATH);
+      source: "mopro\_ffi"
+      guidance:
+    * Use when leveraging graph binaries; the identifier becomes `<name>_witness`.
+    * Keep graph files alongside zkeys to simplify path management in mobile bundles.
+      example:
+      lang: rust
+      code: |
+      const GRAPH\_PATH: \&str = "./assets/multiplier2.bin";
+      mopro\_ffi::graph!(multiplier2, \&GRAPH\_PATH);
+      rust.witnesscalc\_adapter.witness\_macro:
+      kind: function
+      summary: Declare witnesscalc‑based generators for Circom circuits.
+      definition:
+      lang: rust
+      code: |
+      witnesscalc\_adapter::witness!(multiplier2);
+      witnesscalc\_adapter::witness!(keccak\_256\_256\_test);
+      source: "witnesscalc\_adapter"
+      guidance:
+    * Circuit names may include underscores, not dashes; avoid `main` to prevent conflicts.
+    * Activate the appropriate cargo feature (e.g., `circom-witnesscalc`) in `Cargo.toml`.
+      example:
+      lang: rust
+      code: |
+      // Cargo.toml: mopro-ffi = { version = "0.2", features = \["circom-witnesscalc"] }
+      witnesscalc\_adapter::witness!(multiplier2);
+      rust.rust\_witness.witness\_macro:
+      kind: function
+      summary: Generate native Rust witness functions from Circom WASM.
+      definition:
+      lang: rust
+      code: |
+      rust\_witness::witness!(multiplier2);
+      source: "rust\_witness"
+      guidance:
+    * Prefer this path for speed and smaller runtime dependencies compared to WASM witnesscalc.
+    * Ensure you’ve transpiled WASM sources into Rust first (see `transpile_wasm`).
+      example:
+      lang: rust
+      code: |
+      rust\_witness::witness!(multiplier2);
+      // later: use `multiplier2_witness` in `set_circom_circuits!`
+      rust.rust\_witness.transpile\_wasm:
+      kind: function
+      summary: Build‑time transpilation helper to convert Circom WASM to Rust witness code.
+      definition:
+      lang: rust
+      code: |
+      rust\_witness::transpile::transpile\_wasm("./test-vectors".to\_string());
+      source: "rust\_witness::transpile"
+      guidance:
+    * Run from a build step; the directory must contain `<circuit>.wasm` files matching your witness names.
+    * Re‑transpile when updating circuits; stale outputs will cause input/arity mismatches at runtime.
+      example:
+      lang: rust
+      code: |
+      // build.rs or a pre-build script
+      rust\_witness::transpile::transpile\_wasm("./circom-wasm".to\_string());
+
+* name: "iOS — Circom & Halo2 Swift API"
+  exports:
+
+  * ios.generateCircomProof
+  * ios.verifyCircomProof
+  * ios.G1
+  * ios.G2
+  * ios.CircomProof
+  * ios.CircomProofResult
+  * ios.ProofLib
+  * ios.generateHalo2Proof
+  * ios.verifyHalo2Proof
+  * ios.Halo2ProofResult
+    symbols:
+    ios.generateCircomProof:
+    kind: function
+    summary: Generate a Circom proof from a zkey and JSON input on iOS.
+    definition:
+    lang: swift
+    code: |
+    public func generateCircomProof(
+    zkeyPath: String,
+    circuitInputs: String,
+    proofLib: ProofLib
+    ) throws -> CircomProofResult
+    source: "uniffi.mopro (Swift bindings)"
+    guidance:
+
+    * `circuitInputs` must be a JSON string with string‑array values (e.g. `{"a":["3"],"b":["5"]}`) matching the circuit schema.
+    * Ensure `zkeyPath` matches the filename registered via `set_circom_circuits!`; otherwise witness/proof generation fails.
+      example:
+      lang: swift
+      code: |
+      import MoproFFI
+      let inputs = #"{"a":\["3"],"b":\["5"]}"#
+      let proof = try generateCircomProof(
+      zkeyPath: Bundle.main.path(forResource: "multiplier2\_final", ofType: "zkey")!,
+      circuitInputs: inputs,
+      proofLib: .arkworks
+      )
+      ios.verifyCircomProof:
+      kind: function
+      summary: Verify a Circom proof against a zkey on iOS.
+      definition:
+      lang: swift
+      code: |
+      public func verifyCircomProof(
+      zkeyPath: String,
+      proofResult: CircomProofResult,
+      proofLib: ProofLib
+      ) throws -> Bool
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Use the same `proofLib` backend used during proving; mixing backends invalidates verification.
+    * Validate that `proofResult.inputs` aligns with the circuit’s public inputs ordering.
+      example:
+      lang: swift
+      code: |
+      let ok = try verifyCircomProof(
+      zkeyPath: Bundle.main.path(forResource: "multiplier2\_final", ofType: "zkey")!,
+      proofResult: proof,
+      proofLib: .arkworks
+      )
+      ios.G1:
+      kind: type
+      summary: Affine G1 point representation used in Circom proof calldata (iOS).
+      definition:
+      lang: swift
+      code: |
+      public struct G1 {
+      public var x: String
+      public var y: String
+      public var z: String
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Values are hex strings; keep consistent endian and prefixing across conversions.
+    * Use this type only for calldata transport; curve ops remain in Rust.
+      example:
+      lang: swift
+      code: |
+      let a = G1(x: "0x01", y: "0x02", z: "0x01")
+      ios.G2:
+      kind: type
+      summary: Affine G2 point representation used in Circom proof calldata (iOS).
+      definition:
+      lang: swift
+      code: |
+      public struct G2 {
+      public var x: \[String]
+      public var y: \[String]
+      public var z: \[String]
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Elements are arrays of field elements (hex strings) for extension field coordinates.
+    * Preserve array ordering to match on‑chain verifier expectations.
+      example:
+      lang: swift
+      code: |
+      let b = G2(x: \["0x..","0x.."], y: \["0x..","0x.."], z: \["0x01","0x00"])
+      ios.CircomProof:
+      kind: type
+      summary: Structured Circom proof data (protocol + curve + points).
+      definition:
+      lang: swift
+      code: |
+      public struct CircomProof {
+      public var a: G1
+      public var b: G2
+      public var c: G1
+      public var `protocol`: String
+      public var curve: String
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Do not mutate after creation; treat as immutable payload for verification/export.
+    * When serializing for EVM, use platform converters rather than ad‑hoc coding.
+      example:
+      lang: swift
+      code: |
+      let cp = CircomProof(a: a, b: b, c: a, protocol: "groth16", curve: "bn128")
+      ios.CircomProofResult:
+      kind: type
+      summary: Result wrapper carrying Circom proof and its public inputs.
+      definition:
+      lang: swift
+      code: |
+      public struct CircomProofResult {
+      public var proof: CircomProof
+      public var inputs: \[String]
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Inputs are ordered strings of public signals; preserve order when exporting to on‑chain calls.
+    * Keep this object intact for `verifyCircomProof`; don’t split/re‑order fields.
+      example:
+      lang: swift
+      code: |
+      let result = CircomProofResult(proof: cp, inputs: \["15"])
+      ios.ProofLib:
+      kind: enum
+      summary: Selects the Circom proving backend for iOS runs.
+      definition:
+      lang: swift
+      code: |
+      public enum ProofLib {
+      case arkworks
+      case rapidsnark
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Use `.arkworks` for local/debug; switch to `.rapidsnark` after validating parity.
+    * Record backend choice in logs/telemetry to diagnose cross‑env differences.
+      example:
+      lang: swift
+      code: |
+      let backend: ProofLib = .arkworks
+      ios.generateHalo2Proof:
+      kind: function
+      summary: Generate a Halo2/Plonkish proof on iOS given SRS, PK, and inputs.
+      definition:
+      lang: swift
+      code: |
+      public func generateHalo2Proof(
+      srsPath: String,
+      pkPath: String,
+      circuitInputs: \[String: \[String]]
+      ) throws -> Halo2ProofResult
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Inputs are string arrays per signal; keep exact key names as wired in your Rust prove function.
+    * Package SRS/PK as app resources and resolve paths at runtime; avoid large copies in memory.
+      example:
+      lang: swift
+      code: |
+      let h2 = try generateHalo2Proof(
+      srsPath: path("kzg.srs"),
+      pkPath:  path("plonk\_fibonacci\_pk.bin"),
+      circuitInputs: \["n": \["8"]]
+      )
+      ios.verifyHalo2Proof:
+      kind: function
+      summary: Verify a Halo2 proof on iOS with SRS, VK, proof bytes, and public input bytes.
+      definition:
+      lang: swift
+      code: |
+      public func verifyHalo2Proof(
+      srsPath: String,
+      vkPath: String,
+      proof: Data,
+      publicInput: Data
+      ) throws -> Bool
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Use the same KZG/SRS that was used for proving; mismatch yields false.
+    * Feed `h2.proof` and `h2.inputs` directly from `generateHalo2Proof` into verification to avoid encoding drift.
+      example:
+      lang: swift
+      code: |
+      let ok = try verifyHalo2Proof(
+      srsPath: path("kzg.srs"),
+      vkPath:  path("plonk\_fibonacci\_vk.bin"),
+      proof:   h2.proof,
+      publicInput: h2.inputs
+      )
+      ios.Halo2ProofResult:
+      kind: type
+      summary: Byte buffers for Halo2 proof and its public input encoding (iOS).
+      definition:
+      lang: swift
+      code: |
+      public struct Halo2ProofResult {
+      public var proof: Data
+      public var inputs: Data
+      }
+      source: "uniffi.mopro (Swift bindings)"
+      guidance:
+    * Treat as opaque bytes; any schema conversion should happen in Rust.
+    * Keep buffers small; prefer streaming or chunking for very large circuits.
+      example:
+      lang: swift
+      code: |
+      let pr = Halo2ProofResult(proof: Data(), inputs: Data())
+
+* name: "Android — Circom & Halo2 Kotlin API"
+  exports:
+
+  * android.generateCircomProof
+  * android.verifyCircomProof
+  * android.G1
+  * android.G2
+  * android.CircomProof
+  * android.CircomProofResult
+  * android.ProofLib
+  * android.generateHalo2Proof
+  * android.verifyHalo2Proof
+  * android.Halo2ProofResult
+    symbols:
+    android.generateCircomProof:
+    kind: function
+    summary: Generate a Circom proof from a zkey and JSON input on Android.
+    definition:
+    lang: kotlin
+    code: |
+    fun `generateCircomProof`(
+    `zkeyPath`: kotlin.String,
+    `circuitInputs`: kotlin.String,
+    `proofLib`: ProofLib,
+    ): CircomProofResult
+    source: "uniffi.mopro (Kotlin bindings)"
+    guidance:
+
+    * Provide inputs as a JSON string; keep value arrays as strings matching field encodings.
+    * Use `ProofLib.ARKWORKS` for development; switch to `RAPIDSNARK` after parity checks.
+      example:
+      lang: kotlin
+      code: |
+      import uniffi.mopro.generateCircomProof
+      import uniffi.mopro.ProofLib
+      val inputStr = """{"a":\["3"],"b":\["5"]}"""
+      val proof = generateCircomProof("/assets/multiplier2\_final.zkey", inputStr, ProofLib.ARKWORKS)
+      android.verifyCircomProof:
+      kind: function
+      summary: Verify a Circom proof against a zkey on Android.
+      definition:
+      lang: kotlin
+      code: |
+      fun `verifyCircomProof`(
+      `zkeyPath`: kotlin.String,
+      `proofResult`: CircomProofResult,
+      `proofLib`: ProofLib,
+      ): kotlin.Boolean
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Backend must match the one used to generate the proof; otherwise returns false.
+    * Keep `proofResult.inputs` ordering stable through any UI or storage layer.
+      example:
+      lang: kotlin
+      code: |
+      import uniffi.mopro.verifyCircomProof
+      val isValid = verifyCircomProof("/assets/multiplier2\_final.zkey", proof, ProofLib.ARKWORKS)
+      android.G1:
+      kind: type
+      summary: Affine G1 point representation used in Circom proof calldata (Android).
+      definition:
+      lang: kotlin
+      code: |
+      data class G1(
+      var `x`: kotlin.String,
+      var `y`: kotlin.String,
+      var `z`: kotlin.String,
+      )
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Use hex strings; do not mix with decimal encodings from UI.
+    * Instantiate only for transport; curve math remains in Rust.
+      example:
+      lang: kotlin
+      code: |
+      val a = G1("0x01","0x02","0x01")
+      android.G2:
+      kind: type
+      summary: Affine G2 point representation used in Circom proof calldata (Android).
+      definition:
+      lang: kotlin
+      code: |
+      data class G2(
+      var `x`: List\<kotlin.String>,
+      var `y`: List\<kotlin.String>,
+      var `z`: List\<kotlin.String>,
+      )
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Preserve ordering of extension field components.
+    * Validate lengths before marshalling to EVM calldata.
+      example:
+      lang: kotlin
+      code: |
+      val b = G2(listOf("0x..","0x.."), listOf("0x..","0x.."), listOf("0x01","0x00"))
+      android.CircomProof:
+      kind: type
+      summary: Structured Circom proof (Android).
+      definition:
+      lang: kotlin
+      code: |
+      data class CircomProof(
+      var `a`: G1,
+      var `b`: G2,
+      var `c`: G1,
+      var `protocol`: kotlin.String,
+      var `curve`: kotlin.String,
+      )
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Treat as immutable proof payload; do not mutate between prove/verify calls.
+    * Use official converters when creating Ethereum calldata.
+      example:
+      lang: kotlin
+      code: |
+      val cp = CircomProof(a, b, a, "groth16", "bn128")
+      android.CircomProofResult:
+      kind: type
+      summary: Result wrapper carrying Circom proof and its public inputs (Android).
+      definition:
+      lang: kotlin
+      code: |
+      data class CircomProofResult(
+      var `proof`: CircomProof,
+      var `inputs`: List\<kotlin.String>,
+      )
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Keep it intact across IPC/bundle boundaries; order matters for on‑chain verify.
+    * Avoid converting to numeric types in Java/Kotlin—stay as strings.
+      example:
+      lang: kotlin
+      code: |
+      val r = CircomProofResult(cp, listOf("15"))
+      android.ProofLib:
+      kind: enum
+      summary: Selects the Circom proving backend for Android runs.
+      definition:
+      lang: kotlin
+      code: |
+      enum class ProofLib {
+      ARKWORKS,
+      RAPIDSNARK,
+      }
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Log backend choice for telemetry; it’s crucial for cross‑environment debugging.
+    * Expect minor size/time differences between backends; do not compare directly across them.
+      example:
+      lang: kotlin
+      code: |
+      val backend = ProofLib.ARKWORKS
+      android.generateHalo2Proof:
+      kind: function
+      summary: Generate a Halo2/Plonkish proof on Android given SRS, PK, and inputs.
+      definition:
+      lang: kotlin
+      code: |
+      fun `generateHalo2Proof`(
+      `srsPath`: kotlin.String,
+      `pkPath`: kotlin.String,
+      `circuitInputs`: Map\<kotlin.String, List\<kotlin.String>>,
+      ): Halo2ProofResult
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Provide map values as lists of strings; keep your Rust `prove` function’s expected ordering.
+    * Bundle SRS/PK in `assets/` or app‑private storage; compute absolute paths at runtime.
+      example:
+      lang: kotlin
+      code: |
+      val h2 = generateHalo2Proof("/assets/kzg.srs", "/assets/plonk\_fibonacci\_pk.bin", mapOf("n" to listOf("8")))
+      android.verifyHalo2Proof:
+      kind: function
+      summary: Verify a Halo2 proof on Android with SRS, VK, proof bytes, and public input bytes.
+      definition:
+      lang: kotlin
+      code: |
+      fun `verifyHalo2Proof`(
+      `srsPath`: kotlin.String,
+      `vkPath`: kotlin.String,
+      `proof`: kotlin.ByteArray,
+      `publicInput`: kotlin.ByteArray,
+      ): kotlin.Boolean
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Ensure VK matches the PK used to create the proof; mismatches return false.
+    * Use direct byte arrays from `Halo2ProofResult` to avoid accidental re‑encoding.
+      example:
+      lang: kotlin
+      code: |
+      val ok = verifyHalo2Proof("/assets/kzg.srs", "/assets/plonk\_fibonacci\_vk.bin", h2.proof, h2.inputs)
+      android.Halo2ProofResult:
+      kind: type
+      summary: Byte buffers for Halo2 proof and its public input encoding (Android).
+      definition:
+      lang: kotlin
+      code: |
+      data class Halo2ProofResult(
+      var `proof`: kotlin.ByteArray,
+      var `inputs`: kotlin.ByteArray,
+      )
+      source: "uniffi.mopro (Kotlin bindings)"
+      guidance:
+    * Treat as opaque; conversion/parsing should live in Rust or a single, well‑tested converter.
+    * Keep arrays small; large circuits may require streaming or chunked verification.
+      example:
+      lang: kotlin
+      code: |
+      val pr = Halo2ProofResult(byteArrayOf(), byteArrayOf())
+
+* name: "Rust — Noir Adapter API"
+  exports:
+
+  * noir.generate\_noir\_proof
+  * noir.verify\_noir\_proof
+  * noir.get\_noir\_verification\_key
+    symbols:
+    noir.generate\_noir\_proof:
+    kind: function
+    summary: Generate a Noir proof, handling on‑chain vs off‑chain hash selection.
+    definition:
+    lang: rust
+    code: |
+    pub fn generate\_noir\_proof(
+    circuit\_path: String,
+    srs\_path: Option<String>,
+    inputs: Vec<String>,
+    on\_chain: bool,
+    vk: Vec<u8>,
+    low\_memory\_mode: bool,
+    ) -> Result\<Vec<u8>, MoproError>;
+    source: "noir adapter (Rust)"
+    guidance:
+
+    * Set `on_chain=true` when you target on‑chain verifiers; the adapter switches hash implementations accordingly.
+    * Use `low_memory_mode` for constrained devices, trading performance for lower peak memory.
+      example:
+      lang: rust
+      code: |
+      let proof = generate\_noir\_proof(
+      "circuits/fibonacci".into(),
+      Some("srs.kzg".into()),
+      vec!\["8".into()],
+      true,
+      vk\_bytes,
+      false
+      )?;
+      noir.verify\_noir\_proof:
+      kind: function
+      summary: Verify a Noir proof with optional low‑memory behavior.
+      definition:
+      lang: rust
+      code: |
+      pub fn verify\_noir\_proof(
+      circuit\_path: String,
+      proof: Vec<u8>,
+      on\_chain: bool,
+      vk: Vec<u8>,
+      low\_memory\_mode: bool,
+      ) -> Result\<bool, MoproError>;
+      source: "noir adapter (Rust)"
+      guidance:
+    * Pass the exact `vk` used during proof generation; mismatches return `Ok(false)`.
+    * When verifying many proofs, reuse SRS/VK buffers to avoid repeated I/O.
+      example:
+      lang: rust
+      code: |
+      let ok = verify\_noir\_proof(
+      "circuits/fibonacci".into(),
+      proof\_bytes,
+      true,
+      vk\_bytes,
+      false
+      )?;
+      noir.get\_noir\_verification\_key:
+      kind: function
+      summary: Extract the Noir verification key bytes for a circuit.
+      definition:
+      lang: rust
+      code: |
+      pub fn get\_noir\_verification\_key(
+      circuit\_path: String,
+      srs\_path: Option<String>,
+      on\_chain: bool,
+      low\_memory\_mode: bool,
+      ) -> Result\<Vec<u8>, MoproError>;
+      source: "noir adapter (Rust)"
+      guidance:
+    * Precompute and persist VKs alongside circuits to skip recomputation on app startup.
+    * Keep `on_chain` consistent with your target verification environment.
+      example:
+      lang: rust
+      code: |
+      let vk = get\_noir\_verification\_key("circuits/fibonacci".into(), Some("srs.kzg".into()), true, false)?;
+
+common\_workflows:
+
+* title: "Prove & verify a Circom circuit on iOS"
+  steps:
+
+  * Add `mopro_ffi::app!();` to `src/lib.rs` and register your circuit with `set_circom_circuits!`.
+  * Bundle `*.zkey` and (if used) graph/WASM assets in the iOS app.
+  * Call `generateCircomProof(zkeyPath, inputsJSON, .arkworks)` in Swift; store the returned `CircomProofResult`.
+  * Call `verifyCircomProof(zkeyPath, proofResult, .arkworks)`; expect `true` on success.
+* title: "Switch Circom backend to Rapidsnark"
+  steps:
+
+  * Enable the Rapidsnark feature in your Rust crate and rebuild FFI bindings.
+  * Pass `.rapidsnark` / `ProofLib.RAPIDSNARK` to the generate/verify functions and run parity tests.
+* title: "Register a Halo2 circuit and verify on Android"
+  steps:
+
+  * Register PK/VK using `set_halo2_circuits!` in Rust.
+  * Bundle `kzg.srs`, `*_pk.bin`, and `*_vk.bin` in Android assets.
+  * Call `generateHalo2Proof(srs, pk, inputsMap)`; then `verifyHalo2Proof(srs, vk, proof, publicInput)`.
+* title: "Use Rust witnesses for Circom"
+  steps:
+
+  * Transpile WASM with `rust_witness::transpile::transpile_wasm("<dir>")`.
+  * Declare `rust_witness::witness!(my_circuit);` and map it via `set_circom_circuits!`.
+* title: "Noir proof pipeline (Rust)"
+  steps:
+
+  * Obtain SRS and VK via `get_noir_verification_key`.
+  * Run `generate_noir_proof(circuit_path, srs, inputs, on_chain, vk, low_memory)`.
+  * Verify with `verify_noir_proof` using the same `vk` and `on_chain` flag.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Android release build crashes on startup (JNA/FFI symbols missing)."
+  cause: "Code/resource shrinking removed required native symbols."
+  fix: "Disable shrinkers in `build.gradle(.kts)` for release: `minifyEnabled = false`, `shrinkResources = false`."
+* symptom: "Circom proof verifies false on device but true in Rust tests."
+  cause: "Mismatched zkey filename or backend (`ProofLib`) between prove/verify."
+  fix: "Ensure `zkeyPath` matches `set_circom_circuits!` entry and use the same backend for both calls."
+* symptom: "Halo2 verification fails with identical inputs."
+  cause: "SRS or VK mismatch, or public input bytes re‑encoded incorrectly on mobile."
+  fix: "Use the exact SRS/VK used for proving and pass `Halo2ProofResult` bytes directly into `verifyHalo2Proof`."
+* symptom: "Witness generation panics for Circom."
+  cause: "WASM/witness function name mismatch (dashes, case) or stale transpiled outputs."
+  fix: "Use underscores in names, avoid `main`, and re‑run `transpile_wasm`; update `set_circom_circuits!` accordingly."
+
+faq:
+
+* q: "Can I use both Circom and Halo2 in the same app?"
+  a: "Yes—declare `mopro_ffi::app!();` once, then register each family with `set_circom_circuits!` and `set_halo2_circuits!`."
+* q: "Do I need different code for Arkworks vs Rapidsnark?"
+  a: "No—pass the desired backend via `ProofLib` at runtime, but validate parity before switching environments."
+* q: "How should I serialize inputs?"
+  a: "Provide strings for field elements; on iOS JSON string for Circom; on Android JSON or maps of string lists as specified by each API."
+* q: "Where should keys live on mobile?"
+  a: "Bundle as app resources or download to app‑private storage; reference absolute paths when calling FFI."
+
+external\_resources:
+
+* label: "Mopro Docs"
+  url: "[https://zkmopro.org/docs/intro](https://zkmopro.org/docs/intro)"
+* label: "Mopro GitHub"
+  url: "[https://github.com/zkmopro/mopro](https://github.com/zkmopro/mopro)"
+* label: "circom-witnesscalc"
+  url: "[https://github.com/iden3/circom-witnesscalc](https://github.com/iden3/circom-witnesscalc)"
+* label: "Plonkish Fibonacci sample"
+  url: "[https://github.com/sifnoc/plonkish-fibonacci-sample](https://github.com/sifnoc/plonkish-fibonacci-sample)"
+* label: "Halo2 Fibonacci sample (prove/verify functions)"
+  url: "[https://github.com/ElusAegis/halo2-fibonacci-sample](https://github.com/ElusAegis/halo2-fibonacci-sample)"
+

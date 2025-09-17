@@ -1,0 +1,924 @@
+meta:
+spec\_name: worldcoin/minikit-js-and-developer-portal
+spec\_version: 0.3.0
+generated: '2025-09-17'
+library\_version: '>=1.7.1 <2.1.0'
+language: typescript
+homepage: [https://developer.worldcoin.org](https://developer.worldcoin.org)
+tags:
+
+* worldcoin
+* minikit-js
+* mini-apps
+* world-id
+* world-chain
+* payments
+* siwe
+* api
+  purpose: Teach LLM agents how to use Worldcoin MiniKit JS commands together with the Developer Portal API (v2) to build production-ready World App mini apps: payments, contract calls, signatures, permissions, notifications, and proof verification.
+  guiding\_principles:
+* Always verify client-side results on your backend (SIWE signatures, ZK proofs, and MiniKit command results).
+* Use MiniKit.commandsAsync in production to avoid blocking UI; subscribe to ResponseEvent where appropriate.
+* Restrict contract and token allowlists in Developer Portal → Advanced, otherwise sendTransaction will be blocked.
+* For payments, enforce a minimum \$0.10 equivalent and handle token decimals via tokenToDecimals/price API before constructing amounts.
+* Never request broad permissions up front; ask contextually (notifications, contacts, microphone) and cache status with getPermissions.
+* When signing typed data, include full EIP‑712 domain and types; do not accept untrusted typed‑data or messages from user input.
+* Use Permit2 for ERC‑20 transfers if approvals are needed; otherwise call token transfer/transferFrom directly.
+* Log and store correlation IDs (reference, transactionId) so you can reconcile client and server actions later.
+  design\_notes: Source of truth: combined Worldcoin docs (MiniKit JS, World ID, Dev Portal v2) extracted from 'world-worldcoin-world-id-docs-combined.md'. Symbols below embed verbatim or lightly-compressed TypeScript/HTTP definitions from those docs.&#x20;
+  groups:
+* name: MiniKit JS Commands
+  exports:
+
+  * MiniKit.commandsAsync.pay
+  * MiniKit.commandsAsync.sendTransaction
+  * MiniKit.commandsAsync.verify
+  * MiniKit.commandsAsync.walletAuth
+  * MiniKit.commandsAsync.signMessage
+  * MiniKit.commandsAsync.signTypedData
+  * MiniKit.commandsAsync.getPermissions
+  * MiniKit.commandsAsync.requestPermission
+  * MiniKit.commandsAsync.shareContacts
+  * MiniKit.commandsAsync.share
+    symbols:
+    MiniKit.commandsAsync.pay:
+    kind: function
+    summary: Initiate a WLD/USDC payment in World App (gas sponsored on World Chain).
+    definition:
+    code: |-
+    declare namespace MiniKit.commandsAsync {
+    function pay(input: PayCommandInput): Promise<unknown>;
+    }
+
+    ```
+      export type TokensPayload = {
+              symbol: Tokens;
+              token_amount: string;
+            };
+
+            export type PayCommandInput = {
+              reference: string;
+              to: string;
+              tokens: TokensPayload[];
+              network?: Network; // Optional
+              description: string;
+            };
+    lang: typescript
+    source: world-worldcoin-world-id-docs-combined.md  :contentReference[oaicite:1]{index=1}
+    ```
+
+    guidance:
+
+    * Minimum transfer is \$0.10 equivalent; precompute decimals and price before building `tokens`.
+    * Store and later reconcile `reference` and any returned `transactionId` server‑side.
+    * If you need non‑World Chain assets, this command will not work; use `sendTransaction` to call contracts.
+      example:
+      code: |-
+      import { MiniKit, tokenToDecimals, Tokens, type PayCommandInput } from '@worldcoin/minikit-js'
+
+      export async function payUser(address, usdCents) {
+      if (!MiniKit.isInstalled()) return;
+      const amount = tokenToDecimals(usdCents.toString(), 6); // example for USDC
+
+      ```
+      const payload: PayCommandInput = {
+        reference: crypto.randomUUID(),
+        to: address,
+        tokens: [{ symbol: Tokens.USDC, token_amount: amount }],
+        description: 'Thanks!'
+      };
+
+      const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
+      if (finalPayload?.status === 'success') {
+        // verify and record on backend using transactionId/reference
+      }
+      ```
+
+      }
+      lang: javascript
+      MiniKit.commandsAsync.sendTransaction:
+      kind: function
+      summary: Execute arbitrary contract calls atomically; approvals are not permitted (use Permit2 or transfer).
+      definition:
+      code: |-
+      /\* TypeScript \*/
+      export type SendTransactionInput = {
+      transaction: Transaction\[]
+      permit2?: Permit2\[] // Optional
+      formatPayload?: boolean // Optional, default is true. If this is causing errors, you can set this to false.
+      }
+
+      export type Transaction = {
+      address: string // Contract address you're interacting with
+      abi: Abi | readonly unknown\[] // It's recommended to only include the functions you're using.
+      functionName: ContractFunctionName\<Abi | readonly unknown\[], 'payable' | 'nonpayable'>
+      value?: string // Hex string representation of the value to send with the function call
+      args: ContractFunctionArgs<
+      Abi | readonly unknown\[],
+      'payable' | 'nonpayable',
+      ContractFunctionName\<Abi | readonly unknown\[], 'payable' | 'nonpayable'>
+      \>
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Configure allowed contracts and tokens in Developer Portal → Advanced, otherwise requests are blocked.
+    * Batch related calls in `transaction[]`; they execute atomically via multicall.
+    * Set `formatPayload=false` only if the default formatting is causing validation issues.
+      example:
+      code: |-
+      import { MiniKit, type SendTransactionInput } from '@worldcoin/minikit-js'
+      import SimpleABI from './abi/Simple.json'
+
+      export async function callContract(token, to, amountHex) {
+      const input: SendTransactionInput = {
+      transaction: \[{
+      address: token,
+      abi: SimpleABI,
+      functionName: 'transfer',
+      args: \[to, amountHex]
+      }],
+      formatPayload: true
+      }
+      const { finalPayload } = await MiniKit.commandsAsync.sendTransaction(input)
+      if (finalPayload?.status === 'success') {
+      // verify on backend using transaction hash/id
+      }
+      }
+      lang: javascript
+      MiniKit.commandsAsync.verify:
+      kind: function
+      summary: Start a World ID proof flow (Orb/Device) and receive a zero‑knowledge proof payload.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function verify(input: VerifyCommandInput): Promise<unknown>;
+      }
+
+      export type VerifyCommandInput = {
+      action: string
+      signal?: string
+      verification\_level?: VerificationLevel // Default: Orb
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Never trust client proofs. Send the payload to your server and call `/api/v2/verify/{app_id}` or `verifyCloudProof`.
+    * Align `signal` between client and server if used to bind proofs to specific actions.
+      example:
+      code: |-
+      import { MiniKit, type VerifyCommandInput } from '@worldcoin/minikit-js'
+
+      export async function verifyUser() {
+      const input: VerifyCommandInput = { action: 'join\_beta', verification\_level: 'orb' }
+      const { finalPayload } = await MiniKit.commandsAsync.verify(input)
+      // Always send proof to backend for verification
+      }
+      lang: javascript
+      MiniKit.commandsAsync.walletAuth:
+      kind: function
+      summary: Create an EIP‑4361 SIWE message and signature to authenticate the user’s wallet.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function walletAuth(input: WalletAuthInput): Promise<unknown>;
+      }
+
+      interface WalletAuthInput {
+      nonce: string
+      expirationTime?: Date
+      statement?: string
+      requestId?: string
+      notBefore?: Date
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Generate an unpredictable nonce server‑side and store it (e.g., httpOnly cookie) before calling walletAuth.
+    * Verify on backend with `verifySiweMessage(payload, nonce)` and bind a user session to the wallet address.
+      example:
+      code: |-
+      import { MiniKit, type WalletAuthInput } from '@worldcoin/minikit-js'
+
+      export async function siwe() {
+      const res = await fetch('/api/nonce'); const { nonce } = await res.json()
+      const input: WalletAuthInput = { nonce, expirationTime: new Date(Date.now()+7*24*3600e3) }
+      const { finalPayload } = await MiniKit.commandsAsync.walletAuth(input)
+      // POST {payload, nonce} to /api/complete-siwe to verify server-side
+      }
+      lang: javascript
+      MiniKit.commandsAsync.signMessage:
+      kind: function
+      summary: Request a plain message signature (EIP‑191) from World App.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function signMessage(input: SignMessageInput): Promise<unknown>;
+      }
+
+      export type SignMessageInput = {
+      message: string;
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Display clear UX when asking users to sign; never sign opaque or unreviewed data.
+    * Hash and verify the signature on the backend against the expected wallet address.
+      example:
+      code: |-
+      import { MiniKit, type SignMessageInput } from '@worldcoin/minikit-js'
+
+      export async function sign() {
+      const input: SignMessageInput = { message: 'Hello world' }
+      const { finalPayload } = await MiniKit.commandsAsync.signMessage(input)
+      // Verify with wallet address against EIP-191 on the backend
+      }
+      lang: javascript
+      MiniKit.commandsAsync.signTypedData:
+      kind: function
+      summary: Request an EIP‑712 typed‑data signature.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function signTypedData(input: SignTypedDataInput): Promise<unknown>;
+      }
+
+      export type SignTypedDataInput = {
+      types: TypedData
+      primaryType: string
+      message: Record\<string, unknown>
+      domain: TypedDataDomain
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Include `domain`, `types`, and `primaryType` explicitly; avoid dynamic user-provided schemas.
+    * Compare the recovered address to the logged‑in user’s wallet address server‑side.
+      example:
+      code: |-
+      import { MiniKit, type SignTypedDataInput } from '@worldcoin/minikit-js'
+
+      export async function signTyped(data: SignTypedDataInput) {
+      const { finalPayload } = await MiniKit.commandsAsync.signTypedData(data)
+      // Verify EIP-712 on backend
+      }
+      lang: javascript
+      MiniKit.commandsAsync.getPermissions:
+      kind: function
+      summary: Get current permission statuses granted to your mini app.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function getPermissions(): Promise<unknown>;
+      }
+
+      export enum Permission {
+      Notifications = 'notifications',
+      Microphone = 'microphone',
+      }
+
+      type MiniAppGetPermissionsSuccessPayload = {
+      status: 'success';
+      permissions: Permission\[];
+      version: number;    // same version that was received from MiniKit
+      }
+
+      type MiniAppGetPermissionsErrorPayload = {
+      status: 'error'
+      error\_code: GetPermissionsErrorCodes
+      version: number
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Call before `requestPermission` to avoid redundant prompts and to tailor UX.
+    * Use the enum values exactly as defined; treat unknown permissions as denied.
+      example:
+      code: |-
+      import { MiniKit } from '@worldcoin/minikit-js'
+
+      export async function readPerms() {
+      const { finalPayload } = await MiniKit.commandsAsync.getPermissions()
+      // Cache permissions locally to gate feature prompts
+      }
+      lang: javascript
+      MiniKit.commandsAsync.requestPermission:
+      kind: function
+      summary: Prompt the user to grant a permission (e.g., notifications, microphone).
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function requestPermission(input: { permission: Permission }): Promise<unknown>;
+      }
+
+      export enum Permission {
+      Notifications = 'notifications',
+      Microphone = 'microphone',
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Request only when needed and explain the benefit (better conversion and fewer denials).
+    * Combine with `getPermissions()` to avoid prompting if already granted.
+      example:
+      code: |-
+      import { MiniKit, Permission } from '@worldcoin/minikit-js'
+
+      export async function askNotifications() {
+      const { finalPayload } = await MiniKit.commandsAsync.requestPermission({ permission: Permission.Notifications })
+      // If granted, you can send notifications via the API
+      }
+      lang: javascript
+      MiniKit.commandsAsync.shareContacts:
+      kind: function
+      summary: Request contacts selected by the user (with explicit consent).
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function shareContacts(input: ShareContactsInput): Promise<unknown>;
+      }
+
+      export type ShareContactsInput = {
+      isMultiSelectEnabled: boolean
+      inviteMessage?: string
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Do not store contacts without consent; log only what you need to fulfill the feature.
+    * Use `inviteMessage` to clarify why you’re requesting contact access.
+      example:
+      code: |-
+      import { MiniKit, type ShareContactsInput } from '@worldcoin/minikit-js'
+
+      export async function pickContacts() {
+      const input: ShareContactsInput = { isMultiSelectEnabled: true }
+      const { finalPayload } = await MiniKit.commandsAsync.shareContacts(input)
+      // Validate and use contacts on backend (e.g., invitations)
+      }
+      lang: javascript
+      MiniKit.commandsAsync.share:
+      kind: function
+      summary: Open the system share sheet to share a URL/text/files.
+      definition:
+      code: |-
+      declare namespace MiniKit.commandsAsync {
+      function share(input: SharePayload): Promise<unknown>;
+      }
+
+      export type SharePayload = {
+      files: File\[];
+      title?: string;
+      text?: string;
+      url?: string;
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Keep payloads small; not all file types are supported on all devices.
+    * From MiniKit 2.0.0+ and World App 2.8.84+, this is available; gate by version if you support older clients.
+      example:
+      code: |-
+      import { MiniKit, type SharePayload } from '@worldcoin/minikit-js'
+
+      export async function shareSomething(url: string) {
+      const payload: SharePayload = { title: 'Check this out', url }
+      await MiniKit.commandsAsync.share(payload)
+      }
+      lang: javascript
+      since: 2.0.0
+* name: MiniKit JS Helpers
+  exports:
+
+  * MiniKit.getUserByAddress
+  * MiniKit.getUserByUsername
+  * verifySiweMessage
+  * getIsUserVerified
+  * verifyCloudProof
+    symbols:
+    MiniKit.getUserByAddress:
+    kind: function
+    summary: Fetch a World App user profile by wallet address.
+    definition:
+    code: |-
+    declare namespace MiniKit {
+    function getUserByAddress(address: string): Promise<User>;
+    function getUserByUsername(username: string): Promise<User>;
+    }
+
+    ```
+      export type User = {
+      	walletAddress?: string
+      	username?: string
+      	profilePictureUrl?: string
+      	permissions?: {
+      		notifications: boolean
+      		contacts: boolean
+      	}
+      	optedIntoOptionalAnalytics?: boolean
+      	worldAppVersion?: number
+      	deviceOS?: string
+      }
+    lang: typescript
+    source: world-worldcoin-world-id-docs-combined.md  :contentReference[oaicite:11]{index=11}
+    ```
+
+    guidance:
+
+    * Use for public profile info; do not assume presence of optional fields.
+    * If both address and username are known, prefer address for stability.
+      example:
+      code: |-
+      import { MiniKit } from '@worldcoin/minikit-js'
+
+      export async function loadUser(username: string) {
+      const user = await MiniKit.getUserByUsername(username)
+      console.log(user?.walletAddress)
+      }
+      lang: javascript
+      MiniKit.getUserByUsername:
+      kind: function
+      summary: Fetch a World App user profile by username.
+      definition:
+      code: |-
+      declare namespace MiniKit {
+      function getUserByAddress(address: string): Promise<User>;
+      function getUserByUsername(username: string): Promise<User>;
+      }
+
+      export type User = {
+      walletAddress?: string
+      username?: string
+      profilePictureUrl?: string
+      permissions?: {
+      notifications: boolean
+      contacts: boolean
+      }
+      optedIntoOptionalAnalytics?: boolean
+      worldAppVersion?: number
+      deviceOS?: string
+      }
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Usernames can change; cache with caution and refresh before critical flows.
+    * Handle null/undefined results gracefully.
+      example:
+      code: |-
+      import { MiniKit } from '@worldcoin/minikit-js'
+
+      export async function loadUser(username: string) {
+      const user = await MiniKit.getUserByUsername(username)
+      console.log(user?.walletAddress)
+      }
+      lang: javascript
+      verifySiweMessage:
+      kind: function
+      summary: Server-side helper to validate an EIP‑4361 (SIWE) message from walletAuth.
+      definition:
+      code: |-
+      import type { MiniAppWalletAuthSuccessPayload } from '@worldcoin/minikit-js'
+
+      declare function verifySiweMessage(payload: MiniAppWalletAuthSuccessPayload, nonce: string): Promise<{ isValid: boolean }>;
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Compare recovered address to expected wallet and bind to your session/user id.
+    * Reject stale messages by checking issuedAt/expirationTime/notBefore.
+      example:
+      code: |-
+      import { verifySiweMessage } from '@worldcoin/minikit-js'
+
+      export async function verify(payload, nonce) {
+      const result = await verifySiweMessage(payload, nonce)
+      return result.isValid
+      }
+      lang: javascript
+      getIsUserVerified:
+      kind: function
+      summary: Check if a wallet is verified in the World ID Address Book on World Chain.
+      definition:
+      code: |-
+      import { getIsUserVerified } from '@worldcoin/minikit-js'
+
+      // Queries the Address Book contract on World Chain to check verification status
+      declare function getIsUserVerified(address: `0x${string}`): Promise<boolean>;
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Use a reliable RPC (default is Alchemy public) and cache results to avoid repeat on-chain reads.
+    * Treat network errors as indeterminate; do not block core flows solely on this check.
+      example:
+      code: |-
+      import { getIsUserVerified } from '@worldcoin/minikit-js'
+
+      export async function isVerified(addr) {
+      return await getIsUserVerified(addr)
+      }
+      lang: javascript
+      verifyCloudProof:
+      kind: function
+      summary: Validate a World ID proof payload using the hosted verifier (recommended).
+      definition:
+      code: |-
+      // Verifies a World ID proof payload with Worldcoin’s cloud verifier
+      import type { IVerifyResponse } from '@worldcoin/idkit-core'
+      declare function verifyCloudProof(proof: unknown, app\_id: string, action?: string, signal?: string): Promise<IVerifyResponse>;
+      lang: typescript
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Always pass the exact `app_id` used by your mini app, and the same `action`/`signal` you sent to IDKit.
+    * On success, store the `nullifier_hash` server‑side to prevent re-use.
+      example:
+      code: |-
+      import { verifyCloudProof } from '@worldcoin/idkit-core'
+
+      export async function handleProof(proof, app\_id, action, signal) {
+      const res = await verifyCloudProof(proof, app\_id, action, signal)
+      return res.success
+      }
+      lang: javascript
+* name: Developer Portal API (v2)
+  exports:
+
+  * POST [https://developer.worldcoin.org/api/v2/minikit/send-notification](https://developer.worldcoin.org/api/v2/minikit/send-notification)
+  * GET [https://developer.worldcoin.org/api/v2/minikit/transaction/{transaction\_id}](https://developer.worldcoin.org/api/v2/minikit/transaction/{transaction_id})
+  * GET [https://developer.worldcoin.org/api/v2/minikit/transaction/debug](https://developer.worldcoin.org/api/v2/minikit/transaction/debug)
+  * GET [https://app-backend.worldcoin.dev/public/v1/miniapps/prices](https://app-backend.worldcoin.dev/public/v1/miniapps/prices)
+  * POST [https://developer.worldcoin.org/api/v2/create-action/{app\_id}](https://developer.worldcoin.org/api/v2/create-action/{app_id})
+  * GET [https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle](https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle)
+  * POST /api/v2/verify/{app\_id}
+  * GET /api/v1/precheck/{app\_id}
+    symbols:
+    POST [https://developer.worldcoin.org/api/v2/minikit/send-notification](https://developer.worldcoin.org/api/v2/minikit/send-notification):
+    kind: other
+    summary: Send push notifications to specific wallet addresses (subject to rate/quality limits).
+    definition:
+    code: |-
+    openapi: 3.0.0
+    info: { title: MiniKit Notifications API, version: "2.0" }
+    paths:
+    /api/v2/minikit/send-notification:
+    post:
+    security: \[ { bearerAuth: \[] } ]
+    parameters:
+    \- in: header
+    name: Authorization
+    required: true
+    schema: { type: string }
+    description: "Bearer {api\_key}"
+    requestBody:
+    required: true
+    content:
+    application/json:
+    schema:
+    type: object
+    required: \[app\_id, wallet\_addresses, title, message]
+    properties:
+    app\_id: { type: string }
+    wallet\_addresses: { type: array, items: { type: string } }
+    title: { type: string }
+    message: { type: string }
+    mini\_app\_path: { type: string }
+    responses:
+    "200":
+    description: OK
+    "400":
+    description: Bad Request
+    lang: openapi
+    source: world-worldcoin-world-id-docs-combined.md &#x20;
+    guidance:
+
+    * Request and record user permission in-app before sending; unauthorized sends may be rate-limited or blocked.
+    * Use personalized yet concise titles; track open rates in Developer Portal and respect weekly evaluations.
+      example:
+      code: |-
+      import fetch from 'node-fetch'
+
+      const apiKey = process.env.WORLD\_API\_KEY
+      await fetch('[https://developer.worldcoin.org/api/v2/minikit/send-notification](https://developer.worldcoin.org/api/v2/minikit/send-notification)', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+      app\_id: 'app\_xxx',
+      wallet\_addresses: \['0xabc...', '0xdef...'],
+      title: 'Weekly update',
+      message: 'Hello \${username}, new rewards are live!',
+      mini\_app\_path: '/home'
+      })
+      })
+      lang: javascript
+      GET [https://developer.worldcoin.org/api/v2/minikit/transaction/{transaction\_id}](https://developer.worldcoin.org/api/v2/minikit/transaction/{transaction_id}):
+      kind: other
+      summary: Get a MiniKit transaction by id for reconciliation and debugging.
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: MiniKit Transaction API, version: "2.0" }
+      paths:
+      /api/v2/minikit/transaction/{transaction\_id}:
+      get:
+      security: \[ { bearerAuth: \[] } ]
+      parameters:
+      \- in: path
+      name: transaction\_id
+      required: true
+      schema: { type: string }
+      \- in: query
+      name: app\_id
+      required: true
+      schema: { type: string }
+      \- in: query
+      name: type
+      required: false
+      schema: { type: string, enum: \[payment, contract] }
+      responses:
+      "200":
+      description: OK
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Store transaction ids on your backend during command initiation to make lookups deterministic.
+    * If a transaction failed, correlate with simulationError and Tenderly debugUrl from the debug endpoint.
+      example:
+      code: |-
+      import fetch from 'node-fetch'
+      const url = '[https://developer.worldcoin.org/api/v2/minikit/transaction/0xTRANSACTION\_ID?app\_id=app\_xxx\&type=payment](https://developer.worldcoin.org/api/v2/minikit/transaction/0xTRANSACTION_ID?app_id=app_xxx&type=payment)'
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.WORLD_API_KEY}` } })
+      const data = await res.json()
+      lang: javascript
+      GET [https://developer.worldcoin.org/api/v2/minikit/transaction/debug](https://developer.worldcoin.org/api/v2/minikit/transaction/debug):
+      kind: other
+      summary: Retrieve recent transactions with rich debugging fields (debugUrl, simulation errors, etc.).
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: MiniKit Transaction Debug API, version: "2.0" }
+      paths:
+      /api/v2/minikit/transaction/debug:
+      get:
+      security: \[ { bearerAuth: \[] } ]
+      parameters:
+      \- in: query
+      name: app\_id
+      required: true
+      schema: { type: string }
+      responses:
+      "200":
+      description: OK
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Use debug data to investigate failures and optimize user flows; avoid exposing internal details to clients.
+    * Protect this endpoint behind admin dashboards or dev tooling only.
+      example:
+      code: |-
+      import fetch from 'node-fetch'
+      const res = await fetch('[https://developer.worldcoin.org/api/v2/minikit/transaction/debug?app\_id=app\_xxx](https://developer.worldcoin.org/api/v2/minikit/transaction/debug?app_id=app_xxx)', {
+      headers: { Authorization: `Bearer ${process.env.WORLD_API_KEY}` }
+      })
+      const data = await res.json()
+      lang: javascript
+      GET [https://app-backend.worldcoin.dev/public/v1/miniapps/prices](https://app-backend.worldcoin.dev/public/v1/miniapps/prices):
+      kind: other
+      summary: Query current prices for WLD/USDC in multiple fiat currencies.
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: MiniApps Prices API, version: "1.0" }
+      paths:
+      /public/v1/miniapps/prices:
+      get:
+      parameters:
+      \- in: query
+      name: cryptoCurrencies
+      required: true
+      schema: { type: string, example: "WLD,USDC" }
+      \- in: query
+      name: fiatCurrencies
+      required: true
+      schema: { type: string, example: "USD,EUR" }
+      responses:
+      "200":
+      description: OK
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Use this to compute token amounts from fiat values server‑side; always respect token decimals.
+    * Cache results for short periods to reduce load; prices update frequently.
+      example:
+      code: |-
+      const res = await fetch('[https://app-backend.worldcoin.dev/public/v1/miniapps/prices?cryptoCurrencies=WLD,USDC\&fiatCurrencies=USD](https://app-backend.worldcoin.dev/public/v1/miniapps/prices?cryptoCurrencies=WLD,USDC&fiatCurrencies=USD)')
+      const { result } = await res.json()
+      const price = result.prices.WLD.USD.amount
+      lang: javascript
+      POST [https://developer.worldcoin.org/api/v2/create-action/{app\_id}](https://developer.worldcoin.org/api/v2/create-action/{app_id}):
+      kind: other
+      summary: Create an incognito action that can be verified later via World ID.
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: Create Incognito Action API, version: "2.0" }
+      paths:
+      /api/v2/create-action/{app\_id}:
+      post:
+      security: \[ { bearerAuth: \[] } ]
+      parameters:
+      \- in: path
+      name: app\_id
+      required: true
+      schema: { type: string }
+      requestBody:
+      required: true
+      content:
+      application/json:
+      schema:
+      type: object
+      required: \[name]
+      properties:
+      name: { type: string }
+      description: { type: string }
+      max\_verifications: { type: integer }
+      responses:
+      "200": { description: OK }
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Use descriptive names and optional descriptions—these appear in the user’s verification context.
+    * Limit `max_verifications` to the expected number to prevent abuse.
+      example:
+      code: |-
+      await fetch(`https://developer.worldcoin.org/api/v2/create-action/${process.env.APP_ID}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.WORLD_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Early Access', description: 'Join our beta', max\_verifications: 1 })
+      })
+      lang: javascript
+      GET [https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle](https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle):
+      kind: other
+      summary: Determine a user’s current grant cycle (for eligibility/rate limiting flows).
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: User Grant Cycle API, version: "2.0" }
+      paths:
+      /api/v2/minikit/user-grant-cycle:
+      get:
+      security: \[ { bearerAuth: \[] } ]
+      parameters:
+      \- in: query
+      name: wallet\_address
+      required: true
+      schema: { type: string, minLength: 42, maxLength: 42 }
+      \- in: query
+      name: app\_id
+      required: true
+      schema: { type: string }
+      responses:
+      "200": { description: OK }
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Validate wallet address length (42 chars) before calling; reject invalid input early.
+    * Treat responses as advisory and maintain your own server‑side eligibility checks.
+      example:
+      code: |-
+      const url = new URL('[https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle](https://developer.worldcoin.org/api/v2/minikit/user-grant-cycle)')
+      url.searchParams.set('wallet\_address', '0xabc...')
+      url.searchParams.set('app\_id', 'app\_xxx')
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${process.env.WORLD_API_KEY}` } })
+      const data = await res.json()
+      lang: javascript
+      POST /api/v2/verify/{app\_id}:
+      kind: other
+      summary: Verify a World ID proof payload server‑side (alternative to SDK helper).
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: World ID Verify API, version: "2.0" }
+      paths:
+      /api/v2/verify/{app\_id}:
+      post:
+      parameters:
+      \- in: path
+      name: app\_id
+      required: true
+      schema: { type: string }
+      requestBody:
+      required: true
+      content:
+      application/json:
+      schema: { type: object }
+      responses:
+      "200": { description: OK }
+      "400": { description: Invalid }
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Verify on a trusted server only; do not expose your app\_id or verification logic to clients.
+    * On success, store `nullifier_hash` and associate with the acting user to prevent re‑verification.
+      example:
+      code: |-
+      await fetch(`https://developer.worldcoin.org/api/v2/verify/${process.env.APP_ID}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proofPayload)
+      })
+      lang: javascript
+      GET /api/v1/precheck/{app\_id}:
+      kind: other
+      summary: Fetch metadata for an app/action to determine eligibility and status before verification (internal).
+      definition:
+      code: |-
+      openapi: 3.0.0
+      info: { title: World ID Precheck API, version: "1.0" }
+      paths:
+      /api/v1/precheck/{app\_id}:
+      get:
+      parameters:
+      \- in: path
+      name: app\_id
+      required: true
+      schema: { type: string }
+      responses:
+      "200": { description: OK }
+      lang: openapi
+      source: world-worldcoin-world-id-docs-combined.md &#x20;
+      guidance:
+    * Use sparingly; primarily intended for internal use. Prefer cached app metadata where possible.
+    * Align the `action` passed here with your IDKit usage to ensure consistent checks.
+      example:
+      code: |-
+      await fetch(`https://developer.worldcoin.org/api/v1/precheck/${process.env.APP_ID}?action=signin`, { method: 'GET' })
+      lang: javascript
+      common\_workflows:
+* title: Accept a payment and reconcile on backend
+  steps:
+
+  * Compute token amount from fiat using the Prices API; convert to on-chain decimals.
+  * Call MiniKit.commandsAsync.pay with a unique reference.
+  * On client success, POST the result to your backend; record (reference, transactionId).
+  * Later, confirm status via GET /minikit/transaction and/or debug endpoint.
+* title: Sign-in With Wallet (SIWE) using walletAuth
+  steps:
+
+  * Generate a nonce server‑side and store it in a tamper‑proof cookie.
+  * Call walletAuth with nonce; obtain message+signature.
+  * POST payload+nonce to your server and call verifySiweMessage to validate.
+  * Create a server session bound to the wallet address.
+* title: Verify World ID proof
+  steps:
+
+  * Trigger MiniKit.commandsAsync.verify with action and optional signal.
+  * POST the proof to your server.
+  * Validate via verifyCloudProof or POST /api/v2/verify/{app\_id}.
+  * On success, store nullifier\_hash and grant access.
+* title: Contract call with Permit2
+  steps:
+
+  * Construct SendTransactionInput with functionName/args for your contract.
+  * If token transfer requires prior approval, use Permit2 signature transfer.
+  * Batch calls atomically where applicable.
+  * Track transactionId and reconcile with debug endpoint on failures.
+* title: Request notifications & send
+  steps:
+
+  * Call getPermissions; if missing, requestPermission(Permission.Notifications).
+  * Store consent server‑side linked to wallet address.
+  * Send via POST /api/v2/minikit/send-notification with your app\_id and api\_key.
+* title: Check user grant cycle
+  steps:
+
+  * Ensure you have the user’s wallet address and your app\_id.
+  * Call GET /api/v2/minikit/user-grant-cycle with bearer API key.
+  * Use returned cycle info to gate features or rate limits.
+    troubleshooting\_cheatsheet:
+* symptom: sendTransaction requests are rejected
+  cause: Contract or token not allowlisted in Developer Portal → Advanced.
+  fix: Add addresses/ABIs to the allowlist and redeploy configuration; retry.
+* symptom: SIWE verification fails even with a signature
+  cause: Nonce mismatch or expired `expirationTime`.
+  fix: Ensure nonce is issued and stored server‑side; enforce reasonable expiry and time skew.
+* symptom: World ID verification returns already\_verified
+  cause: User has already completed verification for this action.
+  fix: Check and handle this gracefully (e.g., idempotent grant); prevent duplicate grants.
+* symptom: Notifications API returns low deliverability
+  cause: Permission not granted or poor open rates triggered a pause.
+  fix: Request permission in-app; improve content and resend later per policy.
+  faq:
+* q: Do I need a backend?
+  a: Yes. Always verify proofs, signatures, and transactions on a trusted server; never trust client payloads.
+* q: Which chains are supported for payments?
+  a: Payments are sponsored on World Chain for WLD and USDC as per current docs; other assets require contract calls via sendTransaction.
+* q: Can I approve tokens with sendTransaction?
+  a: Approvals are not permitted. Use Permit2 signature transfer or call transfer/transferFrom directly.
+* q: How do I compute token amounts?
+  a: Use the Prices API to fetch WLD/USDC fiat conversions and convert to token decimals before building command payloads.
+  external\_resources:
+* label: Worldcoin Developer Portal
+  url: [https://developer.worldcoin.org](https://developer.worldcoin.org)
+* label: MiniKit JS (npm)
+  url: [https://www.npmjs.com/package/@worldcoin/minikit-js](https://www.npmjs.com/package/@worldcoin/minikit-js)
+* label: World ID docs
+  url: [https://docs.worldcoin.org/id](https://docs.worldcoin.org/id)
+* label: Mini Apps docs
+  url: [https://docs.worldcoin.org/mini-apps](https://docs.worldcoin.org/mini-apps)
+

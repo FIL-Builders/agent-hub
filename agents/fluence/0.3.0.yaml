@@ -1,0 +1,553 @@
+meta:
+spec\_name: fluence/api
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: ">=3.0.0 <4.0.0 (path versioning '/v3')"
+purpose: >-
+Teach LLMs how to search the Fluence decentralized compute marketplace, deploy virtual machines,
+and manage deployments/SSH keys through the public REST API at [https://api.fluence.dev](https://api.fluence.dev).
+guiding\_principles:
+\- Authenticate every call with an API key: set Authorization: Bearer \<API\_KEY>.
+\- Use discovery endpoints first (/marketplace/basic\_configurations, /marketplace/countries, /marketplace/hardware) to build valid filters.
+\- When specifying additionalResources.storage, also include a matching hardware.storage filter; otherwise the request is invalid or ignored.
+\- openPorts updates are declarative: PATCH /vms/v3 replaces the entire list—always include ALL ports you want left open.
+\- Pricing is per 24‑hour epoch in USDC; use POST /vms/v3/estimate before creating to validate budget and capacity.
+\- VM lifecycle status drives behavior: only Active VMs have publicIp; Terminated VMs must still be deleted via API to release reserved funds.
+\- Default OS images are exposed via GET /vms/v3/default\_images; you may also supply a public download URL for a custom image.
+\- All endpoints are JSON; set Content-Type: application/json on POST/PATCH/DELETE with bodies.
+design\_notes: >-
+This pack is derived from the Fluence docs bundle (overview, API guides for offers,
+order/manage VMs, SSH keys, payments, staking, and bridge). Endpoint contracts and example
+payloads were extracted verbatim where provided and lightly normalized into HTTP signatures
+for the 'definition' fields. Source: fluence-docs-combined.md.&#x20;
+language: http
+homepage: [https://api.fluence.dev/docs](https://api.fluence.dev/docs)
+tags: \[fluence, depin, compute-marketplace, rest, vms]
+
+groups:
+
+* name: Marketplace
+  exports:
+
+  * marketplace.offers.search
+  * marketplace.basic\_configurations.list
+  * marketplace.countries.list
+  * marketplace.hardware.list
+    symbols:
+    marketplace.offers.search:
+    kind: function
+    summary: Search available compute offers with optional filters (basic config, hardware, datacenter, price).
+    definition:
+    code: |-
+    POST /marketplace/offers
+    Headers:
+    Authorization: Bearer \<API\_KEY>
+    Content-Type: application/json
+    Body (all fields optional):
+    {
+    "basicConfiguration": "cpu-8-ram-16gb-storage-25gb",
+    "additionalResources": {
+    "storage": \[ { "supply": 20, "units": "GiB", "type": "NVMe" } ]
+    },
+    "hardware": {
+    "CPU": \[ { "manufacturer": "AMD", "architecture": "Zen" } ],
+    "memory": \[ { "type": "DDR", "generation": "5" } ],
+    "storage": \[ { "type": "NVMe" } ]
+    },
+    "datacenter": { "countries": \["US", "PL"] },
+    "maxTotalPricePerEpochUsd": "12.5"
+    }
+    Response 200: Array of offer objects with configuration, resources (VCPU/RAM/STORAGE/PUBLIC\_IP), datacenter, servers, and maxAdditionalSupply.
+    lang: http
+    source: "docs/build/api/get\_offerings/get\_offerings.md "
+    guidance:
+
+    * If you only care about price/size, send {"basicConfiguration": "..."} or {} to list everything.
+    * The basicConfiguration slug format is cpu-{cores}-ram-{GB}gb-storage-{GB}gb. Use /marketplace/basic\_configurations to enumerate valid values.
+    * When requesting additionalResources.storage, you must also include hardware.storage with the same storage type (e.g., NVMe).
+    * Use countries as ISO codes; the filter is OR across the list.
+    * Prices are quoted in USDC per 24‑hour epoch; use them to bound your budget.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/marketplace/offers](https://api.fluence.dev/marketplace/offers)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json"&#x20;
+      -d '{"basicConfiguration":"cpu-4-ram-8gb-storage-25gb","datacenter":{"countries":\["US"]},"hardware":{"storage":\[{"type":"NVMe"}]}}'
+      since: "3.0.0"
+      marketplace.basic\_configurations.list:
+      kind: function
+      summary: List all valid basic VM configurations (slugs) available in the marketplace.
+      definition:
+      code: |-
+      GET /marketplace/basic\_configurations
+      Headers: Authorization: Bearer \<API\_KEY>
+      Response 200: \["cpu-2-ram-4gb-storage-25gb", "cpu-4-ram-8gb-storage-25gb", ...]
+      lang: http
+      source: "docs/build/api/get\_offerings/get\_offerings.md#available-basic-vm-configurations "
+      guidance:
+    * Use these slugs directly in constraints.basicConfiguration in deployments and estimates.
+    * Treat the list as dynamic—cache briefly and refresh as needed.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/marketplace/basic\_configurations](https://api.fluence.dev/marketplace/basic_configurations)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" | jq -r '.\[]'
+      marketplace.countries.list:
+      kind: function
+      summary: List ISO country codes that currently have datacenters with offers.
+      definition:
+      code: |-
+      GET /marketplace/countries
+      Headers: Authorization: Bearer \<API\_KEY>
+      Response 200: \["DE", "FR", "GB", "LT", "PL", "US"]
+      lang: http
+      source: "docs/build/api/get\_offerings/get\_offerings.md#available-datacenter-countries "
+      guidance:
+    * Use as allowed values for datacenter.countries in /marketplace/offers or constraints objects.
+    * The filter is OR—include all acceptable countries.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/marketplace/countries](https://api.fluence.dev/marketplace/countries) -H "Authorization: Bearer \$API\_KEY"
+      marketplace.hardware.list:
+      kind: function
+      summary: List hardware spec values for CPU, memory, and storage used in filters and responses.
+      definition:
+      code: |-
+      GET /marketplace/hardware
+      Headers: Authorization: Bearer \<API\_KEY>
+      Response 200: {
+      "cpu":\[{"manufacturer":"AMD","architecture":"Zen"}, ...],
+      "memory":\[{"type":"DDR","generation":"5"}, ...],
+      "storage":\[{"type":"NVMe"}, ...]
+      }
+      lang: http
+      source: "docs/build/api/get\_offerings/get\_offerings.md#available-hardware-specifications "
+      guidance:
+    * Match these values in hardware filters to ensure your queries return results.
+    * Prefer architecture families (e.g., Zen) over model names for broader matching.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/marketplace/hardware](https://api.fluence.dev/marketplace/hardware) -H "Authorization: Bearer \$API\_KEY" | jq
+
+* name: VMs
+  exports:
+
+  * vms.create
+  * vms.list
+  * vms.update
+  * vms.delete
+  * vms.default\_images.list
+  * vms.estimate
+    symbols:
+    vms.create:
+    kind: function
+    summary: Deploy one or more virtual machines with optional constraints and VM configuration.
+    definition:
+    code: |-
+    POST /vms/v3
+    Headers:
+    Authorization: Bearer \<API\_KEY>
+    Content-Type: application/json
+    Body:
+    {
+    "constraints": {
+    "basicConfiguration": "cpu-4-ram-8gb-storage-25gb",
+    "additionalResources": { "storage": \[ { "type":"NVMe", "supply": 20, "units":"GiB" } ] },
+    "hardware": null,
+    "datacenter": null,
+    "maxTotalPricePerEpochUsd": "1.5"
+    },
+    "instances": 2,
+    "vmConfiguration": {
+    "name": "web-server",
+    "openPorts": \[ { "port":80, "protocol":"tcp" }, { "port":443, "protocol":"tcp" } ],
+    "hostname": "my-vm",
+    "osImage": "[https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/focal/current/focal-server-cloudimg-amd64.img)",
+    "sshKeys": \["ssh-rsa AAAAB3Nza..."]
+    }
+    }
+    Response 200: \[ { "vmId": "0x...", "vmName": "web-server" }, ... ]
+    Response 422: { "error": "No suitable offer found" } | { "error": "Not enough offers found" }
+    lang: http
+    source: "docs/build/api/order\_vm/order\_vm.md "
+    guidance:
+
+    * If you omit constraints, the system will choose the cheapest/available option matching minimal defaults.
+    * Only TCP/UDP are supported for openPorts; port 10250 is reserved and cannot be exposed.
+    * Supply public SSH keys only; the private key must remain offline.
+    * If you need a known‑good OS, first fetch GET /vms/v3/default\_images and reuse downloadUrl.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/vms/v3](https://api.fluence.dev/vms/v3)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json" -d '{
+      "constraints": { "basicConfiguration": "cpu-2-ram-4gb-storage-25gb", "maxTotalPricePerEpochUsd": "1.2" },
+      "instances": 1,
+      "vmConfiguration": {
+      "name": "my-vm",
+      "openPorts": \[{"port":22,"protocol":"tcp"}],
+      "osImage": "[https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img)",
+      "sshKeys": \["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... [user@example.com](mailto:user@example.com)"]
+      }}'
+      vms.list:
+      kind: function
+      summary: List your active VMs and their configuration/status.
+      definition:
+      code: |-
+      GET /vms/v3
+      Headers: Authorization: Bearer \<API\_KEY>
+      Response 200: \[
+      {
+      "id": "0x311edB209b61EaA8c3e67c6B96D03288DB5Bc020",
+      "vmName": "vm-name",
+      "status": "Active|Launching|SmallBalance|InsufficientFunds|Terminated|Stopped",
+      "pricePerEpoch": "2.4352",
+      "resources": \[
+      { "type":"VCPU", "quantity":2, "metadata":{...} },
+      { "type":"RAM", "supply":4, "units":"GiB", "metadata":{...} },
+      { "type":"STORAGE", "supply":25, "units":"GiB", "metadata":{...} },
+      { "type":"PUBLIC\_IP", "quantity":1, "metadata":{ "version": "4" } }
+      ],
+      "createdAt": "2025-04-30T11:23:05Z",
+      "nextBillingAt": "2025-04-30T11:55:09Z",
+      "osImage": "[https://.../ubuntu-22.04-server-cloudimg-amd64.img](https://.../ubuntu-22.04-server-cloudimg-amd64.img)",
+      "datacenter": { "countryCode": "FR", "cityCode": "PAR", "cityIndex": 1, "tier": 4, "certifications": \["PCI DSS", "ISO 27001"] },
+      "publicIp": "154.42.3.159",
+      "ports": \[ { "port": 22, "protocol": "tcp" } ],
+      "reservedBalance": "2.4352",
+      "totalSpent": "2.4352"
+      }
+      ]
+      lang: http
+      source: "docs/build/api/manage\_vms/manage\_vms.md#view-your-active-vms "
+      guidance:
+    * Only Active VMs will have a non‑null publicIp and be reachable.
+    * Use status to detect provider‑terminated VMs; then call DELETE /vms/v3 to finalize and release reserved funds.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/vms/v3](https://api.fluence.dev/vms/v3) -H "Authorization: Bearer \$API\_KEY" | jq
+      vms.update:
+      kind: function
+      summary: Update VM name and/or replace the set of open network ports.
+      definition:
+      code: |-
+      PATCH /vms/v3
+      Headers:
+      Authorization: Bearer \<API\_KEY>
+      Content-Type: application/json
+      Body:
+      {
+      "updates": \[
+      {
+      "id": "0x730eB2c5...",
+      "vmName": "new-vm-name",
+      "openPorts": \[ { "port":22, "protocol":"tcp" }, { "port":9000, "protocol":"tcp" } ]
+      }
+      ]
+      }
+      Response 204 No Content
+      lang: http
+      source: "docs/build/api/manage\_vms/manage\_vms.md#update-vm-ports-and-name "
+      guidance:
+    * openPorts is the full desired state; omitting an existing port will close it.
+    * Port 10250 is reserved for service purposes and cannot be opened.
+      example:
+      lang: bash
+      code: |-
+      curl -sS -X PATCH [https://api.fluence.dev/vms/v3](https://api.fluence.dev/vms/v3)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json"&#x20;
+      -d '{"updates":\[{"id":"0x730eB2c518c881AEB05299DDf38ca546F3513a93","vmName":"api-node","openPorts":\[{"port":22,"protocol":"tcp"},{"port":8080,"protocol":"tcp"}]}]}' -i
+      vms.delete:
+      kind: function
+      summary: Delete (terminate) one or more VMs by id.
+      definition:
+      code: |-
+      DELETE /vms/v3
+      Headers:
+      Authorization: Bearer \<API\_KEY>
+      Content-Type: application/json
+      Body: { "vmIds": \["0x311edB209b6...", "0x79F7D3F8c1A2..."] }
+      Response 200 on success
+      lang: http
+      source: "docs/build/api/manage\_vms/manage\_vms.md#delete-your-vm "
+      guidance:
+    * Deleting a Terminated VM is required to release its reserved funds back to your balance.
+    * You are charged per epoch (24h); deleting just after an epoch rollover still bills the full epoch.
+      example:
+      lang: bash
+      code: |-
+      curl -sS -X DELETE [https://api.fluence.dev/vms/v3](https://api.fluence.dev/vms/v3)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json"&#x20;
+      -d '{"vmIds":\["0x311edB209b61EaA8c3e67c6B96D03288DB5Bc020"]}'
+      vms.default\_images.list:
+      kind: function
+      summary: List Fluence-provided default OS images and their download URLs.
+      definition:
+      code: |-
+      GET /vms/v3/default\_images
+      Headers: Authorization: Bearer \<API\_KEY>
+      Response 200: \[
+      {
+      "id":"df6e9992f8694635a67baafadf5a1905",
+      "name":"22.04 (LTS) x64",
+      "distribution":"Ubuntu",
+      "slug":"ubuntu-22-04-x64",
+      "downloadUrl":"[https://cloud-images.ubuntu.com/.../ubuntu-22.04-server-cloudimg-amd64.img](https://cloud-images.ubuntu.com/.../ubuntu-22.04-server-cloudimg-amd64.img)",
+      "username":"ubuntu",
+      "createdAt":"2025-05-06T14:29:39.382562Z",
+      "updatedAt":"2025-05-06T14:29:39.382562Z"
+      }, ...
+      ]
+      lang: http
+      source: "docs/build/api/order\_vm/order\_vm.md#get-default-os-images "
+      guidance:
+    * Use the downloadUrl in vmConfiguration.osImage for a known-good image.
+    * You can also use your own public OS image URL in supported formats (.qcow2/.img/.raw and compressed variants).
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/vms/v3/default\_images](https://api.fluence.dev/vms/v3/default_images)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" | jq -r '.\[0].downloadUrl'
+      vms.estimate:
+      kind: function
+      summary: Estimate per-epoch pricing, deposit, and capacity feasibility for a prospective deployment.
+      definition:
+      code: |-
+      POST /vms/v3/estimate
+      Headers:
+      Authorization: Bearer \<API\_KEY>
+      Content-Type: application/json
+      Body:
+      {
+      "constraints": {
+      "basicConfiguration": "cpu-2-ram-4gb-storage-25gb",
+      "additionalResources": { "storage": \[ { "type":"NVMe", "supply": 20, "units":"GiB" } ] },
+      "hardware": { "cpu": \[ { "manufacturer":"AMD" } ], "storage":\[ { "type":"NVMe" } ] },
+      "datacenter": { "countries": \["PL"] },
+      "maxTotalPricePerEpochUsd": "1.2"
+      },
+      "instances": 3
+      }
+      Response 200: {
+      "depositAmountUsdc": "7.01532",
+      "depositEpochs": 2,
+      "totalPricePerEpoch": "3.50766",
+      "maxPricePerEpoch": "0.35793",
+      "instances": 10
+      }
+      Response 422: { "error": "Not enough offers found" }
+      lang: http
+      source: "docs/build/api/get\_offerings/get\_offerings.md#estimate-price-for-a-deployment "
+      guidance:
+    * Use estimate to fail fast on availability or budget before attempting POST /vms/v3.
+    * Keep maxTotalPricePerEpochUsd conservative to avoid estimate passing while create later fails on price drift.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/vms/v3/estimate](https://api.fluence.dev/vms/v3/estimate)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json" -d '{
+      "constraints": { "basicConfiguration": "cpu-2-ram-4gb-storage-25gb", "datacenter": { "countries": \["PL"] } },
+      "instances": 2 }'
+
+* name: SSH Keys
+  exports:
+
+  * ssh\_keys.list
+  * ssh\_keys.create
+  * ssh\_keys.delete
+    symbols:
+    ssh\_keys.list:
+    kind: function
+    summary: List your registered SSH public keys.
+    definition:
+    code: |-
+    GET /ssh\_keys
+    Headers: Authorization: Bearer \<API\_KEY>
+    Response 200: \[
+    {
+    "name": "name-ed25519",
+    "fingerprint": "SHA256\:fingerprint",
+    "algorithm": "ssh-ed25519",
+    "comment": "comment",
+    "publicKey": "ssh-ed25519 key",
+    "active": true,
+    "createdAt": "2025-03-28T16:26:38.808750000Z"
+    }
+    ]
+    lang: http
+    source: "docs/build/api/manage\_vms/manage\_vms.md#manage-ssh-keys "
+    guidance:
+
+    * Ensure at least one active key exists before creating VMs; without it you cannot access instances.
+    * Use fingerprints when deleting.
+      example:
+      lang: bash
+      code: |-
+      curl -sS [https://api.fluence.dev/ssh\_keys](https://api.fluence.dev/ssh_keys) -H "Authorization: Bearer \$API\_KEY" | jq
+      ssh\_keys.create:
+      kind: function
+      summary: Add a new SSH public key by name.
+      definition:
+      code: |-
+      POST /ssh\_keys
+      Headers:
+      Authorization: Bearer \<API\_KEY>
+      Content-Type: application/json
+      Body: {
+      "name": "my-key",
+      "publicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA... [user@example.com](mailto:user@example.com)"
+      }
+      Response 201 with created key or 200 with existing key details.
+      lang: http
+      source: "docs/build/api/manage\_vms/manage\_vms.md#add-an-ssh-key "
+      guidance:
+    * Avoid duplicate names; server will de-duplicate by key and may return 200 with existing record.
+    * Only submit public keys; never include private key material.
+      example:
+      lang: bash
+      code: |-
+      curl -sS -X POST [https://api.fluence.dev/ssh\_keys](https://api.fluence.dev/ssh_keys)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json"&#x20;
+      -d '{"name":"laptop-ed25519","publicKey":"ssh-ed25519 AAAAC3Nza... [user@example.com](mailto:user@example.com)"}'
+      ssh\_keys.delete:
+      kind: function
+      summary: Delete an SSH key by fingerprint.
+      definition:
+      code: |-
+      DELETE /ssh\_keys
+      Headers:
+      Authorization: Bearer \<API\_KEY>
+      Content-Type: application/json
+      Body: { "fingerprint": "SHA256\:sINcLA/hlKG0nDpE9n233xEnXAgSISxq0/nVWbbx5A4" }
+      Response 200 on success
+      lang: http
+      source: "docs/build/api/manage\_vms/manage\_vms.md#delete-an-ssh-key "
+      guidance:
+    * Use the exact fingerprint string returned by list; deleting by name is not supported.
+    * Consider deactivating keys you no longer use to minimize attack surface.
+      example:
+      lang: bash
+      code: |-
+      curl -sS -X DELETE [https://api.fluence.dev/ssh\_keys](https://api.fluence.dev/ssh_keys)&#x20;
+      -H "Authorization: Bearer \$API\_KEY" -H "Content-Type: application/json"&#x20;
+      -d '{"fingerprint":"SHA256\:sINcLA/hlKG0nDpE9n233xEnXAgSISxq0/nVWbbx5A4"}'
+
+* name: Auth & Errors
+  exports:
+
+  * auth.bearer
+  * errors.model
+    symbols:
+    auth.bearer:
+    kind: interface
+    summary: Bearer API key authentication header required on all endpoints.
+    definition:
+    code: |-
+    Authorization: Bearer \<YOUR\_API\_KEY>
+    lang: http
+    source: "docs/build/api/overview\.md#authentication "
+    guidance:
+
+    * Create/manage API keys in the Fluence Console settings; missing/invalid keys return 403 with an error JSON.
+    * Send the header on every request; there are no anonymous endpoints.
+      example:
+      lang: bash
+      code: |-
+      curl -i [https://api.fluence.dev/marketplace/countries](https://api.fluence.dev/marketplace/countries) -H "Authorization: Bearer \$API\_KEY"
+      errors.model:
+      kind: type
+      summary: Standard error envelope returned for 4xx/5xx responses.
+      definition:
+      code: |-
+      // HTTP status 4xx/5xx
+      Content-Type: application/json
+      { "error": "Human‑readable message" }
+      lang: http
+      source: "docs/build/api/overview\.md#response-http-statuses "
+      guidance:
+    * Inspect HTTP status code for class (client vs server).
+    * 422 is used for unmet constraints in offers/estimate/create flows; handle gracefully in UX.
+      example:
+      lang: bash
+      code: |-
+
+      # Example: missing API key
+
+      curl -i [https://api.fluence.dev/marketplace/offers](https://api.fluence.dev/marketplace/offers) -H "Content-Type: application/json" -d '{}'
+
+common\_workflows:
+
+* title: Discover configs and search offers
+  steps:
+
+  * GET /marketplace/basic\_configurations to list valid slugs.
+  * GET /marketplace/hardware and /marketplace/countries for allowed filter values.
+  * POST /marketplace/offers with chosen basicConfiguration + optional hardware/datacenter/price to shortlist offers.
+* title: Estimate cost for N identical VMs
+  steps:
+
+  * Build the same constraints you would use for deployment.
+  * POST /vms/v3/estimate with {instances} to get depositAmountUsdc and totalPricePerEpoch.
+  * Refine constraints or reduce instances until estimate fits your budget.
+* title: Deploy a VM and open ports
+  steps:
+
+  * Ensure at least one SSH key exists (GET/POST /ssh\_keys).
+  * POST /vms/v3 with vmConfiguration (name, hostname, osImage, sshKeys, openPorts).
+  * Poll GET /vms/v3 until status becomes Active; read publicIp.
+  * If you need to change ports later, PATCH /vms/v3 with the full desired openPorts list.
+* title: Handle provider‑terminated VMs
+  steps:
+
+  * Call GET /vms/v3 and detect status == Terminated.
+  * Finalize by DELETE /vms/v3 with {vmIds:\[...]}; this releases reserved funds.
+  * Recreate via POST /vms/v3 if capacity still needed.
+* title: Tidy up
+  steps:
+
+  * DELETE /vms/v3 to terminate unneeded instances before epoch rollover when practical.
+  * DELETE /ssh\_keys for keys you no longer use.
+
+troubleshooting\_cheatsheet:
+
+* symptom: POST /vms/v3 returns 422 Not enough offers found
+  cause: Constraints are too strict for current capacity/price.
+  fix: Relax filters (e.g., remove hardware.vendor, increase price ceiling, allow more countries) or reduce instances and retry estimate first.
+* symptom: Cannot SSH—connection refused/timeouts
+  cause: Port 22 not open or VM not yet Active; publicIp is null on Launching VMs.
+  fix: Ensure openPorts includes port 22 tcp; wait until status Active from GET /vms/v3.
+* symptom: Lost access after port change
+  cause: PATCH /vms/v3 openPorts list replaced and omitted port 22.
+  fix: Re‑run PATCH including ALL intended ports (including 22) or recreate VM.
+* symptom: Billing continues after provider terminated my VM
+  cause: Terminated VMs still hold reserved funds until explicitly deleted.
+  fix: DELETE /vms/v3 for the affected vmId to release funds.
+* symptom: Auth failed. No such API Key (403)
+  cause: Missing/invalid Authorization header.
+  fix: Create a valid key in Console and pass Authorization: Bearer \<API\_KEY>.
+
+faq:
+
+* q: How is price calculated?
+  a: >-
+  Per 24‑hour epoch in USDC. Offers expose per‑resource pricing and configuration price;
+  POST /vms/v3/estimate returns deposit and per‑epoch totals for your chosen constraints and instances.&#x20;
+* q: Can I bring my own OS image?
+  a: >-
+  Yes. Provide a public download URL to a supported format (.qcow2/.img/.raw or compressed variants)
+  in vmConfiguration.osImage. Or select a default from GET /vms/v3/default\_images.&#x20;
+* q: Do I need to reopen ports after restart?
+  a: >-
+  Port exposure is part of VM configuration; use PATCH /vms/v3 any time to replace the entire set.
+  Always include all desired ports in each update.&#x20;
+
+external\_resources:
+
+* label: Swagger UI (API Explorer)
+  url: [https://api.fluence.dev/](https://api.fluence.dev/)
+* label: API Reference Docs
+  url: [https://api.fluence.dev/docs](https://api.fluence.dev/docs)
+

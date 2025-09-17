@@ -1,0 +1,517 @@
+meta:
+spec\_name: chainway/clementine
+spec\_version: 0.3.0
+generated: '2025-09-17'
+library\_version: ^0.4.0
+language: rust
+homepage: [https://chainwayxyz.github.io/clementine/clementine\_core/](https://chainwayxyz.github.io/clementine/clementine_core/)
+tags:
+
+* blockchain
+* bitcoin
+* bridge
+* citrea
+* bitvm
+* risc0
+* zkvm
+* grpc
+* cli
+  purpose: Teach LLM agents and developers to operate Clementine—the BitVM-based, trust-minimized BTC ↔ Citrea bridge—via its runtime CLI, environment/configuration model, mTLS RPC setup, and RISC Zero circuit build flows.
+  guiding\_principles:
+* Prefer configuration files for reproducible deployments; switch to env-only mode explicitly with READ\_CONFIG\_FROM\_ENV=1.
+* Run Verifier and Operator behind mTLS and restrict clients; only the Aggregator should call their public RPCs.
+* Pin your Bitcoin node to v29+ and RISC Zero toolchain to 2.1.0 as documented; mixing versions invites subtle failures.
+* Always set RUST\_MIN\_STACK=33554432 for heavy proving; low stack manifests as panics deep in guest code.
+* Cache BitVM data and point BITVM\_CACHE\_PATH at it to avoid long cold-start times.
+* Use the automation feature for end-to-end demos, but review and disable it for production to keep control loops explicit.
+* Build circuits with the correct BITCOIN\_NETWORK (‘mainnet’/‘testnet4’/‘signet’/‘regtest’) to avoid method ID mismatches.
+  design\_notes: This pack is compiled from the user‑supplied Clementine combined documentation (README, docs/*.md, risc0-circuits/README). Where exact type signatures are unavailable, the authoritative contract is the documented CLI, env vars, and directory layouts. Version set to ^0.4.0 based on the changelog placeholder; treat as master/unreleased. Primary sources: docs/usage.md, docs/design.md, docs/*-circuit.md, SECURITY.md, risc0-circuits/README.md. Source bundle citation:&#x20;
+  groups:
+* name: Runtime CLI – Services
+  exports:
+
+  * verifier
+  * operator
+  * aggregator
+  * global\_flags
+    symbols:
+    verifier:
+    kind: function
+    summary: Start the Verifier (aka signer) gRPC server.
+    definition:
+    code: clementine-core verifier \[--config <PATH>] \[--protocol-params <PATH>] \[--verbose <LEVEL>]
+    lang: bash
+    source: docs/usage.md • CLI synopsis for Verifier.&#x20;
+    guidance:
+
+    * Deploy Verifier and Operator with distinct client certs; gate external calls to Verifier to only Aggregator cert.
+    * Share a single PostgreSQL DB across services run by the same entity for simplicity in test setups.
+    * Use --protocol-params to pin protocol constants per deployment; do not rely on environment defaults silently.
+    * Increase --verbose to 5 when diagnosing proving or RPC auth issues; combine with RUST\_LIB\_BACKTRACE=full.
+      example:
+      code: READ\_CONFIG\_FROM\_ENV=0 READ\_PARAMSET\_FROM\_ENV=0 ./target/release/clementine-core verifier --config ./bridge.toml --protocol-params ./params.toml --verbose 4
+      lang: bash
+      description: Run Verifier from files; mTLS must be pre-configured as per RPC Authentication.
+      since: 0.4.0
+      operator:
+      kind: function
+      summary: Start the Operator gRPC server.
+      definition:
+      code: clementine-core operator \[--config <PATH>] \[--protocol-params <PATH>] \[--verbose <LEVEL>]
+      lang: bash
+      source: docs/usage.md • CLI synopsis for Operator.&#x20;
+      guidance:
+    * Operator acknowledges Watchtower challenges; ensure Operator client cert trusts the Aggregator’s CA.
+    * Set RUST\_MIN\_STACK before starting to avoid deep recursion panics when verifying circuits.
+    * If using automation feature, verify Bitcoin node connectivity and funding beforehand.
+      example:
+      code: ./target/release/clementine-core operator --config ./bridge.toml --protocol-params ./params.toml --verbose 3
+      lang: bash
+      since: 0.4.0
+      aggregator:
+      kind: function
+      summary: Start the Aggregator gRPC server.
+      definition:
+      code: |-
+      clementine-core aggregator \[--config <PATH>] \[--protocol-params <PATH>]
+      \[--verbose <LEVEL>]
+      lang: bash
+      source: docs/usage.md • CLI synopsis for Aggregator.&#x20;
+      guidance:
+    * The Aggregator is the only client authorized to call Verifier/Operator public RPCs via mTLS.
+    * Run Aggregator and Verifier on the same host during early testing to simplify certificate distribution.
+    * Enable the automation feature at build time for hands‑off E2E demos; disable for manual control in production.
+      example:
+      code: ./target/release/clementine-core aggregator --config ./bridge.toml --protocol-params ./params.toml --verbose 2
+      lang: bash
+      since: 0.4.0
+      global\_flags:
+      kind: interface
+      summary: Common CLI flags for all Clementine services.
+      definition:
+      code: |-
+      \--config <PATH>
+      \--protocol-params <PATH>
+      \--verbose <LEVEL>
+      \--help
+      lang: text
+      source: docs/usage.md • Global options.&#x20;
+      guidance:
+    * Prefer explicit --protocol-params per environment to avoid mixing constants across networks.
+    * Use --verbose 5 during local debugging; drop to 2–3 in deployments to keep logs actionable.
+      example:
+      code: ./target/release/clementine-core operator --help
+      lang: bash
+* name: Configuration & Environment
+  exports:
+
+  * READ\_CONFIG\_FROM\_ENV
+  * READ\_PARAMSET\_FROM\_ENV
+  * RISC0\_DEV\_MODE
+  * BITVM\_CACHE\_PATH
+  * RUST\_MIN\_STACK
+  * RUST\_LIB\_BACKTRACE
+  * BITCOIN\_NETWORK
+  * BRIDGE\_CIRCUIT\_MODE
+    symbols:
+    READ\_CONFIG\_FROM\_ENV:
+    kind: constant
+    summary: Select configuration source for main app settings.
+    definition:
+    code: |-
+    READ\_CONFIG\_FROM\_ENV = ("1"|"on"|"0"|"off"|unset)
+    \# 1/on → read config from env vars; 0/off/unset → read from --config file
+    lang: text
+    source: docs/usage.md • Configuration Source Selection.&#x20;
+    guidance:
+
+    * When scripting deployments, set this explicitly to avoid surprises if files are missing.
+    * Pair with READ\_PARAMSET\_FROM\_ENV to keep config and param sources consistent.
+      example:
+      code: READ\_CONFIG\_FROM\_ENV=1 ./target/release/clementine-core verifier
+      lang: bash
+      READ\_PARAMSET\_FROM\_ENV:
+      kind: constant
+      summary: Select configuration source for protocol parameters.
+      definition:
+      code: |-
+      READ\_PARAMSET\_FROM\_ENV = ("1"|"on"|"0"|"off"|unset)
+
+      # 1/on → read params from env vars; 0/off/unset → read from --protocol-params file
+
+      lang: text
+      source: docs/usage.md • Configuration Source Selection.&#x20;
+      guidance:
+    * Commit protocol param files to your infra repo to make network upgrades auditable.
+    * Avoid mixing file‑based main config with env‑based params unless documented in runbooks.
+      example:
+      code: READ\_CONFIG\_FROM\_ENV=0 READ\_PARAMSET\_FROM\_ENV=1 ./target/release/clementine-core aggregator --config ./bridge.toml
+      lang: bash
+      RISC0\_DEV\_MODE:
+      kind: constant
+      summary: Enable development mode for RISC Zero (affects VKs/cache & testing).
+      definition:
+      code: RISC0\_DEV\_MODE = 1
+      lang: text
+      source: docs/usage.md • Prerequisites & Testing.&#x20;
+      guidance:
+    * Set in shells used for tests; do not export in production environments.
+    * With dev mode set, point BITVM\_CACHE\_PATH to the dev cache file to match circuit expectations.
+      example:
+      code: export RISC0\_DEV\_MODE=1
+      lang: bash
+      BITVM\_CACHE\_PATH:
+      kind: constant
+      summary: Location of BitVM cache blob to speed up proving.
+      definition:
+      code: BITVM\_CACHE\_PATH = "/path/to/bitvm\_cache.bin"  # or bitvm\_cache\_dev.bin when RISC0\_DEV\_MODE=1
+      lang: text
+      source: docs/usage.md • Optional BitVM cache.&#x20;
+      guidance:
+    * Fetch the cache before first run to avoid long on‑the‑fly generation.
+    * Keep dev and non‑dev caches distinct to prevent method ID mismatches.
+      example:
+      code: |-
+      wget [https://static.testnet.citrea.xyz/common/bitvm\_cache\_v3.bin](https://static.testnet.citrea.xyz/common/bitvm_cache_v3.bin) -O bitvm\_cache.bin
+      export BITVM\_CACHE\_PATH=\$PWD/bitvm\_cache.bin
+      lang: bash
+      RUST\_MIN\_STACK:
+      kind: constant
+      summary: Minimum stack size for Rust threads (heavy proofs need ≥ 32 MiB).
+      definition:
+      code: RUST\_MIN\_STACK = 33554432
+      lang: text
+      source: docs/usage.md • Set minimum stack.&#x20;
+      guidance:
+    * Set globally in the service unit (systemd) to apply across restarts.
+    * If you see stack overflow or deep backtrace panics, raise this and retry.
+      example:
+      code: export RUST\_MIN\_STACK=33554432
+      lang: bash
+      RUST\_LIB\_BACKTRACE:
+      kind: constant
+      summary: Enable full backtraces for debugging.
+      definition:
+      code: RUST\_LIB\_BACKTRACE = full
+      lang: text
+      source: docs/usage.md • Debugging.&#x20;
+      guidance:
+    * Use with --verbose 4–5 to correlate stack traces with high‑level flow.
+    * Disable in production to reduce noise and potential PII in logs.
+      example:
+      code: RUST\_LIB\_BACKTRACE=full ./target/release/clementine-core operator --config ./bridge.toml
+      lang: bash
+      BITCOIN\_NETWORK:
+      kind: constant
+      summary: Build‑time selector for network targeting (affects method IDs).
+      definition:
+      code: BITCOIN\_NETWORK ∈ { mainnet | testnet4 | signet | regtest }
+      lang: text
+      source: risc0-circuits/README.md • Build commands.&#x20;
+      guidance:
+    * Build all circuits with the same network or expect verification failures.
+    * Regenerate artifacts after changing this setting; stale ELFs will not match.
+      example:
+      code: BITCOIN\_NETWORK=regtest REPR\_GUEST\_BUILD=1 cargo build -p bridge-circuit --release
+      lang: bash
+      BRIDGE\_CIRCUIT\_MODE:
+      kind: constant
+      summary: Optional build‑time mode for the Bridge circuit.
+      definition:
+      code: BRIDGE\_CIRCUIT\_MODE = \<CIRCUIT\_MODE>
+      lang: text
+      source: risc0-circuits/README.md • Bridge circuit build.&#x20;
+      guidance:
+    * Keep this unset unless you have a mode‑specific verifier and params.
+    * Document the chosen mode alongside the resulting method IDs.
+      example:
+      code: BITCOIN\_NETWORK=testnet4 BRIDGE\_CIRCUIT\_MODE=default REPR\_GUEST\_BUILD=1 cargo build -p bridge-circuit --release
+      lang: bash
+* name: Circuits Build (RISC Zero)
+  exports:
+
+  * build\_header\_chain
+  * build\_work\_only
+  * build\_bridge\_circuit
+  * build\_bridge\_circuit\_test\_vk
+    symbols:
+    build\_header\_chain:
+    kind: function
+    summary: Build the Header‑Chain guest/host artifacts.
+    definition:
+    code: |-
+    cd risc0-circuits/header-chain/
+    REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=\<NETWORK\_TYPE> cargo build -p work-only --release
+    lang: bash
+    source: risc0-circuits/README.md • Header‑chain build. (Note: upstream command uses -p work-only; verify path)&#x20;
+    guidance:
+
+    * Use REPR\_GUEST\_BUILD=1 to ensure reproducible ELFs and stable method IDs.
+    * Always rebuild after changing BITCOIN\_NETWORK to avoid mismatches in downstream verifiers.
+      example:
+      code: cd risc0-circuits/header-chain && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=regtest cargo build -p work-only --release
+      lang: bash
+      build\_work\_only:
+      kind: function
+      summary: Build the Work‑Only circuit artifacts.
+      definition:
+      code: |-
+      cd risc0-circuits/work-only/
+      REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=\<NETWORK\_TYPE> cargo build -p work-only --release
+      lang: bash
+      source: risc0-circuits/README.md • Work‑only build.&#x20;
+      guidance:
+    * Watchtower nodes use this circuit; pin artifacts per network in artifact management.
+    * Share method IDs with challengers/verifiers to streamline dispute flows.
+      example:
+      code: cd risc0-circuits/work-only && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=testnet4 cargo build -p work-only --release
+      lang: bash
+      build\_bridge\_circuit:
+      kind: function
+      summary: Build the Bridge circuit artifacts for Operators.
+      definition:
+      code: |-
+      cd risc0-circuits/bridge-circuit/
+      REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=\<NETWORK\_TYPE> BRIDGE\_CIRCUIT\_MODE=\<CIRCUIT\_MODE> cargo build -p bridge-circuit --release
+      lang: bash
+      source: risc0-circuits/README.md • Bridge circuit build.&#x20;
+      guidance:
+    * Use the same mode and network across Operator and Disprove scripts.
+    * Check in the resulting ELF/method ID alongside deployment manifests.
+      example:
+      code: cd risc0-circuits/bridge-circuit && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=signet cargo build -p bridge-circuit --release
+      lang: bash
+      build\_bridge\_circuit\_test\_vk:
+      kind: function
+      summary: Build Bridge circuit on regtest with test verification key.
+      definition:
+      code: REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=regtest cargo build -p bridge-circuit --features use-test-vk --release
+      lang: bash
+      source: risc0-circuits/README.md • Test VK build.&#x20;
+      guidance:
+    * Use only for testing; do not mix test VK artifacts with production runs.
+    * Keep separate output directories for regtest vs. other networks to avoid confusion.
+      example:
+      code: cd risc0-circuits/bridge-circuit && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=regtest cargo build -p bridge-circuit --features use-test-vk --release
+      lang: bash
+* name: Operations – Docker & Testing
+  exports:
+
+  * docker\_compose\_verifier\_testnet4
+  * docker\_compose\_full\_regtest
+  * cargo\_test\_all
+  * cargo\_test\_unit
+  * cargo\_test\_integration
+    symbols:
+    docker\_compose\_verifier\_testnet4:
+    kind: function
+    summary: Start Verifier stack on testnet4 via Docker Compose.
+    definition:
+    code: docker compose -f scripts/docker/docker-compose.verifier.testnet4.yml up
+    lang: bash
+    source: docs/usage.md • Using Docker.&#x20;
+    guidance:
+
+    * Edit configs under scripts/docker/configs/ before first run; defaults are examples only.
+    * Fund wallets where required; non‑regtest networks won’t auto‑fund.
+      example:
+      code: docker compose -f scripts/docker/docker-compose.verifier.testnet4.yml up --build
+      lang: bash
+      docker\_compose\_full\_regtest:
+      kind: function
+      summary: Start full local stack (Bitcoin, PostgreSQL, Citrea, Clementine) on regtest.
+      definition:
+      code: docker compose -f scripts/docker/docker-compose.full.regtest.yml up
+      lang: bash
+      source: docs/usage.md • Using Docker.&#x20;
+      guidance:
+    * Regtest auto‑funding simplifies E2E testing; keep it isolated from other environments.
+    * Mount volumes for PostgreSQL data if you need persistence across runs.
+      example:
+      code: docker compose -f scripts/docker/docker-compose.full.regtest.yml up -d
+      lang: bash
+      cargo\_test\_all:
+      kind: function
+      summary: Run all tests with all features.
+      definition:
+      code: cargo test --all-features
+      lang: bash
+      source: docs/usage.md • Running Tests.&#x20;
+      guidance:
+    * Ensure RISC0\_DEV\_MODE=1 for tests that expect dev VKs.
+    * Use -- --nocapture to see println! output when debugging failures.
+      example:
+      code: RISC0\_DEV\_MODE=1 cargo test --all-features -- --nocapture
+      lang: bash
+      cargo\_test\_unit:
+      kind: function
+      summary: Run unit tests only.
+      definition:
+      code: cargo test\_unit
+      lang: bash
+      source: docs/usage.md • Running Tests.&#x20;
+      guidance:
+    * Faster iteration during library development; pair with cargo watch.
+    * Keep unit tests hermetic; mock external RPCs and DB.
+      example:
+      code: cargo test\_unit
+      lang: bash
+      cargo\_test\_integration:
+      kind: function
+      summary: Run integration tests only.
+      definition:
+      code: cargo test\_integration
+      lang: bash
+      source: docs/usage.md • Running Tests.&#x20;
+      guidance:
+    * Spin up dependent services (DB, Bitcoin) before running these tests.
+    * Use a dedicated database and clear state between runs.
+      example:
+      code: cargo test\_integration
+      lang: bash
+* name: Security – mTLS & RPC
+  exports:
+
+  * certs\_layout
+  * rpc\_auth\_policy
+  * generate\_certs\_script
+    symbols:
+    certs\_layout:
+    kind: interface
+    summary: Expected certificate/key directory structure for mTLS.
+    definition:
+    code: |-
+    certs/
+    ├── ca/
+    │   ├── ca.key
+    │   └── ca.pem
+    ├── server/
+    │   ├── ca.pem
+    │   ├── server.key
+    │   └── server.pem
+    ├── client/
+    │   ├── ca.pem
+    │   ├── client.key
+    │   └── client.pem
+    └── aggregator/
+    ├── ca.pem
+    ├── aggregator.key
+    └── aggregator.pem
+    lang: text
+    source: docs/usage.md • Certificate Setup for Tests.&#x20;
+    guidance:
+
+    * Never commit private keys (\*.key) to VCS; rotate regularly and separate test/prod CAs.
+    * Use distinct client certs per service and principle of least privilege.
+      example:
+      code: ls -R certs/
+      lang: bash
+      rpc\_auth\_policy:
+      kind: interface
+      summary: Mutual TLS rules enforced by Verifier/Operator.
+      definition:
+      code: |-
+
+      1. Verifier/Operator RPCs: only Aggregator client certificate may call public endpoints (aggregator\_cert\_path).
+      2. Internal methods: only the entity’s own client cert may call (client\_cert\_path).
+      3. Aggregator: uses TLS for encryption; does not enforce client certs.
+         lang: text
+         source: docs/usage.md • RPC Authentication.&#x20;
+         guidance:
+    * Distribute only the necessary CA roots to each party; keep private keys isolated.
+    * Audit server logs at high verbosity when onboarding new client certs to confirm authz paths.
+      example:
+      code: ./scripts/generate\_certs.sh && ./target/release/clementine-core verifier --config ./bridge.toml
+      lang: bash
+      generate\_certs\_script:
+      kind: function
+      summary: Helper to generate a CA and service/client certs for local testing.
+      definition:
+      code: ./scripts/generate\_certs.sh
+      lang: bash
+      source: docs/usage.md • Certificate Setup for Tests.&#x20;
+      guidance:
+    * Use for local testing only; replace with CA‑issued certs in production.
+    * Keep the generated directory outside your repo or in .gitignore to avoid accidental commits.
+      example:
+      code: ./scripts/generate\_certs.sh
+      lang: bash
+      common\_workflows:
+* title: Single‑host dev setup with Aggregator + Verifier
+  steps:
+
+  * Install Rust and RISC Zero 2.1.0; ensure bitcoind v29+ is running and synced.
+  * export RISC0\_DEV\_MODE=1; export RUST\_MIN\_STACK=33554432; wget BitVM cache and set BITVM\_CACHE\_PATH.
+  * ./scripts/generate\_certs.sh to create local CA and certs.
+  * cargo build --release --features automation to enable automatic duties.
+  * ./target/release/clementine-core aggregator --config ./bridge.toml --protocol-params ./params.toml
+  * ./target/release/clementine-core verifier --config ./bridge.toml --protocol-params ./params.toml --verbose 4
+* title: Run on regtest via Docker Compose
+  steps:
+
+  * Customize files under scripts/docker/configs/ to match your environment.
+  * docker compose -f scripts/docker/docker-compose.full.regtest.yml up -d
+  * Watch logs; ensure services are healthy and RPC ports are reachable.
+* title: Build all circuits for testnet4
+  steps:
+
+  * cd risc0-circuits/header-chain && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=testnet4 cargo build -p work-only --release
+  * cd ../work-only && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=testnet4 cargo build -p work-only --release
+  * cd ../bridge-circuit && REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=testnet4 cargo build -p bridge-circuit --release
+* title: Switch to env‑only configuration at runtime
+  steps:
+
+  * Set READ\_CONFIG\_FROM\_ENV=1 and READ\_PARAMSET\_FROM\_ENV=1 in your service unit.
+  * Populate required env vars for DB, RPC, TLS paths as documented in your config schema.
+  * Start service and verify boot logs mention 'reading config from environment'.
+* title: Enable deep debugging
+  steps:
+
+  * Set RUST\_LIB\_BACKTRACE=full and increase --verbose to 5.
+  * Reproduce the issue; capture logs and backtraces.
+  * If stack overflow suspected, raise RUST\_MIN\_STACK and retry.
+* title: Use test verification key for Bridge circuit on regtest
+  steps:
+
+  * cd risc0-circuits/bridge-circuit
+  * REPR\_GUEST\_BUILD=1 BITCOIN\_NETWORK=regtest cargo build -p bridge-circuit --features use-test-vk --release
+  * Run Operator against regtest with artifacts from this build only.
+* title: Fetch and wire BitVM cache
+  steps:
+
+  * wget [https://static.testnet.citrea.xyz/common/bitvm\_cache\_v3.bin](https://static.testnet.citrea.xyz/common/bitvm_cache_v3.bin) -O bitvm\_cache.bin
+  * export BITVM\_CACHE\_PATH=\$PWD/bitvm\_cache.bin
+  * Start services and confirm cache path detected in logs.
+    troubleshooting\_cheatsheet:
+* symptom: Service panics with deep stack trace in guest execution.
+  cause: Insufficient thread stack for heavy proving.
+  fix: Set RUST\_MIN\_STACK=33554432 and restart; confirm via env dump.
+* symptom: Verifier/Operator reject RPC calls with certificate errors.
+  cause: mTLS not configured or wrong client certificate used.
+  fix: Regenerate certs with scripts/generate\_certs.sh and ensure Aggregator uses the client cert signed by the same CA.
+* symptom: Work‑only/Bridge proofs fail to verify after switching networks.
+  cause: Artifacts built with a different BITCOIN\_NETWORK than runtime expectations.
+  fix: Rebuild circuits with the correct BITCOIN\_NETWORK and redeploy artifacts.
+* symptom: Long startup times on fresh environments.
+  cause: BitVM cache missing; proving cache being generated on the fly.
+  fix: Download cache and set BITVM\_CACHE\_PATH to the binary.
+* symptom: Unknown flags or help output differs from docs.
+  cause: Library version drift (Unreleased master vs. your checkout).
+  fix: Pin to a specific git tag/commit and regenerate docs; verify with --help.
+  faq:
+* q: Why N‑of‑N signers instead of M‑of‑N for the bridge funds?
+  a: The N‑of‑N arrangement functions as a key deletion covenant, not a plain multisig. Updates to the N‑of‑N set are governed by a separate M‑of‑N multisig with time restrictions, allowing exits if trust changes.&#x20;
+* q: Why is the bridge denominator 10 BTC rather than 1 BTC?
+  a: Kickoff connectors per round are limited, constraining withdrawal throughput; 1 BTC currently appears infeasible per the docs (open research).&#x20;
+* q: Why Winternitz one‑time signatures (WOTS)?
+  a: Bitcoin Script can only natively verify Schnorr signatures over transactions; WOTS can be verified via hashing, enabling message‑like commitments and state propagation across UTXOs in BitVM flows.&#x20;
+  external\_resources:
+* label: Clementine Whitepaper
+  url: [https://citrea.xyz/clementine\_whitepaper.pdf](https://citrea.xyz/clementine_whitepaper.pdf)
+* label: Clementine Code Docs (clementine\_core)
+  url: [https://chainwayxyz.github.io/clementine/clementine\_core/](https://chainwayxyz.github.io/clementine/clementine_core/)
+* label: RISC Zero Install Guide
+  url: [https://dev.risczero.com/api/zkvm/install](https://dev.risczero.com/api/zkvm/install)
+* label: 'Docker Hub: chainwayxyz/clementine'
+  url: [https://hub.docker.com/r/chainwayxyz/clementine](https://hub.docker.com/r/chainwayxyz/clementine)
+

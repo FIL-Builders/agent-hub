@@ -1,0 +1,856 @@
+meta:
+spec\_name: fetchai/agentverse-hosting-api
+spec\_version: 0.3.0
+generated: '2025-09-17'
+library\_version: '>=1.0.0 <2.0.0'
+language: http+json
+homepage: [https://agentverse.ai](https://agentverse.ai)
+tags:
+
+* fetch.ai
+* agentverse
+* hosting
+* agents
+* REST
+* ai-engine
+  purpose: LLM-ready reference for the Agentverse Hosting API (v1 REST) to list, create, control, and observe Fetch.ai agents and their usage.
+  guiding\_principles:
+* Treat agent addresses as stable identifiers and pass them as path parameters where required.
+* Normalize response types: some samples show booleans and numbers as strings—coerce to booleans/numbers in clients.
+* Use code digests to detect code changes and avoid unnecessary deployments.
+* Start/stop endpoints toggle runtime state; poll the agent record after actions to confirm state.
+* Store revision numbers to understand code rollouts; each update increments the revision.
+* Logs endpoints are best-effort snapshots; persist critical telemetry in your own store.
+* Design idempotent client code for create/update operations to handle retries safely.
+* Respect rate limiting and authentication as configured in your Agentverse account; propagate errors verbatim for debugging.
+  design\_notes: Derived from the combined Fetch.ai docs (test.mdx Hosting API section, data object descriptions, and examples). Grouped by resource area (Agents, Code & Control, Usage, Types). Examples use modern Node.js fetch for clarity.&#x20;
+  groups:
+* name: Agents
+  exports:
+
+  * agents.list
+  * agents.create
+  * agents.get
+  * agents.delete
+    symbols:
+    agents.list:
+    kind: function
+    summary: List all of your hosted agents.
+    definition:
+    lang: openapi
+    code: |-
+    paths:
+    /v1/hosting/agents:
+    get:
+    summary: List agents
+    responses:
+    '200':
+    description: Array of Agent objects
+    content:
+    application/json:
+    schema:
+    type: array
+    items:
+    \$ref: '#/components/schemas/Agent'
+    components:
+    schemas:
+    Agent:
+    type: object
+    properties:
+    name: { type: string }
+    address: { type: string }
+    running: { type: boolean }
+    compiled: { type: \["boolean","null"] }
+    revision: { type: integer }
+    code\_digest: { type: \["string","null"] }
+    wallet\_address: { type: \["string","null"] }
+    required: \[name,address,running,compiled,revision,code\_digest,wallet\_address]
+    source: pages/test.mdx → Hosting API > GET /v1/hosting/agents
+    guidance:
+
+    * Paginate client-side if the list is large (API returns full array).
+    * Cache by ETag or hash to avoid re-rendering dashboards when no changes.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      // Node 18+
+      // List all agents
+      const res = await fetch('[https://agentverse.ai/v1/hosting/agents](https://agentverse.ai/v1/hosting/agents)');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const agents = await res.json();
+      console.log(agents.map(a => `${a.name} ${a.address}`).join('\n'));
+      })().catch(err => console.error(err));
+      since: v1
+      agents.create:
+      kind: function
+      summary: Create a new agent (returns its address and initial metadata).
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents:
+      post:
+      summary: Create agent
+      requestBody:
+      required: true
+      content:
+      application/json:
+      schema:
+      type: object
+      properties:
+      name: { type: string }
+      required: \[name]
+      responses:
+      '200':
+      description: Created Agent
+      content:
+      application/json:
+      schema:
+      \$ref: '#/components/schemas/Agent'
+      source: pages/test.mdx → Hosting API > POST /v1/hosting/agents
+      guidance:
+    * The input `name` is a label only; persist the returned `address` as the primary key for later calls.
+    * New agents may have `compiled: null` until code is uploaded—create then update code.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const res = await fetch('[https://agentverse.ai/v1/hosting/agents](https://agentverse.ai/v1/hosting/agents)', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'My newest agent' })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const agent = await res.json();
+      console.log('Created agent address:', agent.address);
+      })().catch(err => console.error(err));
+      since: v1
+      agents.get:
+      kind: function
+      summary: Fetch a specific agent by address.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{agentAddress}:
+      get:
+      summary: Get agent by address
+      parameters:
+      \- in: path
+      name: agentAddress
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Agent
+      content:
+      application/json:
+      schema:
+      \$ref: '#/components/schemas/Agent'
+      source: pages/test.mdx → Hosting API > GET /v1/hosting/agents/{agentAddress}
+      guidance:
+    * Always URL-encode the address string when building the path.
+    * If 404, verify the address and that the agent belongs to your workspace/tenant.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1qtw0hy4kj65fv6j7qyv5mgdecq7c4qyqfqnjgc25wz4vf5h47l9l6m7qqtg';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      console.log(await res.json());
+      })().catch(err => console.error(err));
+      since: v1
+      agents.delete:
+      kind: function
+      summary: Delete a specific agent by address.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{agentAddress}:
+      delete:
+      summary: Delete agent by address
+      parameters:
+      \- in: path
+      name: agentAddress
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Deletion confirmed (empty object)
+      source: pages/test.mdx → Hosting API > DELETE /v1/hosting/agents/{agentAddress}
+      guidance:
+    * This is destructive; consider implementing a soft-delete in your app before calling the API.
+    * Perform a final GET to confirm the agent no longer exists or is no longer returned.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1q2dfhywtt8xazrdyzgap6gzdd7uhk4e0wmc3gjqt42esauaegcm8cuvclpj';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}`, { method: 'DELETE' });
+      console.log('Deleted:', res.ok);
+      })().catch(err => console.error(err));
+      since: v1
+* name: Code, Control & Logs
+  exports:
+
+  * code.get
+  * code.update
+  * control.start
+  * control.stop
+  * logs.getLatest
+  * logs.delete
+    symbols:
+    code.get:
+    kind: function
+    summary: Get the latest code bundle for an agent (digest, code, timestamp).
+    definition:
+    lang: openapi
+    code: |-
+    paths:
+    /v1/hosting/agents/{agentAddress}/code:
+    get:
+    summary: Get agent code
+    parameters:
+    \- in: path
+    name: agentAddress
+    required: true
+    schema: { type: string }
+    responses:
+    '200':
+    description: Array of AgentCode records (most recent first)
+    content:
+    application/json:
+    schema:
+    type: array
+    items:
+    \$ref: '#/components/schemas/AgentCode'
+    components:
+    schemas:
+    AgentCode:
+    type: object
+    properties:
+    digest: { type: string }
+    code:   { type: string }
+    timestamp: { type: string, format: date-time }
+    required: \[digest, code, timestamp]
+    source: pages/test.mdx → Hosting API > GET /v1/hosting/agents/{agentAddress}/code
+    guidance:
+
+    * Use the `digest` to detect whether the server-side code changed before overwriting.
+    * Treat `code` as the authoritative text—if you store your own copy, keep the digest in sync.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const addr = 'agent1q2dfhywtt8xazrdyzgap6gzdd7uhk4e0wmc3gjqt42esauaegcm8cuvclpj';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(addr)}/code`);
+      const history = await res.json();
+      console.log('Latest digest:', history\[0]?.digest);
+      })().catch(err => console.error(err));
+      since: v1
+      code.update:
+      kind: function
+      summary: Replace the agent’s code by uploading a multi-file bundle; returns the new digest.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{agentAddress}/code:
+      put:
+      summary: Update agent code
+      parameters:
+      \- in: path
+      name: agentAddress
+      required: true
+      schema: { type: string }
+      requestBody:
+      required: true
+      content:
+      application/json:
+      schema:
+      type: object
+      properties:
+      code:
+      type: array
+      items:
+      type: object
+      properties:
+      id: { type: integer }
+      name: { type: string }
+      value: { type: string }
+      language: { type: string }
+      required: \[id, name, value, language]
+      required: \[code]
+      responses:
+      '200':
+      description: Updated digest
+      content:
+      application/json:
+      schema:
+      \$ref: '#/components/schemas/AgentCodeDigest'
+      components:
+      schemas:
+      AgentCodeDigest:
+      type: object
+      properties:
+      digest: { type: string }
+      required: \[digest]
+      source: pages/test.mdx → Hosting API > PUT /v1/hosting/agents/{agentAddress}/code
+      guidance:
+    * Send the whole code bundle on each update—server computes the digest over all files.
+    * Keep secrets (e.g., seeds) in a separate file such as `.env`; do not hardcode in source.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const addr = 'agent1q2dfhywtt8xazrdyzgap6gzdd7uhk4e0wmc3gjqt42esauaegcm8cuvclpj';
+      const payload = {
+      code: \[
+      { id: 0, name: 'agent.py', value: 'from uagents import Agent\n# ...', language: 'python' },
+      { id: 1, name: '.env', value: 'AGENT\_SEED=YOUR\_AGENT\_SEED', language: 'python' }
+      ]
+      };
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(addr)}/code`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload)
+      });
+      const out = await res.json();
+      console.log('New digest:', out.digest);
+      })().catch(err => console.error(err));
+      since: v1
+      control.start:
+      kind: function
+      summary: Start the runtime for an agent (bring it online).
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{address}/start:
+      post:
+      summary: Start agent
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Agent after start
+      content:
+      application/json:
+      schema:
+      \$ref: '#/components/schemas/Agent'
+      source: pages/test.mdx → Hosting API > POST /v1/hosting/agents/{address}/start
+      guidance:
+    * Some samples show booleans as strings (e.g., `running: "True"`); normalize values in your client.
+    * If you rely on compiled status, re-fetch the Agent to confirm `compiled === true` before routing traffic.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}/start`, { method: 'POST' });
+      const agent = await res.json();
+      console.log('Running:', agent.running);
+      })().catch(err => console.error(err));
+      since: v1
+      control.stop:
+      kind: function
+      summary: Stop the runtime for an agent (take it offline).
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{address}/stop:
+      post:
+      summary: Stop agent
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Agent after stop
+      content:
+      application/json:
+      schema:
+      \$ref: '#/components/schemas/Agent'
+      source: pages/test.mdx → Hosting API > POST /v1/hosting/agents/{address}/stop
+      guidance:
+    * Quiesce in-flight work before stopping; design your Agent to handle SIGTERM-like shutdowns.
+    * After stopping, verify `running === false` via a GET before proceeding with maintenance.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}/stop`, { method: 'POST' });
+      const agent = await res.json();
+      console.log('Stopped:', agent.running === false || agent.running === 'False');
+      })().catch(err => console.error(err));
+      since: v1
+      logs.getLatest:
+      kind: function
+      summary: Fetch the latest log entries for an agent.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{address}/logs/latest:
+      get:
+      summary: Get latest logs
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Array of log entries
+      content:
+      application/json:
+      schema:
+      type: array
+      items:
+      \$ref: '#/components/schemas/AgentLog'
+      components:
+      schemas:
+      AgentLog:
+      type: object
+      properties:
+      log\_timestamp: { type: string, format: date-time }
+      log\_entry:     { type: string }
+      required: \[log\_timestamp, log\_entry]
+      source: pages/test.mdx → Hosting API > GET /v1/hosting/agents/{address}/logs/latest
+      guidance:
+    * Logs are transient; export them to your own storage if you need long-term retention.
+    * Use server time in `log_timestamp` for ordering; do not assume monotonicity across shards.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}/logs/latest`);
+      const lines = await res.json();
+      for (const l of lines) console.log(`[${l.log_timestamp}] ${l.log_entry}`);
+      })().catch(err => console.error(err));
+      since: v1
+      logs.delete:
+      kind: function
+      summary: Delete the latest logs for an agent.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/agents/{address}/logs:
+      delete:
+      summary: Delete latest logs
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Empty object on success
+      source: pages/test.mdx → Hosting API > DELETE /v1/hosting/agents/{address}/logs
+      guidance:
+    * This clears only the latest batch on the platform; confirm your own observability pipeline before deleting.
+    * Run a GET immediately after deletion to ensure the platform state matches expectations.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const address = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/agents/${encodeURIComponent(address)}/logs`, { method: 'DELETE' });
+      console.log('Deleted logs:', res.ok);
+      })().catch(err => console.error(err));
+      since: v1
+* name: Usage
+  exports:
+
+  * usage.getCurrent
+  * usage.getByMonth
+  * usage.getCurrentForAgent
+  * usage.getForAgentByMonth
+    symbols:
+    usage.getCurrent:
+    kind: function
+    summary: Get usage data for the currently selected account/workspace (current period).
+    definition:
+    lang: openapi
+    code: |-
+    paths:
+    /v1/hosting/usage/current:
+    get:
+    summary: Get current usage
+    responses:
+    '200':
+    description: Array with current usage summary
+    content:
+    application/json:
+    schema:
+    type: array
+    items:
+    \$ref: '#/components/schemas/Usage'
+    components:
+    schemas:
+    Usage:
+    type: object
+    properties:
+    year: { type: string }
+    month: { type: string }
+    computation\_time: { type: string }
+    num\_messages: { type: string }
+    num\_message\_bytes: { type: string }
+    num\_agents: { type: string }
+    quota\_computation\_time: { type: string }
+    quota\_num\_messages: { type: string }
+    quota\_message\_bytes: { type: string }
+    quota\_agents: { type: string }
+    source: pages/test.mdx → Hosting API > GET /v1/hosting/usage/current
+    guidance:
+
+    * The example shows numeric fields as strings; parse them into numbers for calculations.
+    * Use these quotas to drive client-side meters and to alert before limits are reached.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const res = await fetch('[https://agentverse.ai/v1/hosting/usage/current](https://agentverse.ai/v1/hosting/usage/current)');
+      const \[u] = await res.json();
+      const used = Number(u.num\_messages);
+      const cap = Number(u.quota\_num\_messages);
+      console.log(`Messages: ${used}/${cap} (${(used/cap*100).toFixed(1)}%)`);
+      })().catch(err => console.error(err));
+      since: v1
+      usage.getByMonth:
+      kind: function
+      summary: Get usage data for a specific year and month.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/usage/{year}/{month}:
+      get:
+      summary: Get usage by month
+      parameters:
+      \- in: path
+      name: year
+      required: true
+      schema: { type: string }
+      \- in: path
+      name: month
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Array with usage summary for the month
+      content:
+      application/json:
+      schema:
+      type: array
+      items:
+      \$ref: '#/components/schemas/Usage'
+      source: pages/test.mdx → Hosting API > GET /v1/hosting/usage/{year}/{month}
+      guidance:
+    * Use zero-padded month (e.g., '03' for March) to avoid routing issues.
+    * Compare month totals to per-agent totals to spot hotspots.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const y = '2023', m = '08';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/usage/${y}/${m}`);
+      console.log(await res.json());
+      })().catch(err => console.error(err));
+      since: v1
+      usage.getCurrentForAgent:
+      kind: function
+      summary: Get current-period usage for a specific agent address.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/usage/agents/{address}/current:
+      get:
+      summary: Get current usage for agent
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Array with current usage for the agent
+      content:
+      application/json:
+      schema:
+      type: array
+      items:
+      type: object
+      properties:
+      year: { type: string }
+      month: { type: string }
+      computation\_time: { type: string }
+      num\_messages: { type: string }
+      num\_message\_bytes: { type: string }
+      source: pages/test.mdx → Hosting API > GET /v1/hosting/usage/agents/{address}/current
+      guidance:
+    * Join with agent metadata for richer dashboards (e.g., name, compiled state).
+    * Normalize address case and URL-encode when building the path.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const addr = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/usage/agents/${encodeURIComponent(addr)}/current`);
+      console.log(await res.json());
+      })().catch(err => console.error(err));
+      since: v1
+      usage.getForAgentByMonth:
+      kind: function
+      summary: Get usage for a specific agent address in a specific year and month.
+      definition:
+      lang: openapi
+      code: |-
+      paths:
+      /v1/hosting/usage/agents/{address}/{year}/{month}:
+      get:
+      summary: Get usage for agent by month
+      parameters:
+      \- in: path
+      name: address
+      required: true
+      schema: { type: string }
+      \- in: path
+      name: year
+      required: true
+      schema: { type: string }
+      \- in: path
+      name: month
+      required: true
+      schema: { type: string }
+      responses:
+      '200':
+      description: Array with usage summary for the agent in the month
+      content:
+      application/json:
+      schema:
+      type: array
+      items:
+      type: object
+      properties:
+      year: { type: string }
+      month: { type: string }
+      computation\_time: { type: string }
+      num\_messages: { type: string }
+      num\_message\_bytes: { type: string }
+      source: pages/test.mdx → Hosting API > GET /v1/hosting/usage/agents/{address}/{year}/{month}
+      guidance:
+    * Use this to build time-series for a single agent; bucket results by month.
+    * Handle missing months (no usage) gracefully in charts.
+      example:
+      lang: javascript
+      code: |-
+      (async () => {
+      const addr = 'agent1qvnppqyhk4hu0q64tnfkspux8hpd9zayyclhafvkz5340uqx3ax02txfll7';
+      const res = await fetch(`https://agentverse.ai/v1/hosting/usage/agents/${encodeURIComponent(addr)}/2023/03`);
+      console.log(await res.json());
+      })().catch(err => console.error(err));
+      since: v1
+* name: Types
+  exports:
+
+  * types.Agent
+  * types.AgentCode
+  * types.AgentCodeDigest
+  * types.AgentLog
+  * types.NewAgent
+  * types.UpdateAgentCode
+    symbols:
+    types.Agent:
+    kind: interface
+    summary: Agent metadata record.
+    definition:
+    lang: typescript
+    code: |-
+    export interface Agent {
+    name: string;
+    address: string;
+    running: boolean;
+    compiled: boolean | null;
+    revision: number;
+    code\_digest: string | null;
+    wallet\_address: string | null;
+    }
+    source: pages/test.mdx → Notable Objects > The Agent Object
+    guidance:
+
+    * `compiled` can be null before the first compilation; handle tri-state logic.
+    * Treat `address` as both the identifier and the agent’s current public key.
+      example:
+      lang: javascript
+      code: |-
+      // Example of handling tri-state compiled flag:
+      function isReady(agent) {
+      return agent.running === true && agent.compiled === true;
+      }
+      since: v1
+      types.AgentCode:
+      kind: interface
+      summary: Single version entry of uploaded code.
+      definition:
+      lang: typescript
+      code: |-
+      export interface AgentCode {
+      digest: string;
+      code: string;
+      timestamp: string; // ISO date-time
+      }
+      source: pages/test.mdx → Notable Objects > The AgentCode Object
+      guidance:
+    * Use `timestamp` to order code revisions when multiple entries are returned.
+    * Compare `digest` to avoid re-uploading unchanged bundles.
+      example:
+      lang: javascript
+      code: |-
+      const isStale = (serverDigest, localDigest) => serverDigest !== localDigest;
+      since: v1
+      types.AgentCodeDigest:
+      kind: interface
+      summary: Digest wrapper returned after code update.
+      definition:
+      lang: typescript
+      code: |-
+      export interface AgentCodeDigest {
+      digest: string;
+      }
+      source: pages/test.mdx → Notable Objects > The AgentCodeDigest Object
+      guidance:
+    * Persist the digest alongside your code to enable change detection.
+    * Log the digest in release notes for traceability.
+      example:
+      lang: javascript
+      code: |-
+      function recordDigest(addr, digest) { console.log(addr, digest); }
+      since: v1
+      types.AgentLog:
+      kind: interface
+      summary: Single log entry.
+      definition:
+      lang: typescript
+      code: |-
+      export interface AgentLog {
+      log\_timestamp: string; // ISO date-time
+      log\_entry: string;
+      }
+      source: pages/test.mdx → Notable Objects > The AgentLog Object
+      guidance:
+    * Timestamps use ISO strings; convert to Date objects for sorting in UIs.
+    * Log lines may include severity prefixes like \[INFO]; parse if needed.
+      example:
+      lang: javascript
+      code: |-
+      const parseLevel = (line) => (line.match(/$(\w+)$/)?.\[1] ?? 'INFO');
+      since: v1
+      types.NewAgent:
+      kind: interface
+      summary: Create-agent payload.
+      definition:
+      lang: typescript
+      code: |-
+      export interface NewAgent {
+      name: string;
+      }
+      source: pages/test.mdx → Notable Objects > The NewAgent Object
+      guidance:
+    * Names are labels; uniqueness is not guaranteed—use address for identity.
+    * Validate length and characters in UI before sending.
+      example:
+      lang: javascript
+      code: |-
+      const payload = { name: 'My first agent' };
+      since: v1
+      types.UpdateAgentCode:
+      kind: interface
+      summary: Update-agent-code payload.
+      definition:
+      lang: typescript
+      code: |-
+      export interface UpdateAgentCode {
+      code: Array<{
+      id: number;
+      name: string;
+      value: string;
+      language: string;
+      }>;
+      }
+      source: pages/test.mdx → Notable Objects > The UpdateAgentCode Object
+      guidance:
+    * Include all files needed to run the agent (source + configuration).
+    * Keep stable `id` values across updates to aid diff tooling server-side.
+      example:
+      lang: javascript
+      code: |-
+      const update = { code: \[{ id: 0, name: 'agent.py', value: '# ...', language: 'python' }] };
+      since: v1
+      common\_workflows:
+* title: Create → Upload Code → Start an Agent
+  steps:
+
+  * POST /v1/hosting/agents with { name } to create; persist returned address.
+  * PUT /v1/hosting/agents/{address}/code with the full file bundle; capture returned digest.
+  * POST /v1/hosting/agents/{address}/start to bring the agent online.
+  * GET /v1/hosting/agents/{address} until running===true and compiled===true.
+* title: Update Code Safely with Digest Guard
+  steps:
+
+  * GET /v1/hosting/agents/{address}/code; read latest digest.
+  * If digest differs from your local build, PUT the new code bundle.
+  * Record the new digest and revision for rollback tracking.
+* title: Tail Logs and Clear
+  steps:
+
+  * GET /v1/hosting/agents/{address}/logs/latest to fetch recent entries.
+  * Stream or print to console; persist important events to your store.
+  * DELETE /v1/hosting/agents/{address}/logs to clear the latest batch.
+* title: Build a Usage Gauge
+  steps:
+
+  * GET /v1/hosting/usage/current.
+  * Parse numeric-like strings to numbers.
+  * Compute utilization ratios vs quotas for dashboards and alerts.
+    troubleshooting\_cheatsheet:
+* symptom: Agent shows running: "True" (string) instead of boolean.
+  cause: Serialization differences in sample responses.
+  fix: Coerce values to booleans in your client (e.g., agent.running === true || agent.running === "True").
+* symptom: Compiled is null and agent never starts.
+  cause: Code not uploaded or compilation failed.
+  fix: Upload code via PUT /code and check logs for compiler/runtime errors; retry after fixes.
+* symptom: 404 on GET /agents/{address}.
+  cause: Incorrect or unencoded address, or different workspace.
+  fix: URL-encode the address and verify the agent belongs to your account.
+* symptom: Usage numbers are strings, causing chart math errors.
+  cause: API returns numeric-like fields as strings in examples.
+  fix: Wrap values with Number(...) before calculations.
+  faq:
+* q: Is the Hosting API versioned?
+  a: Yes. Paths are prefixed with /v1. This pack targets >=1.0.0 and <2.0.0 based on the documented endpoints.&#x20;
+* q: How do I authenticate requests?
+  a: The provided docs focus on endpoints and objects and do not specify auth. Integrate with your Agentverse account’s authentication mechanism (e.g., dashboard-issued tokens) as applicable.
+* q: Can I partially update code files?
+  a: The documented PUT /code accepts a complete bundle array; send the full set each time so the server can compute a consistent digest.&#x20;
+  external\_resources:
+* label: Agentverse (Fetch.ai)
+  url: [https://agentverse.ai/](https://agentverse.ai/)
+* label: uAgents (GitHub)
+  url: [https://github.com/fetchai/uAgents](https://github.com/fetchai/uAgents)
+* label: Docs – Getting started with Agents
+  url: [https://fetch.ai/docs/guides/agents/getting-started/create-a-uagent](https://fetch.ai/docs/guides/agents/getting-started/create-a-uagent)
+

@@ -1,0 +1,829 @@
+meta:
+spec\_name: hedera/mirror-node-rest
+spec\_version: "0.3.0"
+library\_version: "^0.129.0"
+generated: "2025-09-17"
+language: english
+homepage: [https://docs.hedera.com/hedera/sdks-and-apis/rest-api](https://docs.hedera.com/hedera/sdks-and-apis/rest-api)
+tags: \[hedera, mirror-node, rest, web3, hbar, hts, contracts, json]
+purpose: Senior‑developer reference for the Hedera Mirror Node REST API: concrete endpoints, parameters, and best practices for reading ledger state (accounts, tokens, contracts, transactions, network).
+guiding\_principles:
+\- Pick the right network base URL (mainnet/testnet/previewnet) and keep it consistent per session.
+\- Use timestamp filters and ordering to make queries deterministic; default order is ascending unless stated otherwise.
+\- Respect pagination: follow `links.next` until null; do not assume fixed page sizes.
+\- Prefer IDs over names; accept `idOrAliasOrEvmAddress` and `contractIdOrAddress` where documented.
+\- Use `/api/v1/contracts/call` for eth\_call–style simulations and gas estimates; it does not mutate state.
+\- Cache static data (contract bytecode, token metadata) and only poll changing resources (balances, transactions).
+\- Mind HBAR units: REST returns tinybars (1 ℏ = 100,000,000 tinybars) and timestamps as `seconds.nanoseconds` strings.
+\- Expect eventual consistency; newly‑submitted transactions may take a short time to appear.
+\- Use query filters (e.g., `account.id`, `token.id`, `publickey`) to narrow scans and reduce payload sizes.
+design\_notes: >
+Source of truth: Hedera documentation (combined export) including Mirror Node REST sections for Accounts,
+Tokens, Smart Contracts, Transactions, and Network, with embedded OpenAPI references to mainnet/testnet specs.
+Endpoint names and path templates are taken verbatim from those pages (e.g., /api/v1/tokens,
+/api/v1/accounts/{idOrAliasOrEvmAddress}). This pack groups endpoints by domain and prioritizes high‑leverage
+reads and simulations. See tokens and smart contracts pages for explicit swagger embeds linking to
+/api/v1/openapi.yml on mainnet/testnet. Document basis: hedera‑hedera‑docs‑combined.md.
+
+groups:
+
+* name: Accounts
+  exports:
+
+  * "GET /api/v1/accounts"
+  * "GET /api/v1/accounts/{idOrAliasOrEvmAddress}"
+  * "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/allowances/crypto"
+  * "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/nfts"
+  * "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/rewards"
+  * "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/airdrops/pending"
+    symbols:
+    "GET /api/v1/accounts":
+    kind: function
+    summary: List accounts with optional filters.
+    definition:
+    lang: openapi
+    source: Mirror Node REST – Accounts
+    code: |
+    paths:
+    /api/v1/accounts:
+    get:
+    summary: List accounts
+    parameters:
+    \- in: query
+    name: account.id
+    schema: { type: string }
+    \- in: query
+    name: publickey
+    schema: { type: string }
+    \- in: query
+    name: limit
+    schema: { type: integer }
+    \- in: query
+    name: order
+    schema: { type: string, enum: \[asc, desc] }
+    responses:
+    "200": { description: JSON list of accounts with `links.next` pagination }
+    guidance:
+
+    * Filter early—combine `account.id`, `publickey`, and range filters to reduce result set.
+    * Paginate via `links.next` until it returns null; do not construct your own next URLs.
+    * If you only need balances, prefer `/api/v1/balances` (snapshot) for efficiency.
+      example:
+      lang: bash
+      description: Lists the two most recent accounts on testnet.
+      code: |
+      curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts?limit=2\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/accounts?limit=2&order=desc)" | jq .
+
+  "GET /api/v1/accounts/{idOrAliasOrEvmAddress}":
+  kind: function
+  summary: Fetch a single account by numeric ID, alias, or EVM address.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Accounts
+  code: |
+  paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}:
+  get:
+  summary: Get account detail
+  parameters:
+  \- in: path
+  name: idOrAliasOrEvmAddress
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: Account object }
+  "404": { description: Account not found }
+  guidance:
+  \- IDs accept `0.0.x`, alias (RFC4648 no‑padding base32), or `0x…` EVM address.
+  \- The response contains an `evm_address` field useful for EVM tooling.
+  \- Use consistent casing for hex addresses; mirror node is case‑insensitive but tools may not be.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001](https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001)" | jq .
+
+  "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/allowances/crypto":
+  kind: function
+  summary: List HBAR (crypto) allowances granted by an account.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Accounts
+  code: |
+  paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}/allowances/crypto:
+  get:
+  summary: List HBAR allowances by grantor account
+  parameters:
+  \- in: path
+  name: idOrAliasOrEvmAddress
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: List of crypto allowances }
+  guidance:
+  \- Grantor perspective—this endpoint shows allowances the account granted to spenders.
+  \- Join with `/api/v1/accounts/{...}` to resolve spender IDs to EVM addresses for wallets.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/allowances/crypto](https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/allowances/crypto)" | jq .
+
+  "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/nfts":
+  kind: function
+  summary: List NFTs owned by an account.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Accounts
+  code: |
+  paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}/nfts:
+  get:
+  summary: List NFTs for an account
+  parameters:
+  \- in: path
+  name: idOrAliasOrEvmAddress
+  required: true
+  schema: { type: string }
+  \- in: query
+  name: limit
+  schema: { type: integer }
+  \- in: query
+  name: order
+  schema: { type: string, enum: \[asc, desc] }
+  responses:
+  "200": { description: List of NFT holdings with pagination }
+  guidance:
+  \- Use `order=desc` to see newest acquisitions first.
+  \- Combine with `/api/v1/tokens/{tokenId}/nfts/{serialNumber}` to fetch metadata for each NFT.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/nfts?limit=5\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/nfts?limit=5&order=desc)" | jq .
+
+  "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/rewards":
+  kind: function
+  summary: List historical staking rewards paid to an account.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Accounts
+  code: |
+  paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}/rewards:
+  get:
+  summary: List staking rewards for an account
+  parameters:
+  \- in: path
+  name: idOrAliasOrEvmAddress
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: List of reward payouts with timestamp and amount }
+  guidance:
+  \- Amounts are in tinybars; convert to HBAR for user display.
+  \- Rewards are lazy‑paid; absence of entries may indicate no payout during the period.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/rewards](https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/rewards)" | jq .
+
+  "GET /api/v1/accounts/{idOrAliasOrEvmAddress}/airdrops/pending":
+  kind: function
+  summary: List pending token airdrops for an account (HIP‑904).
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Accounts
+  code: |
+  paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}/airdrops/pending:
+  get:
+  summary: List pending token airdrops for an account
+  parameters:
+  \- in: path
+  name: idOrAliasOrEvmAddress
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: List of pending airdrops }
+  guidance:
+  \- Use this to display user‑actionable claims; pair with outstanding airdrops when needed.
+  \- Results may be empty even if an airdrop exists but was already claimed.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/airdrops/pending](https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001/airdrops/pending)" | jq .
+
+* name: Tokens
+  exports:
+
+  * "GET /api/v1/tokens"
+  * "GET /api/v1/tokens/{tokenId}"
+  * "GET /api/v1/tokens/{tokenId}/balances"
+  * "GET /api/v1/tokens/{tokenId}/nfts"
+  * "GET /api/v1/tokens/{tokenId}/nfts/{serialNumber}"
+    symbols:
+    "GET /api/v1/tokens":
+    kind: function
+    summary: List tokens with filters.
+    definition:
+    lang: openapi
+    source: Mirror Node REST – Tokens (Swagger embed)
+    code: |
+    paths:
+    /api/v1/tokens:
+    get:
+    summary: List tokens
+    parameters:
+    \- in: query
+    name: account.id
+    schema: { type: string }
+    \- in: query
+    name: publickey
+    schema: { type: string }
+    \- in: query
+    name: token.id
+    schema: { type: string }
+    \- in: query
+    name: limit
+    schema: { type: integer }
+    \- in: query
+    name: order
+    schema: { type: string, enum: \[asc, desc] }
+    responses:
+    "200": { description: JSON list of tokens }
+    guidance:
+
+    * Filter by `account.id` to find tokens associated with an account.
+    * Use `publickey` to find tokens controlled by a specific admin key.
+    * Results include token type (FUNGIBLE/NON\_FUNGIBLE) and keys; cache metadata.
+      example:
+      lang: bash
+      code: |
+      curl -s "[https://testnet.mirrornode.hedera.com/api/v1/tokens?limit=3\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/tokens?limit=3&order=desc)" | jq .
+
+  "GET /api/v1/tokens/{tokenId}":
+  kind: function
+  summary: Get token metadata by token ID.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Tokens (Swagger embed)
+  code: |
+  paths:
+  /api/v1/tokens/{tokenId}:
+  get:
+  summary: Get token by ID
+  parameters:
+  \- in: path
+  name: tokenId
+  required: true
+  schema: { type: string, example: "0.0.12345" }
+  responses:
+  "200": { description: Token object }
+  "404": { description: Token not found }
+  guidance:
+  \- Token ID uses `shard.realm.num` form (e.g., 0.0.12345).
+  \- For NFTs, this returns collection‑level metadata; use the NFTs endpoints for per‑serial details.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345](https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345)" | jq .
+
+  "GET /api/v1/tokens/{tokenId}/balances":
+  kind: function
+  summary: List per‑account balances for a token.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Tokens (Swagger embed)
+  code: |
+  paths:
+  /api/v1/tokens/{tokenId}/balances:
+  get:
+  summary: List balances for a token
+  parameters:
+  \- in: path
+  name: tokenId
+  required: true
+  schema: { type: string }
+  \- in: query
+  name: timestamp
+  schema: { type: string, description: "seconds.nanoseconds" }
+  \- in: query
+  name: limit
+  schema: { type: integer }
+  \- in: query
+  name: order
+  schema: { type: string, enum: \[asc, desc] }
+  responses:
+  "200": { description: JSON list with account balances for the token }
+  guidance:
+  \- Use the `timestamp` query to get historical balances at a point in time.
+  \- Balances are integers in the token's smallest unit (decimals in token metadata).
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/balances?limit=2\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/balances?limit=2&order=desc)" | jq .
+
+  "GET /api/v1/tokens/{tokenId}/nfts":
+  kind: function
+  summary: List NFT serials for a collection.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Tokens (Swagger embed)
+  code: |
+  paths:
+  /api/v1/tokens/{tokenId}/nfts:
+  get:
+  summary: List NFTs for a token collection
+  parameters:
+  \- in: path
+  name: tokenId
+  required: true
+  schema: { type: string }
+  \- in: query
+  name: account.id
+  schema: { type: string }
+  \- in: query
+  name: spender.id
+  schema: { type: string }
+  \- in: query
+  name: limit
+  schema: { type: integer }
+  \- in: query
+  name: order
+  schema: { type: string, enum: \[asc, desc] }
+  responses:
+  "200": { description: JSON list of NFT serials with owner/spender }
+  guidance:
+  \- Filter by `account.id` to list only NFTs owned by a specific account.
+  \- For transfer history of a serial, hop to `/api/v1/tokens/{tokenId}/nfts/{serialNumber}/transactions`.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/nfts?limit=5\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/nfts?limit=5&order=desc)" | jq .
+
+  "GET /api/v1/tokens/{tokenId}/nfts/{serialNumber}":
+  kind: function
+  summary: Fetch an individual NFT by serial number.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Tokens (Swagger embed)
+  code: |
+  paths:
+  /api/v1/tokens/{tokenId}/nfts/{serialNumber}:
+  get:
+  summary: Get NFT metadata for a serial
+  parameters:
+  \- in: path
+  name: tokenId
+  required: true
+  schema: { type: string }
+  \- in: path
+  name: serialNumber
+  required: true
+  schema: { type: integer }
+  responses:
+  "200": { description: NFT object (metadata, owner, timestamps) }
+  "404": { description: NFT not found }
+  guidance:
+  \- Use this to resolve tokenURI/metadata and current ownership.
+  \- Pair with `/api/v1/accounts/{...}/nfts` when building user wallets.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/nfts/1](https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.12345/nfts/1)" | jq .
+
+* name: Smart Contracts
+  exports:
+
+  * "GET /api/v1/contracts"
+  * "GET /api/v1/contracts/{contractIdOrAddress}"
+  * "GET /api/v1/contracts/{contractIdOrAddress}/results/logs"
+  * "GET /api/v1/contracts/results/{transactionIdOrHash}"
+  * "GET /api/v1/contracts/{contractIdOrAddress}/state"
+  * "POST /api/v1/contracts/call"
+    symbols:
+    "GET /api/v1/contracts":
+    kind: function
+    summary: List smart contracts.
+    definition:
+    lang: openapi
+    source: Mirror Node REST – Smart Contracts (OpenAPI mainnet)
+    code: |
+    paths:
+    /api/v1/contracts:
+    get:
+    summary: List contracts
+    parameters:
+    \- in: query
+    name: evm\_address
+    schema: { type: string }
+    \- in: query
+    name: creator.id
+    schema: { type: string }
+    \- in: query
+    name: limit
+    schema: { type: integer }
+    \- in: query
+    name: order
+    schema: { type: string, enum: \[asc, desc] }
+    responses:
+    "200": { description: JSON list of contracts }
+    guidance:
+
+    * Filter by `evm_address` to find a single contract quickly, or by `creator.id` for deployments.
+    * Returned objects include `bytecode` and `evm_address`; cache bytecode for repeated use.
+      example:
+      lang: bash
+      code: |
+      curl -s "[https://testnet.mirrornode.hedera.com/api/v1/contracts?limit=2\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/contracts?limit=2&order=desc)" | jq .
+
+  "GET /api/v1/contracts/{contractIdOrAddress}":
+  kind: function
+  summary: Get details for a specific contract by Hedera ID or EVM address.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Smart Contracts (OpenAPI mainnet)
+  code: |
+  paths:
+  /api/v1/contracts/{contractIdOrAddress}:
+  get:
+  summary: Get contract detail
+  parameters:
+  \- in: path
+  name: contractIdOrAddress
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: Contract object }
+  "404": { description: Not found }
+  guidance:
+  \- Use `0x…` or `0.0.x` in the same path; mirror node resolves both.
+  \- If you need current storage values, see `/api/v1/contracts/{id}/state`.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100](https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100)" | jq .
+
+  "GET /api/v1/contracts/{contractIdOrAddress}/results/logs":
+  kind: function
+  summary: List logs emitted by a specific contract across executions.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Smart Contracts (OpenAPI mainnet)
+  code: |
+  paths:
+  /api/v1/contracts/{contractIdOrAddress}/results/logs:
+  get:
+  summary: List contract logs
+  parameters:
+  \- in: path
+  name: contractIdOrAddress
+  required: true
+  schema: { type: string }
+  \- in: query
+  name: topic0
+  schema: { type: string, description: "Keccak256 topic hash" }
+  \- in: query
+  name: limit
+  schema: { type: integer }
+  \- in: query
+  name: order
+  schema: { type: string, enum: \[asc, desc] }
+  responses:
+  "200": { description: JSON list of logs with bloom/topics/data }
+  guidance:
+  \- Filter by topic hashes (`topic0`..`topic3`) to avoid scanning all logs.
+  \- Use `/api/v1/contracts/results/logs` to search across all contracts when the address is unknown.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100/results/logs?limit=5\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100/results/logs?limit=5&order=desc)" | jq .
+
+  "GET /api/v1/contracts/results/{transactionIdOrHash}":
+  kind: function
+  summary: Fetch the contract execution result by transaction ID or hash.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Smart Contracts (OpenAPI mainnet)
+  code: |
+  paths:
+  /api/v1/contracts/results/{transactionIdOrHash}:
+  get:
+  summary: Get contract execution result
+  parameters:
+  \- in: path
+  name: transactionIdOrHash
+  required: true
+  schema: { type: string }
+  responses:
+  "200": { description: Execution result including status, gas used, logs }
+  "404": { description: Not found }
+  guidance:
+  \- Use the transaction hash from your client or the `transaction_id` (`0.0.x-sssss.nnnnnnnnn`) form.
+  \- For opcode trace or state changes, follow related endpoints referenced in the result object.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0.0.100-1700000000.000000001](https://testnet.mirrornode.hedera.com/api/v1/contracts/results/0.0.100-1700000000.000000001)" | jq .
+
+  "GET /api/v1/contracts/{contractIdOrAddress}/state":
+  kind: function
+  summary: Get key/value storage state for a contract.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Smart Contracts (OpenAPI mainnet)
+  code: |
+  paths:
+  /api/v1/contracts/{contractIdOrAddress}/state:
+  get:
+  summary: Get contract storage state (key/value)
+  parameters:
+  \- in: path
+  name: contractIdOrAddress
+  required: true
+  schema: { type: string }
+  \- in: query
+  name: slot
+  schema: { type: string, description: "Optionally filter by storage slot (0x…)" }
+  \- in: query
+  name: timestamp
+  schema: { type: string, description: "seconds.nanoseconds" }
+  responses:
+  "200": { description: List of storage entries (slot/value/timestamp)" }
+  guidance:
+  \- Use `timestamp` to view historical snapshots; without it you get the latest.
+  \- Slots and values are hex strings; decode according to your contract's storage layout.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100/state?limit=2](https://testnet.mirrornode.hedera.com/api/v1/contracts/0.0.100/state?limit=2)" | jq .
+
+  "POST /api/v1/contracts/call":
+  kind: function
+  summary: Simulate a contract call or estimate gas (eth\_call equivalent).
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Smart Contracts (Guide + Swagger)
+  code: |
+  paths:
+  /api/v1/contracts/call:
+  post:
+  summary: Simulate a contract call or estimate gas
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  estimate: { type: boolean, description: "true for gas estimation" }
+  block:    { type: string,  description: "e.g., latest" }
+  data:     { type: string,  description: "ABI‑encoded calldata (0x…)" }
+  from:     { type: string,  description: "optional caller address" }
+  to:       { type: string,  description: "contract address or ID" }
+  value:    { type: string,  description: "tinybars as hex string (optional)" }
+  responses:
+  "200": { description: JSON result with hex return or gas estimate }
+  guidance:
+  \- Set `estimate: true` to get gas usage without executing logic on-chain.
+  \- Calldata must be ABI‑encoded; use your web3 library's encoder.
+  \- The endpoint is read‑only; it will not change contract state.
+  example:
+  lang: bash
+  description: Estimate gas for ERC‑20 balanceOf(0x3e9) example calldata.
+  code: |
+  curl -s -X POST "[https://testnet.mirrornode.hedera.com/api/v1/contracts/call](https://testnet.mirrornode.hedera.com/api/v1/contracts/call)"&#x20;
+  -H "Content-Type: application/json"&#x20;
+  -d '{"to":"0x0000000000000000000000000000000000001f41","data":"0x70a0823100000000000000000000000000000000000000000000000000000000000003e9","estimate"\:true,"block":"latest"}' | jq .
+
+* name: Transactions
+  exports:
+
+  * "GET /api/v1/transactions"
+  * "GET /api/v1/transactions/{transactionId}"
+    symbols:
+    "GET /api/v1/transactions":
+    kind: function
+    summary: List transactions with rich filters.
+    definition:
+    lang: openapi
+    source: Mirror Node REST – Transactions
+    code: |
+    paths:
+    /api/v1/transactions:
+    get:
+    summary: List transactions
+    parameters:
+    \- in: query
+    name: account.id
+    schema: { type: string }
+    \- in: query
+    name: transactiontype
+    schema: { type: string }
+    \- in: query
+    name: timestamp
+    schema: { type: string, description: "range: lt:, lte:, gt:, gte:" }
+    \- in: query
+    name: limit
+    schema: { type: integer }
+    \- in: query
+    name: order
+    schema: { type: string, enum: \[asc, desc] }
+    responses:
+    "200": { description: List of transactions with pagination }
+    guidance:
+
+    * Use range operators on `timestamp` (e.g., `gte:`, `lte:`) for time windows.
+    * Filter by `transactiontype` (e.g., CRYPTOTRANSFER, CONTRACTCALL) to minimize payloads.
+    * Use `account.id` to scope to a participant account (payer or involved).
+      example:
+      lang: bash
+      code: |
+      curl -s "[https://testnet.mirrornode.hedera.com/api/v1/transactions?account.id=0.0.1001\&limit=2\&order=desc](https://testnet.mirrornode.hedera.com/api/v1/transactions?account.id=0.0.1001&limit=2&order=desc)" | jq .
+
+  "GET /api/v1/transactions/{transactionId}":
+  kind: function
+  summary: Fetch a transaction by transaction ID (or its hash in some deployments).
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Transactions
+  code: |
+  paths:
+  /api/v1/transactions/{transactionId}:
+  get:
+  summary: Get transaction by ID
+  parameters:
+  \- in: path
+  name: transactionId
+  required: true
+  schema: { type: string, example: "0.0.1001-1700000000.000000001" }
+  responses:
+  "200": { description: Transaction object with receipts/records if available }
+  "404": { description: Not found }
+  guidance:
+  \- Transaction ID format is `payerAccount-validStartTimestamp`.
+  \- For EVM clients you may prefer to resolve via JSON‑RPC (`eth_getTransactionReceipt`); mirror node also supports hash lookups in certain endpoints.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/transactions/0.0.1001-1700000000.000000001](https://testnet.mirrornode.hedera.com/api/v1/transactions/0.0.1001-1700000000.000000001)" | jq .
+
+* name: Network
+  exports:
+
+  * "GET /api/v1/network/nodes"
+  * "GET /api/v1/network/stake"
+  * "GET /api/v1/network/supply"
+    symbols:
+    "GET /api/v1/network/nodes":
+    kind: function
+    summary: List Hedera network nodes and endpoints.
+    definition:
+    lang: openapi
+    source: Mirror Node REST – Network (OpenAPI)
+    code: |
+    paths:
+    /api/v1/network/nodes:
+    get:
+    summary: List network nodes
+    responses:
+    "200": { description: Node list with gRPC address book info and `links.next` }
+    guidance:
+
+    * Follow `links.next` to retrieve the full node list.
+    * Use this to build client node pools; SDKs may provide defaults.
+      example:
+      lang: bash
+      code: |
+      curl -s "[https://testnet.mirrornode.hedera.com/api/v1/network/nodes](https://testnet.mirrornode.hedera.com/api/v1/network/nodes)" | jq .
+
+  "GET /api/v1/network/stake":
+  kind: function
+  summary: Fetch network staking summary and per‑node stakes.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Network (OpenAPI)
+  code: |
+  paths:
+  /api/v1/network/stake:
+  get:
+  summary: Get stake data
+  responses:
+  "200": { description: Staking metrics including node stake and reward rates }
+  guidance:
+  \- Useful for wallets and staking dashboards to display network rates.
+  \- Data reflects the latest consensus epoch; not historical unless paired with timestamp parameters in releases that support it.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/network/stake](https://testnet.mirrornode.hedera.com/api/v1/network/stake)" | jq .
+
+  "GET /api/v1/network/supply":
+  kind: function
+  summary: Retrieve circulating and total HBAR supply.
+  definition:
+  lang: openapi
+  source: Mirror Node REST – Network (Swagger embed)
+  code: |
+  paths:
+  /api/v1/network/supply:
+  get:
+  summary: Get HBAR supply
+  responses:
+  "200": { description: Circulating supply, max supply, and related values }
+  guidance:
+  \- Unit is tinybars; convert to HBAR for display.
+  \- Use for market data widgets; cache and refresh infrequently.
+  example:
+  lang: bash
+  code: |
+  curl -s "[https://testnet.mirrornode.hedera.com/api/v1/network/supply](https://testnet.mirrornode.hedera.com/api/v1/network/supply)" | jq .
+
+common\_workflows:
+
+* title: Get an account's token balances at a historical timestamp
+  steps:
+
+  * Call `GET /api/v1/tokens/{tokenId}/balances?timestamp=<ts>` for each relevant token.
+  * Alternatively, use `GET /api/v1/accounts/{id}/nfts` for NFT holdings and cross‑reference serials.
+  * Display values in token units using token `decimals` metadata.
+* title: Resolve an EVM address to a Hedera Account ID
+  steps:
+
+  * Call `GET /api/v1/accounts/{idOrAliasOrEvmAddress}` with the `0x…` EVM address.
+  * Use the returned `account` field (e.g., `0.0.x`) and `alias` if you need a public key mapping.
+* title: Simulate a contract read and decode the return value
+  steps:
+
+  * ABI‑encode the function call (e.g., using ethers.js `iface.encodeFunctionData`).
+  * POST `/api/v1/contracts/call` with `{ to, data, block: 'latest' }`.
+  * Decode the `result` buffer with your ABI to native types; do not expect state changes.
+* title: Filter and page through recent CRYPTOTRANSFER activity for an account
+  steps:
+
+  * GET `/api/v1/transactions?account.id=<id>&transactiontype=CRYPTOTRANSFER&order=desc&limit=100`.
+  * Follow `links.next` until null to accumulate the full window.
+  * Summarize transfers by `transfers[]` in each transaction record.
+* title: Find contract events for a specific topic
+  steps:
+
+  * Compute the topic hash (e.g., keccak256 of the event signature).
+  * GET `/api/v1/contracts/{contractIdOrAddress}/results/logs?topic0=<hash>&order=desc`.
+  * Parse each log's `data` and `topics` per your ABI.
+* title: Check current HBAR supply and staking metrics
+  steps:
+
+  * GET `/api/v1/network/supply` for circulating/total supply in tinybars.
+  * GET `/api/v1/network/stake` for current network staking and reward info.
+* title: Show a user's pending airdrops
+  steps:
+
+  * GET `/api/v1/accounts/{id}/airdrops/pending` to list pending token airdrops.
+  * Link out to claim flows as required by your app design.
+
+troubleshooting\_cheatsheet:
+
+* symptom: Empty results despite recent on‑chain activity.
+  cause: Mirror node ingestion lag or using the wrong network base URL.
+  fix: Wait briefly and retry; verify you are querying the correct environment (mainnet/testnet/previewnet).
+* symptom: "`links.next` present but following it returns the first page again."
+  cause: Not using the exact `links.next` URL or missing query parameters when reconstructing.
+  fix: Always follow `links.next` verbatim; do not rebuild pagination URLs.
+* symptom: "HBAR amounts look 100,000,000× larger than expected."
+  cause: Values are returned in tinybars.
+  fix: Divide by 100\_000\_000 to display in HBAR (or use token decimals for HTS tokens).
+* symptom: No data when querying by EVM address.
+  cause: Using the wrong checksum/casing or the address maps to an alias/account that has not executed any transactions.
+  fix: Try the canonical lowercase hex address and confirm the mapping via `GET /api/v1/accounts/{address}`.
+* symptom: Contract call simulation fails with invalid data.
+  cause: Calldata not ABI‑encoded or missing `to` address.
+  fix: Encode with a web3 library and include the `to` contract address (or ID) and function selector.
+
+faq:
+
+* q: When should I use Mirror Node REST vs. JSON‑RPC?
+  a: >
+  Use REST for rich, Hedera‑native data (accounts, HTS tokens, logs, state) and for read‑only simulations via
+  `/contracts/call`. Use JSON‑RPC (Hashio/Relay) for Ethereum‑compatible dapps that expect `eth_*` methods.
+  Many apps use both.
+* q: Do endpoints return historical data?
+  a: Some endpoints accept `timestamp` filters to query historical state (e.g., token balances, contract state). Otherwise results reflect the latest indexed state.
+* q: Are results paginated?
+  a: Yes. Endpoints that return lists include a `links.next` field. Keep requesting that URL until it returns null.
+* q: What units and formats should I expect?
+  a: HBAR is in tinybars (1 ℏ = 100,000,000 tinybars). Timestamps are strings in `seconds.nanoseconds` form. Hex values are `0x`‑prefixed.
+* q: Can I pass EVM addresses and Hedera IDs interchangeably?
+  a: Where documented as `{idOrAliasOrEvmAddress}` or `{contractIdOrAddress}`, both forms are supported.
+
+external\_resources:
+
+* label: Mirror Node REST – Mainnet OpenAPI
+  url: [https://mainnet.mirrornode.hedera.com/api/v1/docs/openapi.yml](https://mainnet.mirrornode.hedera.com/api/v1/docs/openapi.yml)
+* label: Mirror Node REST – Testnet OpenAPI
+  url: [https://testnet.mirrornode.hedera.com/api/v1/docs/openapi.yml](https://testnet.mirrornode.hedera.com/api/v1/docs/openapi.yml)
+* label: REST API Docs (Accounts)
+  url: [https://docs.hedera.com/hedera/sdks-and-apis/rest-api/accounts](https://docs.hedera.com/hedera/sdks-and-apis/rest-api/accounts)
+* label: REST API Docs (Tokens)
+  url: [https://docs.hedera.com/hedera/sdks-and-apis/rest-api/tokens](https://docs.hedera.com/hedera/sdks-and-apis/rest-api/tokens)
+* label: REST API Docs (Smart Contracts)
+  url: [https://docs.hedera.com/hedera/sdks-and-apis/rest-api/smart-contracts](https://docs.hedera.com/hedera/sdks-and-apis/rest-api/smart-contracts)
+

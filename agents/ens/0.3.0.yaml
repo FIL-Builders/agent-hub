@@ -1,0 +1,772 @@
+meta:
+spec\_name: ens/ethereum-name-service
+spec\_version: "0.3.0"
+generated: "2025-09-17"
+library\_version: "ENS core contracts (Solidity ^0.8.x), docs snapshot as referenced"
+language: solidity
+homepage: [https://docs.ens.domains](https://docs.ens.domains)
+tags:
+\- ethereum
+\- ens
+\- registry
+\- registrar
+\- resolver
+\- reverse
+\- namewrapper
+\- ccip-read
+purpose: >
+Teach an LLM to use the core ENS on‑chain contracts—ETHRegistrarController, ENS
+Registry, Public/Extended Resolvers, Reverse Registrar, and the Name Wrapper—
+with safe practitioner patterns for registering, resolving, reversing, and wrapping names.
+guiding\_principles:
+\- Normalize names before hashing or DNS‑encoding; otherwise labelhash/namehash will be wrong.&#x20;
+\- Follow the commit‑reveal flow and timing: commit → wait ≥ MIN\_COMMITMENT\_AGE (≈60s) → register; commitments expire after 24h.&#x20;
+\- When paying for registration, add \~3–5% headroom over `rentPrice` to handle price drift; excess is refunded.&#x20;
+\- Never assume a resolver’s capabilities; gate writes with `supportsInterface` (EIP‑165) and only then call feature methods (e.g., `setText`).&#x20;
+\- Do not hardcode resolver or reverse registrar addresses; resolve from deployments/ENSIP‑19 and prefer capability checks.
+\- Use Name Wrapper fuses and states deliberately (Wrapped/Emancipated/Locked); locking is irreversible.
+\- If building CCIP‑Read resolvers, implement verification in callbacks; the toy example without checks is for demo only.&#x20;
+design\_notes: >
+This pack is organized by high‑value workflows: Registration (ETHRegistrarController),
+Reverse (Reverse Registrar), Resolver (on‑chain & CCIP‑Read), Name Wrapper, and
+Registry utilities. Every `definition.code` snippet is sourced verbatim or lightly
+compressed from the ENS docs (file paths embedded in `source`), prioritizing pages
+that publish authoritative function signatures and usage guidance—for example, the
+registrar’s commit‑reveal flow and constants, resolver interfaces and EIP‑165 usage,
+reverse registrar write methods and signature flows, and Name Wrapper wrap/unwrap and
+subname APIs.
+
+groups:
+
+* name: Registration (ETHRegistrarController)
+  exports:
+
+  * ETHRegistrarController.makeCommitment
+  * ETHRegistrarController.commit
+  * ETHRegistrarController.register
+  * ETHRegistrarController.available
+  * ETHRegistrarController.rentPrice
+  * ETHRegistrarController.MIN\_COMMITMENT\_AGE
+  * ETHRegistrarController.MIN\_REGISTRATION\_DURATION
+  * ETHRegistrarController.commitments
+    symbols:
+    ETHRegistrarController.makeCommitment:
+    kind: function
+    summary: Build the opaque commitment used in the commit‑reveal registration flow.
+    definition:
+    lang: solidity
+    source: "src/pages/learn/registering.mdx (commit/reveal) "
+    code: |
+    ETHRegistrarController.makeCommitment(
+    name string,
+    owner address,
+    duration uint256,
+    secret bytes32,
+    resolver address,
+    data bytes\[],
+    reverseRecord bool,
+    ownerControlledFuses uint16
+    ) view returns (bytes32)
+    guidance:
+
+    * Use a freshly random 32‑byte `secret`; reuse the *same* `secret` for `register`.&#x20;
+    * You can pre‑seed resolver writes via `data` (e.g., encoded `setAddr`) and set fuses on wrap at registration time.&#x20;
+      example:
+      lang: javascript
+      description: Compute a commitment with ethers v6.
+      code: |
+      import { ethers } from "ethers";
+      const controller = new ethers.Contract(controllerAddress, \[
+      "function makeCommitment(string,address,uint256,bytes32,address,bytes\[],bool,uint16) view returns (bytes32)"
+      ], signer);
+      const secret = ethers.hexlify(ethers.randomBytes(32));
+      const commitment = await controller.makeCommitment(
+      "myname", await signer.getAddress(), 31536000n, secret,
+      resolverAddress, \[], false, 0
+      );
+      ETHRegistrarController.commit:
+      kind: function
+      summary: Submit the commitment hash on‑chain; must mature before `register`.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (commit) "
+      code: |
+      ETHRegistrarController.commit(commitment bytes32)
+      guidance:
+    * Wait at least `MIN_COMMITMENT_AGE` (≈60s) after `commit` before calling `register`.&#x20;
+    * If you miss `MAX_COMMITMENT_AGE` (24h), re‑commit with a new secret.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const ctrl = new ethers.Contract(controllerAddress, \[
+      "function commit(bytes32) external"
+      ], signer);
+      await (await ctrl.commit(commitment)).wait();
+      ETHRegistrarController.register:
+      kind: function
+      summary: Finalize name registration after the minimum wait with ETH payment.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (register) "
+      code: |
+      ETHRegistrarController.register(
+      name string,
+      owner address,
+      duration uint256,
+      secret bytes32,
+      resolver address,
+      data bytes\[],
+      reverseRecord bool,
+      ownerControlledFuses uint16
+      ) payable
+      guidance:
+    * Ensure `available(name)` and `duration ≥ MIN_REGISTRATION_DURATION`.&#x20;
+    * Send `rentPrice(name, duration)` plus \~3–5% to handle USD‑denominated pricing; excess is refunded.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const abi = \[
+      "function rentPrice(string,uint256) view returns (uint256)",
+      "function register(string,address,uint256,bytes32,address,bytes\[],bool,uint16) payable"
+      ];
+      const ctrl = new ethers.Contract(controllerAddress, abi, signer);
+      const duration = 31536000n;
+      const price = await ctrl.rentPrice("myname", duration);
+      const value = (price \* 105n) / 100n; // 5% headroom
+      await (await ctrl.register(
+      "myname", await signer.getAddress(), duration, secret,
+      resolverAddress, \[], false, 0, { value }
+      )).wait();
+      ETHRegistrarController.available:
+      kind: function
+      summary: Checks if a name is valid and available for registration by this controller.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (Other features) "
+      code: |
+      ETHRegistrarController.available(string name) view returns (bool)
+      guidance:
+    * Query availability immediately before `register` to avoid race conditions.&#x20;
+    * For raw label checks, you may also reference BaseRegistrar functions (e.g., `nameExpires`).&#x20;
+      example:
+      lang: javascript
+      code: |
+      const ctrl = new ethers.Contract(controllerAddress, \[
+      "function available(string) view returns (bool)"
+      ], provider);
+      const ok = await ctrl.available("myname");
+      ETHRegistrarController.rentPrice:
+      kind: function
+      summary: Returns ETH cost (in wei) for a name and duration; paid in ETH but USD‑denominated.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (Other features) "
+      code: |
+      ETHRegistrarController.rentPrice(string name, uint duration) view returns (uint)
+      guidance:
+    * Add a small premium (3–5%) to the sent value to cover price changes; extra is refunded.&#x20;
+    * Price oracles may update between estimate and send; avoid exact‑value sends.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const price = await ctrl.rentPrice("myname", 31536000n);
+      console.log(`wei: ${price}`);
+      ETHRegistrarController.MIN\_COMMITMENT\_AGE:
+      kind: constant
+      summary: Minimum delay between `commit` and `register` (≈60 seconds).
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (Other features) "
+      code: |
+      ETHRegistrarController.MIN\_COMMITMENT\_AGE uint
+      guidance:
+    * Enforce in your UX (disable “Register” until the min age elapses).&#x20;
+    * Track `commitments[hash]` on‑chain to compute readiness.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const abi = \["function MIN\_COMMITMENT\_AGE() view returns (uint256)"];
+      const ctrl = new ethers.Contract(controllerAddress, abi, provider);
+      console.log((await ctrl.MIN\_COMMITMENT\_AGE()).toString());
+      ETHRegistrarController.MIN\_REGISTRATION\_DURATION:
+      kind: constant
+      summary: Minimum duration permitted for a new registration.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (Other features) "
+      code: |
+      ETHRegistrarController.MIN\_REGISTRATION\_DURATION uint
+      guidance:
+    * Validate duration client‑side before calling `register`.&#x20;
+    * Combine with premium/auction logic for UX after grace periods.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const abi = \["function MIN\_REGISTRATION\_DURATION() view returns (uint256)"];
+      const ctrl = new ethers.Contract(controllerAddress, abi, provider);
+      const min = await ctrl.MIN\_REGISTRATION\_DURATION();
+      ETHRegistrarController.commitments:
+      kind: function
+      summary: Public mapping exposing commitment timestamps.
+      definition:
+      lang: solidity
+      source: "src/pages/learn/registering.mdx (Other features) "
+      code: |
+      ETHRegistrarController.commitments(bytes32 commitment) view returns (uint)
+      guidance:
+    * Use this to compute time‑to‑register and to detect expired commitments.&#x20;
+    * If expired, re‑create commitment with a fresh secret and re‑commit.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const abi = \["function commitments(bytes32) view returns (uint256)"];
+      const ctrl = new ethers.Contract(controllerAddress, abi, provider);
+      const ts = await ctrl.commitments(commitmentHash);
+
+* name: Reverse Resolution (ReverseRegistrar)
+  exports:
+
+  * ReverseRegistrar.setName
+  * ReverseRegistrar.setNameForAddr
+  * ReverseRegistrar.setNameForOwnableWithSignature
+  * ReverseRegistrar.setNameForAddrWithSignature
+  * ReverseRegistrar.claim
+  * ReverseRegistrar.claimWithResolver
+  * ReverseRegistrar.defaultResolver
+    symbols:
+    ReverseRegistrar.setName:
+    kind: function
+    summary: Sets the `name()` record for the caller’s reverse record.
+    definition:
+    lang: solidity
+    source: "src/pages/resolution/index.mdx (Reverse Registrar interface) "
+    code: |
+    function setName(string memory name) external returns (bytes32);
+    guidance:
+
+    * Prefer per‑chain reverse records; L1 acts as default fallback if no chain‑specific record exists.&#x20;
+    * Never force users to change primary names without clear consent.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \["function setName(string) returns (bytes32)"], signer);
+      await rr.setName("alice.eth");
+      ReverseRegistrar.setNameForAddr:
+      kind: function
+      summary: Set reverse `name()` for an arbitrary addr (e.g., contract owned by an SCA).
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (Reverse Registrar interface) "
+      code: |
+      function setNameForAddr(address addr, string memory name) external returns (bytes32);
+      guidance:
+    * Use for SCAs or managed contracts when the signer differs from `addr`.&#x20;
+    * Consider permissioning in your app to avoid spoofing reverse names.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \["function setNameForAddr(address,string) returns (bytes32)"], signer);
+      await rr.setNameForAddr(contractAddr, "my-contract.eth");
+      ReverseRegistrar.setNameForOwnableWithSignature:
+      kind: function
+      summary: Sets reverse name for an Ownable contract using an owner signature.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (signature variants) "
+      code: |
+      function setNameForOwnableWithSignature(
+      address contractAddr,
+      address owner,
+      string calldata name,
+      uint256\[] memory coinTypes,
+      uint256 signatureExpiry,
+      bytes calldata signature
+      ) external returns (bytes32);
+      guidance:
+    * `coinTypes` must include the contract’s coin type; signatures expire (≤ \~1h).&#x20;
+    * Validate the typed data/selector and expiry server‑side before broadcasting.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \[
+      "function setNameForOwnableWithSignature(address,address,string,uint256\[],uint256,bytes) returns (bytes32)"
+      ], signer);
+      await rr.setNameForOwnableWithSignature(ca, owner, "name.eth", \[60], Math.floor(Date.now()/1000)+3600, sigBytes);
+      ReverseRegistrar.setNameForAddrWithSignature:
+      kind: function
+      summary: Sets reverse name for an EOA address with its signature.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (signature variants) "
+      code: |
+      function setNameForAddrWithSignature(
+      address addr,
+      string calldata name,
+      uint256\[] calldata coinTypes,
+      uint256 signatureExpiry,
+      bytes calldata signature
+      ) external returns (bytes32);
+      guidance:
+    * Ensure the validator/registrar address and function selector match the signed payload.&#x20;
+    * Reject stale signatures past `signatureExpiry`.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \[
+      "function setNameForAddrWithSignature(address,string,uint256\[],uint256,bytes) returns (bytes32)"
+      ], signer);
+      await rr.setNameForAddrWithSignature(addr, "alice.eth", \[60], exp, sig);
+      ReverseRegistrar.claim:
+      kind: function
+      summary: Claims ownership of the caller’s reverse node to a target owner.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (Other functions) "
+      code: |
+      function claim(address owner) public returns (bytes32);
+      guidance:
+    * Use `claimWithResolver` to also set a resolver in one step.&#x20;
+    * Claiming does not set the reverse `name()`; follow with `setName*`.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \["function claim(address) returns (bytes32)"], signer);
+      await rr.claim(await signer.getAddress());
+      ReverseRegistrar.claimWithResolver:
+      kind: function
+      summary: Claims reverse node ownership and optionally sets the resolver.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (Other functions) "
+      code: |
+      function claimWithResolver(address owner, address resolver) public returns (bytes32);
+      guidance:
+    * Pass a non‑zero resolver to set it during claim; else, resolver remains unchanged.&#x20;
+    * Setting resolver enables subsequent `name()`/records edits.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \["function claimWithResolver(address,address) returns (bytes32)"], signer);
+      await rr.claimWithResolver(await signer.getAddress(), resolverAddress);
+      ReverseRegistrar.defaultResolver:
+      kind: function
+      summary: Returns the resolver address used by `setName`.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (Other functions) "
+      code: |
+      function defaultResolver() public view returns (address);
+      guidance:
+    * Useful for apps that prefer the registrar’s default resolver for reverse records.&#x20;
+    * Do not hardcode addresses; fetch current deployments per chain.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const rr = new ethers.Contract(rrAddress, \["function defaultResolver() view returns (address)"], provider);
+      const res = await rr.defaultResolver();
+
+* name: Resolver & CCIP‑Read
+  exports:
+
+  * Resolver.IMyResolver
+  * Resolver.IExtendedResolver.resolve
+  * Resolver.supportsInterface
+  * Resolver.OnchainResolver.setAddr
+  * Resolver.OffchainResolver.addr
+    symbols:
+    Resolver.IMyResolver:
+    kind: interface
+    summary: Minimal resolver read/write interface (addr, text, contenthash).
+    definition:
+    lang: solidity
+    source: "src/pages/resolvers/quickstart.mdx (Resolver Interface) "
+    code: |
+    interface IMyResolver {
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
+    function addr(bytes32 node) external view returns (address payable);
+    function addr(bytes32 node, uint256 coinType) external view returns (bytes memory);
+    function contenthash(bytes32 node) external view returns (bytes memory);
+    function text(bytes32 node, string calldata key) external view returns (string memory);
+
+    ```
+        function setAddr(bytes32 node, address addr) external;
+        function setAddr(bytes32 node, uint256 coinType, bytes calldata a) external;
+        function setContenthash(bytes32 node, bytes calldata hash) external;
+        function setText(bytes32 node, string calldata key, string calldata value) external;
+    }
+    ```
+
+    guidance:
+
+    * Gate mutations with `supportsInterface` checks for each feature you rely on.&#x20;
+    * Prefer the latest Public Resolver where suitable; custom resolvers vary.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const resolver = new ethers.Contract(resolverAddress, \[
+      "function setText(bytes32,string,string)",
+      "function supportsInterface(bytes4) view returns (bool)"
+      ], signer);
+      // Example: set a text record after checking interface (id omitted here)
+      Resolver.IExtendedResolver.resolve:
+      kind: function
+      summary: ENSIP‑10 wildcard `resolve(bytes,bytes)` for custom resolvers (incl. CCIP‑Read).
+      definition:
+      lang: solidity
+      source: "src/pages/resolvers/quickstart.mdx (ExtendedResolver) "
+      code: |
+      interface IExtendedResolver {
+      function resolve(
+      bytes memory name,
+      bytes memory data
+      ) external view returns (bytes memory);
+      }
+      guidance:
+    * Add interface id `0x9061b923` to your EIP‑165 support table.&#x20;
+    * Combine with CCIP‑Read OffchainLookup for off‑chain data sources.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // Read path typically via client library; writes not required for resolve()
+      // Implement in a custom resolver contract per ENSIP‑10.
+      Resolver.supportsInterface:
+      kind: function
+      summary: EIP‑165 capability query used to safely detect resolver features.
+      definition:
+      lang: solidity
+      source: "src/pages/resolvers/interacting.mdx (supportsInterface) "
+      code: |
+      function supportsInterface(bytes4 interfaceID) external pure returns (bool)
+      guidance:
+    * Probe before writes (e.g., `setText`, `setContenthash`) to avoid reverts.&#x20;
+    * Interface IDs are 4‑byte XORs of function selectors per EIP‑165.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const res = new ethers.Contract(resolverAddress, \["function supportsInterface(bytes4) view returns (bool)"], provider);
+      const ok = await res.supportsInterface("0x3b3b57de"); // addr(bytes32) example
+      Resolver.OnchainResolver.setAddr:
+      kind: function
+      summary: Minimal on‑chain resolver example to set an ETH address.
+      definition:
+      lang: solidity
+      source: "src/pages/resolvers/quickstart.mdx (OnchainResolver) "
+      code: |
+      contract OnchainResolver {
+      mapping(bytes32 node => address addr) public addr;
+      function setAddr(bytes32 node, address \_addr) external {
+      addr\[node] = \_addr;
+      }
+      }
+      guidance:
+    * Demo only; add ownership/ACL checks before production use.&#x20;
+    * Consider storing multi‑coin addresses and EVM default per ENSIP‑19.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // Interact with setAddr on a custom deployed resolver
+      const r = new ethers.Contract(customResolver, \["function setAddr(bytes32,address)"], signer);
+      await r.setAddr(nodeHash, target);
+      Resolver.OffchainResolver.addr:
+      kind: function
+      summary: CCIP‑Read example `addr(bytes32)` that reverts `OffchainLookup` for gateway fetch.
+      definition:
+      lang: solidity
+      source: "src/pages/terminology.mdx (OffchainResolver example) "
+      code: |
+      error OffchainLookup(
+      address sender, string\[] urls, bytes callData, bytes4 callbackFunction, bytes extraData
+      );
+      function addr(bytes32 node) external view returns (address) {
+      bytes memory callData = abi.encodeWithSelector(OffchainResolver.addr.selector, node);
+      string; urls\[0] = url;
+      revert OffchainLookup(address(this), urls, callData, OffchainResolver.addrCallback.selector, abi.encode(callData, address(this)));
+      }
+      guidance:
+    * The demo omits response verification; implement signature or Merkle proofs in `addrCallback`.&#x20;
+    * Use a gateway you control; rotate endpoints without redeploying the resolver.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // Clients handle OffchainLookup via CCIP-Read middleware; contract side shown above.
+
+* name: Name Wrapper (ERC‑1155)
+  exports:
+
+  * NameWrapper.wrapETH2LD
+  * NameWrapper.wrap
+  * NameWrapper.unwrapETH2LD
+  * NameWrapper.unwrap
+  * NameWrapper.setSubnodeOwner
+  * NameWrapper.setSubnodeRecord
+    symbols:
+    NameWrapper.wrapETH2LD:
+    kind: function
+    summary: Wrap a `.eth` 2LD, transferring ERC‑721 to the wrapper and minting ERC‑1155.
+    definition:
+    lang: solidity
+    source: "src/pages/wrapper/overview\.mdx (Wrapping .eth 2LDs) "
+    code: |
+    NameWrapper.wrapETH2LD(string label, address wrappedOwner, uint16 ownerControlledFuses, address resolver)
+    guidance:
+
+    * Owner‑controlled fuses can be set at wrap‑time; consider future subname policy.&#x20;
+    * Resolver may be assigned during wrapping to enable immediate record edits.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function wrapETH2LD(string,address,uint16,address)"
+      ], signer);
+      await nw\.wrapETH2LD("myname", await signer.getAddress(), 0, resolverAddress);
+      NameWrapper.wrap:
+      kind: function
+      summary: Wrap any ENS name (including DNS names) by transferring manager to the wrapper.
+      definition:
+      lang: solidity
+      source: "src/pages/wrapper/overview\.mdx (Wrapping other names) "
+      code: |
+      NameWrapper.wrap(bytes name, address wrappedOwner, address resolver)
+      guidance:
+    * DNS‑encoded `name` bytes are required; normalize before encoding.&#x20;
+    * Wrapped DNS names don’t support fuses; treat as ERC‑1155 only.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function wrap(bytes,address,address)"
+      ], signer);
+      await nw\.wrap(dnsEncodedBytes, await signer.getAddress(), resolverAddress);
+      NameWrapper.unwrapETH2LD:
+      kind: function
+      summary: Unwrap a `.eth` 2LD back to ERC‑721 registrant/manager (if not locked).
+      definition:
+      lang: solidity
+      source: "src/pages/wrapper/overview\.mdx (Unwrap .eth 2LD) "
+      code: |
+      NameWrapper.unwrapETH2LD(bytes32 labelhash, address registrant, address controller)
+      guidance:
+    * Not possible if the parent has been locked (`CANNOT_UNWRAP`).&#x20;
+    * Ensure target addresses are correct; unwrap burns the ERC‑1155.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function unwrapETH2LD(bytes32,address,address)"
+      ], signer);
+      await nw\.unwrapETH2LD(labelhash, newRegistrant, newController);
+      NameWrapper.unwrap:
+      kind: function
+      summary: Unwrap a subname or non‑.eth name back to registry control.
+      definition:
+      lang: solidity
+      source: "src/pages/wrapper/overview\.mdx (Unwrap other names) "
+      code: |
+      NameWrapper.unwrap(bytes32 parentNode, bytes32 labelhash, address controller)
+      guidance:
+    * Parent may enforce fuses on subnames; respect parent‑controlled policies.&#x20;
+    * Use correct `parentNode` (namehash of parent) and `labelhash` of child.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function unwrap(bytes32,bytes32,address)"
+      ], signer);
+      await nw\.unwrap(parentNode, childLabelhash, newController);
+      NameWrapper.setSubnodeOwner:
+      kind: function
+      summary: Create a wrapped subname and assign owner with fuses/expiry.
+      definition:
+      lang: solidity
+      source: "src/pages/wrapper/creating-subname-registrar.mdx (APIs) "
+      code: |
+      NameWrapper.setSubnodeOwner(
+      bytes32 parentNode,
+      string label,
+      address owner,
+      uint32 fuses,
+      uint64 expiry
+      )
+      guidance:
+    * Burn parent‑controlled fuses to guarantee subname invariants for holders.&#x20;
+    * Lock the parent if you need irrevocable guarantees (irreversible).&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function setSubnodeOwner(bytes32,string,address,uint32,uint64)"
+      ], signer);
+      await nw\.setSubnodeOwner(parentNode, "sub", newOwner, 65536, expiry);
+      NameWrapper.setSubnodeRecord:
+      kind: function
+      summary: Create a wrapped subname and set owner+resolver+TTL+fuses+expiry atomically.
+      definition:
+      lang: solidity
+      source: "src/pages/wrapper/creating-subname-registrar.mdx (APIs) "
+      code: |
+      NameWrapper.setSubnodeRecord(
+      bytes32 parentNode,
+      string label,
+      address owner,
+      address resolver,
+      uint64 ttl,
+      uint32 fuses,
+      uint64 expiry
+      )
+      guidance:
+    * Prefer `setSubnodeRecord` to avoid interleaving states and extra txs.&#x20;
+    * Ensure resolver supports required interfaces before setting records.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const nw = new ethers.Contract(nwAddress, \[
+      "function setSubnodeRecord(bytes32,string,address,address,uint64,uint32,uint64)"
+      ], signer);
+      await nw\.setSubnodeRecord(parentNode, "api", owner, resolver, 0, 0, expiry);
+
+* name: Registry (ENS)
+  exports:
+
+  * ENS.setResolver
+  * ENS.resolver
+  * ENS.owner
+    symbols:
+    ENS.setResolver:
+    kind: function
+    summary: Set the resolver contract for a node in the ENS Registry.
+    definition:
+    lang: solidity
+    source: "src/pages/resolvers/interacting.mdx (setResolver) "
+    code: |
+    interface ENS {
+    function setResolver(bytes32 node, address resolver) external;
+    }
+    guidance:
+
+    * Overwriting a user’s resolver is destructive; obtain explicit consent.&#x20;
+    * After changing resolver, re‑write required records on the new resolver.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const ens = new ethers.Contract(registryAddress, \["function setResolver(bytes32,address)"], signer);
+      await ens.setResolver(node, resolver);
+      ENS.resolver:
+      kind: function
+      summary: Read the resolver for a node from the ENS Registry.
+      definition:
+      lang: solidity
+      source: "src/pages/resolution/index.mdx (How to resolve) "
+      code: |
+      ENS.resolver(bytes32 node) view returns (address)
+      guidance:
+    * Client libs (ethers/viem/wagmi) wrap this; direct calls are fine for infra.&#x20;
+    * Use this first when performing resolution pipelines.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const ens = new ethers.Contract(registryAddress, \["function resolver(bytes32) view returns (address)"], provider);
+      const resolverAddr = await ens.resolver(node);
+      ENS.owner:
+      kind: function
+      summary: Read the owner of a node from the ENS Registry.
+      definition:
+      lang: solidity
+      source: "src/pages/web/quickstart.mdx (ReverseSetter example) "
+      code: |
+      interface ENS {
+      function owner(bytes32 node) external view returns (address);
+      }
+      guidance:
+    * Useful to discover the Reverse Registrar at `owner(namehash('addr.reverse'))`.&#x20;
+    * Ownership in the registry may be held by the Name Wrapper for wrapped names.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const ens = new ethers.Contract(registryAddress, \["function owner(bytes32) view returns (address)"], provider);
+      const who = await ens.owner(node);
+
+common\_workflows:
+
+* title: Register a `.eth` name safely (commit → wait → register)
+  steps:
+
+  * Build commitment with `makeCommitment` (fresh random 32‑byte secret).&#x20;
+  * Submit `commit`, wait ≥ `MIN_COMMITMENT_AGE` (\~60s).&#x20;
+  * Check `available(name)` and compute `rentPrice(duration)`.&#x20;
+  * Call `register` sending rent plus \~3–5% headroom; excess is refunded.&#x20;
+* title: Set a reverse record for an EOA
+  steps:
+
+  * Call `setName("alice.eth")` on the chain’s Reverse Registrar.&#x20;
+  * Prefer chain‑specific reverse with L1 fallback; don’t hardcode addresses.&#x20;
+* title: Update text records on a resolver
+  steps:
+
+  * Read resolver via `ENS.resolver(node)`; ensure it exists.&#x20;
+  * Probe capability `supportsInterface` for the text interface.&#x20;
+  * Call `setText(node, key, value)` on the resolver.&#x20;
+* title: Wrap a name and issue subnames with fuses
+  steps:
+
+  * Wrap parent with `wrapETH2LD` or `wrap`; set desired owner‑fuses.&#x20;
+  * (Optionally) Lock parent; note this is irreversible.&#x20;
+  * Create subnames via `setSubnodeRecord` to set owner+resolver+TTL+fuses+expiry atomically.&#x20;
+* title: Build an off‑chain resolver (CCIP‑Read)
+  steps:
+
+  * Implement `resolve(bytes,bytes)` (ENSIP‑10) and/or an `addr(bytes32)` that reverts `OffchainLookup`.
+  * Verify gateway responses in the callback; demo code omits verification.&#x20;
+* title: Change a node’s resolver safely
+  steps:
+
+  * Communicate to the user that resolver overwrite is destructive.&#x20;
+  * Call `ENS.setResolver(node, resolver)` then re‑apply required records on the new resolver.&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Register reverted: commitment too new"
+  cause: "Tried to register before `MIN_COMMITMENT_AGE` elapsed."
+  fix: "Wait ≥60s after `commit`, then call `register`."&#x20;
+* symptom: "Register reverted: value too low"
+  cause: "`rentPrice` changed between quote and tx."
+  fix: "Send 3–5% over `rentPrice`; ENS refunds excess."&#x20;
+* symptom: "Resolver write reverted"
+  cause: "Resolver doesn’t implement the interface (e.g., text records)."
+  fix: "Check `supportsInterface` for the needed feature before calling."&#x20;
+* symptom: "Can’t unwrap wrapped name"
+  cause: "Parent/name is Locked; `CANNOT_UNWRAP` burned."
+  fix: "Unwrapping is impossible once locked; design process accordingly."&#x20;
+* symptom: "Reverse name not reflected on chain X"
+  cause: "Only L1 default set; no chain‑specific reverse record."
+  fix: "Set reverse on the target chain’s Reverse Registrar; L1 is fallback."&#x20;
+
+faq:
+
+* q: "Can I renew someone else’s ENS name?"
+  a: "Yes. Any account can renew any name for any duration; ownership is unaffected."&#x20;
+* q: "Where do my registration funds go?"
+  a: "Funds flow to the ETHRegistrarController, then to the ENS Treasury (withdrawable), funding ENS, its ecosystem, and public goods."&#x20;
+* q: "Should I hardcode resolver or reverse registrar addresses?"
+  a: "No. Resolve deployments dynamically and rely on `supportsInterface` for capability checks; addresses can change."
+* q: "Is the CCIP‑Read OffchainResolver example secure?"
+  a: "The demo lacks verification in the callback and is for illustration only; add proper proof/attestation checks."&#x20;
+
+external\_resources:
+
+* label: ENS Docs – Registering & Renewing
+  url: [https://docs.ens.domains/learn/registering](https://docs.ens.domains/learn/registering)
+* label: ENS Docs – Resolvers Quickstart
+  url: [https://docs.ens.domains/resolvers/quickstart](https://docs.ens.domains/resolvers/quickstart)
+* label: ENS Docs – Reverse Registrars
+  url: [https://docs.ens.domains/registry/reverse](https://docs.ens.domains/registry/reverse)
+* label: ENS Docs – Name Wrapper Overview
+  url: [https://docs.ens.domains/wrapper/overview](https://docs.ens.domains/wrapper/overview)
+* label: ENS Docs – Creating a Subname Registrar
+  url: [https://docs.ens.domains/wrapper/creating-subname-registrar](https://docs.ens.domains/wrapper/creating-subname-registrar)
+* label: ENS Docs – Interacting with Resolvers
+  url: [https://docs.ens.domains/resolvers/interacting](https://docs.ens.domains/resolvers/interacting)
+* label: ENSIP‑10 Extended Resolution
+  url: [https://docs.ens.domains/ensip/10](https://docs.ens.domains/ensip/10)
+* label: ENSIP‑19 Default Address & Reverse Namespaces
+  url: [https://docs.ens.domains/ensip/19](https://docs.ens.domains/ensip/19)
+
