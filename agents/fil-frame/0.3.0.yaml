@@ -1,0 +1,896 @@
+meta:
+spec\_name: fil-frame
+spec\_version: "0.3.0"
+generated: "2025-09-18"
+library\_version: "^0.0.1"
+language: typescript
+homepage: [https://github.com/FIL-Builders/fil-frame](https://github.com/FIL-Builders/fil-frame)
+tags: \[filecoin, fvm, hardhat, nextjs, react, viem, wagmi, lighthouse, pinata]
+purpose: >
+Provide a senior‑developer reference for FIL‑Frame’s core surfaces—Solidity on‑ramp
+contracts, Hardhat tasks & deploy scripts, Next.js API utilities, React components,
+and deal‑making helpers—combining ground‑truth signatures with proven usage patterns.
+guiding\_principles:
+\- Treat on‑chain deal flow as two parts: (1) off‑chain data prep (CAR, CommP, pieceCid),
+then (2) on‑chain proposal with exact struct fields and epoch math.
+\- Always convert CIDs correctly: piece\_cid is raw bytes (CommP), not a base32 multihash.
+Use helpers and validate lengths before submitting.
+\- Favor typed ABIs generated post‑deploy (run the generateTsAbis step) to keep UI hooks
+and forms in sync with contracts.
+\- For Filfox verification, use the dedicated Hardhat task on Filecoin networks; use
+Hardhat’s standard verifier elsewhere.
+\- Poll provider backends (e.g., Lighthouse Data Depot) with bounded retries; many fields
+appear asynchronously after CAR creation.
+\- Keep “verified\_deal” settings consistent with your DataCap intent and provider policy;
+reject mismatches in authenticateMessage/dealNotify stages.
+\- Use wagmi/viem for client calls and ethers v6 for scripts; prefer BigInt for attoFIL and
+convert carefully when interacting with CBOR BigInt types.
+design\_notes: >
+Definitions are extracted verbatim or lightly compressed from the FIL‑Frame repository
+(contracts, tasks, deploy scripts, Next.js API, and components). Solidity contract
+members and Hardhat task params come from the raw sources. The “makeDealFunction”
+ABI and Deal helpers are taken from the Next.js dealClient utilities. The Filfox
+verification flow mirrors the repo’s dedicated task. Source files used: DealClient.sol
+([GitHub][1]), DealInfo.sol ([GitHub][2]), make-deal-proposal.ts ([GitHub][3]),
+get-deal-data.ts ([GitHub][4]), verify-contract.ts ([GitHub][5]),
+deploy/99\_generateTsAbis.ts ([GitHub][6]), deploy/00\_deal\_client.ts ([GitHub][7]),
+deploy/01\_deal\_info.ts ([GitHub][8]), api/lighthouse/route.ts ([GitHub][9]),
+api/lighthouse/data-depot.ts ([GitHub][10]), dealClient/\_components/Upload.tsx ([GitHub][11]),
+dealClient/\_components/Pinata.tsx ([GitHub][12]), dealClient/\_components/LighthouseUpload.tsx ([GitHub][13]),
+dealClient/utils.ts ([GitHub][14]), WriteOnlyFunctionForm.tsx ([GitHub][15]),
+blockexplorer components (TransactionsTable, SearchBar, AddressStorageTab) ([GitHub][16]),
+package.jsons for versioning ([GitHub][17]). Also consulted the user‑supplied
+overview doc for structure and intent.&#x20;
+
+groups:
+
+* name: solidity-contracts
+  exports: \[DealClient, DealInfo]
+  symbols:
+  DealClient:
+  kind: class
+  summary: Filecoin on‑chain deal on‑ramp; stores requests, emits proposals, and handles market callbacks.
+  definition:
+  lang: solidity
+  source: packages/hardhat/contracts/DealClient.sol
+  code: |
+  pragma solidity ^0.8.23;
+
+  ```
+      struct RequestId { bytes32 requestId; bool valid; }
+      struct RequestIdx { uint256 idx; bool valid; }
+      struct ProviderSet { bytes provider; bool valid; }
+
+      // User request for this contract to make a deal.
+      struct DealRequest {
+        bytes piece_cid;
+        uint64 piece_size;
+        bool   verified_deal;
+        string label;
+        int64  start_epoch;
+        int64  end_epoch;
+        uint256 storage_price_per_epoch;
+        uint256 provider_collateral;
+        uint256 client_collateral;
+        uint64  extra_params_version;
+        ExtraParamsV1 extra_params;
+      }
+
+      // Extra parameters associated with the deal request.
+      struct ExtraParamsV1 {
+        string location_ref;
+        uint64 car_size;
+        bool   skip_ipni_announce;
+        bool   remove_unsealed_copy;
+      }
+
+      contract DealClient {
+        enum Status { None, RequestSubmitted, DealPublished, DealActivated, DealTerminated }
+
+        event DealProposalCreate(bytes32 indexed id, uint64 size, bool indexed verified, uint256 price);
+
+        function getProviderSet(bytes calldata cid) public view returns (ProviderSet memory);
+        function getProposalIdSet(bytes calldata cid) public view returns (RequestId memory);
+        function dealsLength() public view returns (uint256);
+        function getDealByIndex(uint256 index) public view returns (DealRequest memory);
+
+        function makeDealProposal(DealRequest calldata deal) public returns (bytes32);
+        function getDealProposal(bytes32 proposalId) public view returns (bytes memory);
+        function getExtraParams(bytes32 proposalId) public view returns (bytes memory);
+
+        function updateActivationStatus(bytes memory pieceCid) public;
+        function addBalance(uint256 value) public;
+        function withdrawBalance(address client, uint256 value) public returns (uint);
+        function handle_filecoin_method(
+            uint64 method, uint64, bytes memory params
+        ) public returns (uint32, uint64, bytes memory);
+      }
+  guidance:
+    - piece_cid must be the CommP bytes (not a multibase string). Convert from CID to hex bytes before calling.
+    - start_epoch/end_epoch are chain epochs; compute from “now + lead time” to give providers room to publish.
+    - For verified deals, align collateral/price with provider policies; mismatches are rejected during callbacks.
+    - Listen for DealProposalCreate to retrieve the proposalId; index it off‑chain for UI workflows.
+    - Call updateActivationStatus periodically to transition status to Activated/Terminated post‑publish.
+  example:
+    lang: javascript
+    description: Submit a deal proposal via ethers v6 with typed struct.
+    code: |
+      import { ethers } from "ethers";
+      import DealClientAbi from "./DealClient.abi.json";
+
+      const deal: any = {
+        piece_cid: "0x...commpbytes",
+        piece_size: 262144n,
+        verified_deal: true,
+        label: "my-data",
+        start_epoch: 123456n,
+        end_epoch: 223456n,
+        storage_price_per_epoch: 0n,
+        provider_collateral: 0n,
+        client_collateral: 0n,
+        extra_params_version: 1n,
+        extra_params: {
+          location_ref: "https://example.com/my.car",
+          car_size: 262144n,
+          skip_ipni_announce: false,
+          remove_unsealed_copy: false,
+        },
+      };
+
+      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL!);
+      const wallet = new ethers.Wallet(process.env.PRIVATE_KEY!, provider);
+      const dealClient = new ethers.Contract(process.env.DEAL_CLIENT!, DealClientAbi, wallet);
+      const tx = await dealClient.makeDealProposal(deal);
+      console.log("proposalId:", (await tx.wait()).logs[0].topics[1]);
+
+  since: "0.0.1"
+  ```
+
+  DealInfo:
+  kind: class
+  summary: Read‑only helper to query market state for a given dealId and return a consolidated struct.
+  definition:
+  lang: solidity
+  source: packages/hardhat/contracts/DealInfo.sol
+  code: |
+  pragma solidity ^0.8.23;
+
+  ```
+      import {MarketTypes} from "filecoin-solidity-api/contracts/v0.8/types/MarketTypes.sol";
+      import {CommonTypes} from "filecoin-solidity-api/contracts/v0.8/types/CommonTypes.sol";
+
+      contract DealInfo {
+        struct DealData {
+          CommonTypes.DealLabel dealLabel;
+          uint64 dealClientActorId;
+          uint64 dealProviderActorId;
+          MarketTypes.GetDealDataCommitmentReturn dealCommitment;
+          MarketTypes.GetDealTermReturn dealTerm;
+          CommonTypes.BigInt dealPricePerEpoch;
+          CommonTypes.BigInt clientCollateral;
+          CommonTypes.BigInt providerCollateral;
+          bool isDealActivated;
+          MarketTypes.GetDealActivationReturn activationStatus;
+        }
+
+        function getDealLabel(uint64 dealId) public view returns (CommonTypes.DealLabel memory);
+        function getDealClient(uint64 dealId) public view returns (uint64);
+        function getDealProvider(uint64 dealId) public view returns (uint64);
+        function getDealCommitment(uint64 dealId) public view returns (MarketTypes.GetDealDataCommitmentReturn memory);
+        function getDealTerm(uint64 dealId) public view returns (MarketTypes.GetDealTermReturn memory);
+        function getDealTotalPrice(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+        function getClientCollateral(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+        function getProviderCollateral(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+        function getDealVerification(uint64 dealId) public view returns (bool);
+        function getDealActivationStatus(uint64 dealId) public view returns (MarketTypes.GetDealActivationReturn memory);
+        function getAllDealData(uint64 dealId) public view returns (DealData memory);
+      }
+  guidance:
+    - getAllDealData consolidates multiple MarketAPI reads; prefer it for UI or indexing to minimize RPC round‑trips.
+    - Convert CBOR BigInt values to uint256 carefully; losing precision can break cost/collateral displays.
+  example:
+    lang: javascript
+    code: |
+      import { ethers } from "ethers";
+      import DealInfoAbi from "./DealInfo.abi.json";
+      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL!);
+      const dealInfo = new ethers.Contract(process.env.DEAL_INFO!, DealInfoAbi, provider);
+      const data = await dealInfo.getAllDealData(12345n);
+      console.log("label:", data.dealLabel);
+  since: "0.0.1"
+  ```
+
+* name: hardhat-tasks
+  exports: \[make-deal-proposal, get-deal-data, verify-contract]
+  symbols:
+  make-deal-proposal:
+  kind: function
+  summary: Hardhat task that builds a DealRequest from CLI args and calls DealClient.makeDealProposal.
+  definition:
+  lang: typescript
+  source: packages/hardhat/tasks/deal-client/make-deal-proposal.ts
+  code: |
+  import { DealRequestStruct, ExtraParamsV1Struct } from "../../typechain-types/contracts/DealClient";
+  import CID from "cids";
+  import { task } from "hardhat/config";
+  import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+  ```
+      task("make-deal-proposal", "Makes a deal proposal via the client contract. This will ultimately emit an event that storage providers can listen to and choose to accept your deal.")
+        .addParam("contract", "The address of the deal client solidity")
+        .addParam("pieceCid", "The address of the DealRewarder contract")
+        .addParam("pieceSize", "The piece CID of the data you want to put up a bounty for")
+        .addParam("verifiedDeal", "Size of the data you are putting a bounty on")
+        .addParam("label", "The deal label (typically the raw cid)")
+        .addParam("startEpoch", "The epoch the deal will start")
+        .addParam("endEpoch", "The epoch the deal will end")
+        .addParam("storagePricePerEpoch", "The cost of the deal, in FIL, per epoch")
+        .addParam("providerCollateral", "The collateral, in FIL, to be put up by the storage provider")
+        .addParam("clientCollateral", "The collateral, in FIL, to be put up by the client (which is you)")
+        .addParam("extraParamsVersion", "")
+        .addParam("locationRef", "Where the data you want to be stored is located")
+        .addParam("carSize", "The size of the .car file")
+        .addParam("skipIpniAnnounce", "")
+        .addParam("removeUnsealedCopy", "")
+        .setAction(async (taskArgs, hre: HardhatRuntimeEnvironment) => {
+          // ... constructs ExtraParamsV1Struct and DealRequestStruct, then:
+          const dealClient = await hre.ethers.getContractAt("DealClient", taskArgs.contract);
+          const tx = await dealClient.makeDealProposal(dealRequestStruct);
+          const receipt = await tx.wait();
+          console.log("Complete! Event Emitted. ProposalId is:", receipt.logs[0].topics[1]);
+        });
+  guidance:
+    - Pass booleans as strings ("true"/"false") when invoking via CLI; the task coerces them.
+    - Convert the pieceCid (base32) to hex bytes via cids and prefix with 0x; do not pass the base32 string directly.
+    - Prefer small zero‑price test deals for local dev (price/collateral 0) and raise values only for testnets/mainnet.
+  example:
+    lang: bash
+    code: |
+      npx hardhat make-deal-proposal \
+        --network calibration \
+        --contract 0xDea1... \
+        --pieceCid bafkqa... \
+        --pieceSize 262144 \
+        --verifiedDeal true \
+        --label my-data \
+        --startEpoch 1200000 --endEpoch 1210000 \
+        --storagePricePerEpoch 0 --providerCollateral 0 --clientCollateral 0 \
+        --extraParamsVersion 1 \
+        --locationRef https://data-depot.lighthouse.storage/api/download/download_car?fileId=abc.car \
+        --carSize 262144 --skipIpniAnnounce false --removeUnsealedCopy false
+  since: "0.0.1"
+  ```
+
+  get-deal-data:
+  kind: function
+  summary: Hardhat task that reads DealInfo.getAllDealData for a given dealId and logs fields.
+  definition:
+  lang: typescript
+  source: packages/hardhat/tasks/deal-info/get-deal-data.ts
+  code: |
+  import { DealInfo } from "../../typechain-types/contracts/DealInfo";
+  import { task } from "hardhat/config";
+  import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+  ```
+      task("get-deal-data", "Fetches and displays all deal information for a given deal ID")
+        .addParam("contract", "The address of the DealInfo contract")
+        .addParam("dealId", "The ID of the deal to fetch information for")
+        .setAction(async (taskArgs, hre: HardhatRuntimeEnvironment) => {
+          const wallet = await hre.ethers.provider.getSigner();
+          const dealInfo = (await hre.ethers.getContractAt("DealInfo", taskArgs.contract, wallet)) as DealInfo;
+          const dealData = await dealInfo.getAllDealData(taskArgs.dealId);
+          console.log("Deal Information:", dealData);
+        });
+  guidance:
+    - Use the same network as the target deal; cross‑network calls will fail silently in logs.
+    - dealId is a Filecoin Market deal number (uint64), not a proposalId (bytes32).
+  example:
+    lang: bash
+    code: |
+      npx hardhat get-deal-data --network calibration \
+        --contract 0xDea1... --dealId 123456
+  since: "0.0.1"
+  ```
+
+  verify-contract:
+  kind: function
+  summary: Hardhat task that posts compiler metadata + sources to Filfox’s verify endpoint on Filecoin networks.
+  definition:
+  lang: typescript
+  source: packages/hardhat/tasks/verify-contract.ts
+  code: |
+  import { task } from "hardhat/config";
+  interface VerifyContractParams { contractName: string; }
+
+  ```
+      task("verify-contract", "Verifies a contract on Filfox")
+        .addParam("contractName", "The name of the contract to verify")
+        .setAction(async (taskArgs: VerifyContractParams, hre) => {
+          // Extract deployments + solc input, then POST to Filfox endpoint based on network.
+          // On success, prints the explorer URL; otherwise prints a friendly error per errorCode.
+        });
+  guidance:
+    - Use VERIFY=true yarn deploy to run verification immediately after deploy on calibration/filecoin.
+    - Ensure deployments/<network>/solcInputs/<hash>.json exists; Filfox requires long compiler version (vX.Y.Z+commit...).
+    - For non‑Filecoin chains, use hardhat-verify instead of this task.
+  example:
+    lang: bash
+    code: |
+      # After a successful deploy
+      npx hardhat verify-contract --network calibration --contractName DealClient
+  since: "0.0.1"
+  ```
+
+* name: deploy-scripts
+  exports: \[deployDealClient, deployDealInfo, generateTsAbis]
+  symbols:
+  deployDealClient:
+  kind: function
+  summary: hardhat-deploy script for DealClient with optional Filfox verification when VERIFY=true.
+  definition:
+  lang: typescript
+  source: packages/hardhat/deploy/00\_deal\_client.ts
+  code: |
+  import { DeployFunction } from "hardhat-deploy/types";
+  import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+  ```
+      const deployDealClient: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+        const [deployerSigner] = await hre.ethers.getSigners();
+        const deployer = await deployerSigner.getAddress();
+        const { deploy } = hre.deployments;
+
+        const DealClient = await deploy("DealClient", {
+          from: deployer, args: [], log: true, autoMine: true, waitConfirmations: 3,
+        });
+
+        if (process.env.VERIFY === "true") {
+          const filecoinNetworks = ["calibration", "filecoin"];
+          if (filecoinNetworks.includes(hre.network.name)) {
+            await hre.run("verify-contract", { contractName: "DealClient" });
+          } else {
+            await hre.run("verify:verify", { address: DealClient.address, constructorArguments: [deployer] });
+          }
+        }
+      };
+      export default deployDealClient;
+      deployDealClient.tags = ["DealClient"];
+  guidance:
+    - Always wait a few blocks or add an explicit timeout before Filfox verification to allow indexing.
+    - Use named tags (DealClient) to run targeted deploys: `yarn deploy --tags DealClient`.
+  example:
+    lang: bash
+    code: |
+      yarn deploy --network calibration --tags DealClient
+  since: "0.0.1"
+  ```
+
+  deployDealInfo:
+  kind: function
+  summary: hardhat-deploy script for DealInfo with an explicit 10s pre‑verify wait.
+  definition:
+  lang: typescript
+  source: packages/hardhat/deploy/01\_deal\_info.ts
+  code: |
+  import { DeployFunction } from "hardhat-deploy/types";
+  import { HardhatRuntimeEnvironment } from "hardhat/types";
+
+  ```
+      const deployDealInfo: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
+        const [deployerSigner] = await hre.ethers.getSigners();
+        const deployer = await deployerSigner.getAddress();
+        const { deploy } = hre.deployments;
+
+        const DealInfo = await deploy("DealInfo", {
+          from: deployer, args: [], log: true, autoMine: true,
+        });
+
+        if (process.env.VERIFY === "true") {
+          await new Promise(r => setTimeout(r, 10000));
+          const filecoinNetworks = ["calibration", "filecoin"];
+          if (filecoinNetworks.includes(hre.network.name)) {
+            await hre.run("verify-contract", { contractName: "DealInfo" });
+          } else {
+            await hre.run("verify:verify", { address: DealInfo.address, constructorArguments: [deployer] });
+          }
+        }
+      };
+      export default deployDealInfo;
+      deployDealInfo.tags = ["DealInfo"];
+  guidance:
+    - The built‑in 10s wait reduces verify flakiness; increase it if the explorer lags.
+    - Deploy both on the same network as your UI to avoid cross‑chain addresses in generated ABIs.
+  example:
+    lang: bash
+    code: |
+      VERIFY=true yarn deploy --network calibration --tags DealInfo
+  since: "0.0.1"
+  ```
+
+  generateTsAbis:
+  kind: function
+  summary: Final deploy step that writes nextjs/contracts/deployedContracts.ts from deployments/\* artifacts.
+  definition:
+  lang: typescript
+  source: packages/hardhat/deploy/99\_generateTsAbis.ts
+  code: |
+  import \* as fs from "fs";
+  import prettier from "prettier";
+  import { DeployFunction } from "hardhat-deploy/types";
+
+  ```
+      const generateTsAbis: DeployFunction = async function () {
+        const allContractsData = getContractDataFromDeployments(); // reads deployments/* + solc inputs
+        // writes ../nextjs/contracts/deployedContracts.ts with GenericContractsDeclaration
+        // and inheritedFunctions, formatted by prettier
+      };
+      export default generateTsAbis;
+      generateTsAbis.tags = ["generateTsAbis"];
+      generateTsAbis.runAtTheEnd = true;
+  guidance:
+    - Commit the generated file to keep UIs and hooks reproducible across CI and environments.
+    - Use the emitted inheritedFunctions map to annotate forms (e.g., WriteOnlyFunctionForm tooltips).
+  example:
+    lang: javascript
+    code: |
+      import deployed from "~~/contracts/deployedContracts";
+      console.log(Object.keys(deployed)); // chain IDs present as keys
+  since: "0.0.1"
+  ```
+
+* name: nextjs-api
+  exports:
+
+  * POST /api/lighthouse
+  * uploadToLighthouseDataDepot
+  * uploadToIPFS
+    symbols:
+    POST /api/lighthouse:
+    kind: function
+    summary: Next.js route handler that accepts a file + API key and returns CAR/piece details from Lighthouse Data Depot.
+    definition:
+    lang: typescript
+    source: packages/nextjs/app/api/lighthouse/route.ts
+    code: |
+    import { NextRequest, NextResponse } from "next/server";
+    import { uploadToLighthouseDataDepot } from "./data-depot";
+
+    ```
+    export async function POST(request: NextRequest) {
+      try {
+        const form = await request.formData();
+        const file  = form.get("file")  as File;
+        const apiKey = form.get("apiKey") as string;
+        if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
+        const result = await uploadToLighthouseDataDepot(file, apiKey);
+        return NextResponse.json({ result }, { status: 200 });
+      } catch (error) {
+        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+      }
+    }
+    ```
+
+    guidance:
+
+    * Node 18+ provides global File; if missing, polyfill or move upload logic into server actions.
+    * Validate size/mime server‑side; the client can’t be trusted for CAR/piece calculations.
+      example:
+      lang: javascript
+      code: |
+      const form = new FormData();
+      form.append("file", new File(\[new Blob(\["hi"])], "hi.txt"));
+      form.append("apiKey", process.env.LH\_API\_KEY!);
+      const res = await fetch("/api/lighthouse", { method: "POST", body: form });
+      console.log(await res.json());
+      since: "0.0.1"
+
+  uploadToLighthouseDataDepot:
+  kind: function
+  summary: Creates a CAR at Lighthouse, polls for pieceCid, and returns carLink + piece metadata.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/api/lighthouse/data-depot.ts
+  code: |
+  import lighthouse from "@lighthouse-web3/sdk";
+  import fs from "fs";
+  import path from "path";
+
+  ```
+      export const uploadToLighthouseDataDepot = async (
+        file: File, apiKey: string,
+      ): Promise<{ carLink: string; carSize: number; pieceCid: string; pieceSize: number; mimeType: string; }> => {
+        // writes to ./uploads, calls dataDepotAuth, createCar, polls viewCarFiles up to 180× with 5s delay,
+        // then builds carLink and returns { carLink, carSize, pieceCid, pieceSize, mimeType }, finally deletes temp file.
+      };
+  guidance:
+    - Polling up to ~15 minutes is expected on test infra; surface progress in UI to avoid perceived hangs.
+    - Clean temp files with a finally or helper (deleteFile) to avoid filling the server’s disk.
+  example:
+    lang: javascript
+    code: |
+      const file = new File([new Blob(["hello"])], "hello.txt");
+      const out  = await uploadToLighthouseDataDepot(file, process.env.LH_API_KEY!);
+      console.log(out.pieceCid, out.carLink);
+  since: "0.0.1"
+  ```
+
+  uploadToIPFS:
+  kind: function
+  summary: Server action using Pinata JWT to pin a file via pinFileToIPFS and return basic upload metadata.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/dealClient/\_components/Pinata.tsx
+  code: |
+  "use server";
+  export type PinataResponse = {
+  ipfsHash: string; pinSize: number; timeStamp: string; isDuplicate: boolean;
+  };
+  export async function uploadToIPFS(data: FormData): Promise<PinataResponse> {
+  // POST to [https://api.pinata.cloud/pinning/pinFileToIPFS](https://api.pinata.cloud/pinning/pinFileToIPFS) with Authorization: Bearer \<NEXT\_PUBLIC\_PINATA\_API\_KEY>
+  // returns IpfsHash/pinSize/timeStamp/isDuplicate (renamed to friendlier keys).
+  }
+  guidance:
+  \- Keep JWT in server‑only env vars; never expose it in the browser bundle.
+  \- The API returns IpfsHash in PascalCase; normalize keys before surfacing to UI to avoid casing bugs.
+  example:
+  lang: javascript
+  code: |
+  const fd = new FormData();
+  fd.append("file", new File(\[new Blob(\["ok"])], "ok.txt"));
+  const { ipfsHash } = await uploadToIPFS(fd);
+  console.log("ipfs cid:", ipfsHash);
+  since: "0.0.1"
+
+* name: deal-client-utils
+  exports: \[makeDealFunction, createDealObject, getDefaultDealInputs]
+  symbols:
+  makeDealFunction:
+  kind: constant
+  summary: viem/abitype Function ABI for DealClient.makeDealProposal(tuple DealRequest) → bytes32.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/dealClient/utils.ts
+  code: |
+  import { AbiFunction } from "viem";
+  export const makeDealFunction: AbiFunction = {
+  inputs: \[{
+  components: \[
+  { internalType: "bytes",   name: "piece\_cid", type: "bytes"   },
+  { internalType: "uint64",  name: "piece\_size", type: "uint64" },
+  { internalType: "bool",    name: "verified\_deal", type: "bool" },
+  { internalType: "string",  name: "label", type: "string" },
+  { internalType: "int64",   name: "start\_epoch", type: "int64" },
+  { internalType: "int64",   name: "end\_epoch", type: "int64" },
+  { internalType: "uint256", name: "storage\_price\_per\_epoch", type: "uint256" },
+  { internalType: "uint256", name: "provider\_collateral",     type: "uint256" },
+  { internalType: "uint256", name: "client\_collateral",       type: "uint256" },
+  { internalType: "uint64",  name: "extra\_params\_version",    type: "uint64"  },
+  { components: \[
+  { internalType: "string", name: "location\_ref",        type: "string" },
+  { internalType: "uint64",  name: "car\_size",            type: "uint64" },
+  { internalType: "bool",    name: "skip\_ipni\_announce",  type: "bool"   },
+  { internalType: "bool",    name: "remove\_unsealed\_copy",type: "bool"   },
+  ], internalType: "struct ExtraParamsV1", name: "extra\_params", type: "tuple" }
+  ],
+  internalType: "struct DealRequest", name: "deal", type: "tuple",
+  }],
+  name: "makeDealProposal",
+  outputs: \[{ internalType: "bytes32", name: "", type: "bytes32" }],
+  stateMutability: "nonpayable",
+  type: "function",
+  };
+  guidance:
+  \- Use with viem’s writeContract or wagmi’s useWriteContract; pass a JS object matching the nested tuple shape.
+  \- Keep numeric fields as BigInt (or numbers that viem converts) to avoid underflow/overflow in uint64/uint256 slots.
+  example:
+  lang: javascript
+  code: |
+  import { writeContract } from "@wagmi/core";
+  import { http, createConfig } from "wagmi";
+  import { makeDealFunction } from "\~\~/app/dealClient/utils";
+
+  ```
+      const config = createConfig({ chains: [], transports: {}, multiInjectedProviderDiscovery: false });
+      const res = await writeContract(config, {
+        address: "0xDea1...", abi: [makeDealFunction], functionName: "makeDealProposal",
+        args: [{ /* DealRequest object here */ }],
+      });
+      console.log(res);
+  since: "0.0.1"
+  ```
+
+  createDealObject:
+  kind: function
+  summary: Helper to assemble a DealRequest object from flat form inputs.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/dealClient/utils.ts
+  code: |
+  export interface DealInputs {
+  piece\_cid: string; piece\_size: number; verified\_deal: boolean; label: string;
+  start\_epoch: number; end\_epoch: number; storage\_price\_per\_epoch: number;
+  provider\_collateral: number; client\_collateral: number; extra\_params\_version: number;
+  location\_ref: string; car\_size: number; skip\_ipni\_announce: boolean; remove\_unsealed\_copy: boolean;
+  }
+  export function createDealObject(inputs: DealInputs) {
+  return {
+  piece\_cid: inputs.piece\_cid,
+  piece\_size: inputs.piece\_size,
+  verified\_deal: inputs.verified\_deal,
+  label: inputs.label,
+  start\_epoch: inputs.start\_epoch,
+  end\_epoch: inputs.end\_epoch,
+  storage\_price\_per\_epoch: inputs.storage\_price\_per\_epoch,
+  provider\_collateral: inputs.provider\_collateral,
+  client\_collateral: inputs.client\_collateral,
+  extra\_params\_version: inputs.extra\_params\_version,
+  extra\_params: {
+  location\_ref: inputs.location\_ref,
+  car\_size: inputs.car\_size,
+  skip\_ipni\_announce: inputs.skip\_ipni\_announce,
+  remove\_unsealed\_copy: inputs.remove\_unsealed\_copy,
+  },
+  };
+  }
+  guidance:
+  \- Validate CID/CommP and epoch ranges before building; this function does not perform any runtime checks.
+  \- Keep UI state flat and transform at the boundary for clearer forms and error messages.
+  example:
+  lang: javascript
+  code: |
+  import { createDealObject } from "\~\~/app/dealClient/utils";
+  const deal = createDealObject({ /\* flat fields from form \*/ });
+  console.log(deal.extra\_params.location\_ref);
+  since: "0.0.1"
+
+  getDefaultDealInputs:
+  kind: function
+  summary: Seeds DealInputs from Lighthouse results (carLink, carSize, pieceCid, pieceSize, deal window).
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/dealClient/utils.ts
+  code: |
+  import { DealInfoData } from "\~\~/hooks/lighthouse/useUpload";
+  export const getDefaultDealInputs = (dealParams?: DealInfoData) => ({
+  piece\_cid: dealParams?.pieceCid ?? "0x00",
+  piece\_size: dealParams?.pieceSize ?? 0,
+  verified\_deal: true,
+  label: "",
+  start\_epoch: dealParams?.dealStartBlock ?? 0,
+  end\_epoch: dealParams?.dealEndBlock ?? 0,
+  storage\_price\_per\_epoch: 0,
+  provider\_collateral: 0,
+  client\_collateral: 0,
+  extra\_params\_version: 1,
+  location\_ref: dealParams?.carLink ?? "",
+  car\_size: dealParams?.carSize ?? 0,
+  skip\_ipni\_announce: false,
+  remove\_unsealed\_copy: false,
+  });
+  guidance:
+  \- Use as initial form state; don’t submit defaults without user review of epochs and pricing.
+  \- If your backend provides different windows, overwrite start/end epochs before calling the contract.
+  example:
+  lang: javascript
+  code: |
+  const defaults = getDefaultDealInputs({ pieceCid: "0x...", pieceSize: 262144, carLink: "https\://...", carSize: 262144, dealStartBlock: 1200000, dealEndBlock: 1210000 });
+  console.log(defaults.piece\_size);
+  since: "0.0.1"
+
+* name: react-components
+  exports:
+
+  * GetFileDealParams
+  * LighthouseGetFileDealParams
+  * WriteOnlyFunctionForm
+  * TransactionsTable
+  * SearchBar
+  * AddressStorageTab
+    symbols:
+    GetFileDealParams:
+    kind: component
+    summary: Client component to upload to Pinata, compute CID/CommP, and submit an on‑chain offer.
+    definition:
+    lang: typescript
+    source: packages/nextjs/app/dealClient/\_components/Upload.tsx
+    code: |
+    export const GetFileDealParams = () => {
+    // uses uploadToIPFS + ipfs-unixfs-importer + @web3-storage/data-segment CommP
+    // builds { pieceSize, pieceCID, ipfsUrl, cid } and (optionally) submits a transaction
+    };
+    guidance:
+
+    * Large files: offload CommP to a worker to keep the UI responsive.
+    * Be explicit about BigInt conversions when building the on‑chain offer object.
+      example:
+      lang: javascript
+      code: |
+      import { GetFileDealParams } from "\~\~/app/dealClient/\_components/Upload";
+      export default function Page(){ return <GetFileDealParams />; }
+      since: "0.0.1"
+
+  LighthouseGetFileDealParams:
+  kind: component
+  summary: UI wrapper over useLighthouseGetFilecoinDealParams hook; wires onUploadSuccess/onUploadError.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/dealClient/\_components/LighthouseUpload.tsx
+  code: |
+  export const LighthouseGetFileDealParams = ({
+  handleGetDealParams, dealDurationInMonths,
+  }: { handleGetDealParams: (x: any) => void; dealDurationInMonths: number; }) => {
+  // calls hook.uploadFile(file, months) and forwards outputs to parent via handleGetDealParams
+  };
+  guidance:
+  \- Reset the file input after success to allow re‑uploads of the same filename.
+  \- Surface duration → epoch math in the parent for clarity; keep this component “dumb”.
+  example:
+  lang: javascript
+  code: | <LighthouseGetFileDealParams dealDurationInMonths={6} handleGetDealParams={console.log} />
+  since: "0.0.1"
+
+  WriteOnlyFunctionForm:
+  kind: component
+  summary: Generic write‑function form used in the Debug UI; integrates wagmi write + transactor UX.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/debug/\_components/contract/WriteOnlyFunctionForm.tsx
+  code: |
+  export const WriteOnlyFunctionForm = ({
+  abi, abiFunction, onChange, contractAddress, inheritedFrom,
+  }: { abi: any; abiFunction: any; onChange: () => void; contractAddress: `0x${string}`; inheritedFrom?: string; }) => {
+  // builds inputs from ABI, uses useWriteContract + useWaitForTransactionReceipt
+  };
+  guidance:
+  \- Transform ABI once with useMemo to avoid re‑render storms when editing inputs.
+  \- If stateMutability is payable, add a BigInt value field and validate non‑negative.
+  example:
+  lang: javascript
+  code: |
+  \<WriteOnlyFunctionForm abi={\[makeDealFunction]} abiFunction={makeDealFunction} onChange={()=>{}} contractAddress="0xDea1..." />
+  since: "0.0.1"
+
+  TransactionsTable:
+  kind: component
+  summary: Simple block/transaction table with function selector decoding and per‑tx receipt join.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/blockexplorer/\_components/TransactionsTable.tsx
+  code: |
+  import { TransactionsTableProps } from "\~\~/utils/fil-frame";
+  export const TransactionsTable = ({ blocks, transactionReceipts }: TransactionsTableProps) => {
+  // maps blocks → transactions, decodes first 4 bytes of input, displays To/From/value/timestamp
+  };
+  guidance:
+  \- Pre‑index receipts by hash to avoid O(n²) lookups during render.
+  \- Decode functionName with your ABI map when input !== "0x".
+  example:
+  lang: javascript
+  code: | <TransactionsTable blocks={blocks} transactionReceipts={txReceiptsByHash} />
+  since: "0.0.1"
+
+  SearchBar:
+  kind: component
+  summary: Client search for address or tx hash; uses viem Public Client to route to the correct page.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/blockexplorer/\_components/SearchBar.tsx
+  code: |
+  export const SearchBar = () => {
+  // if hex → try getTransaction(hash) then route; if address → route to address page
+  };
+  guidance:
+  \- Validate hex/hash length; avoid querying client APIs on obviously invalid inputs.
+  \- Debounce input changes if you add auto‑suggestions later.
+  example:
+  lang: javascript
+  code: |
+  \<form onSubmit={/\* handleSearch \*/}><input /></form>
+  since: "0.0.1"
+
+  AddressStorageTab:
+  kind: component
+  summary: Reads contract storage slots sequentially via viem.getStorageAt and displays non‑zero entries.
+  definition:
+  lang: typescript
+  source: packages/nextjs/app/blockexplorer/\_components/AddressStorageTab.tsx
+  code: |
+  import { Address } from "viem";
+  export const AddressStorageTab = ({ address }: { address: Address }) => {
+  // loops slot index 0..N until zeroed slot, renders values
+  };
+  guidance:
+  \- This is a teaching tool; for large contracts, cap the scan or provide a slot range selector.
+  \- Always display endianness/slot packing caveats; users often misinterpret raw storage.
+  example:
+  lang: javascript
+  code: |
+  \<AddressStorageTab address={"0xAbc..."} />
+  since: "0.0.1"
+
+common\_workflows:
+
+* title: Upload → CAR/CommP → Propose on‑chain
+  steps:
+
+  * Use POST /api/lighthouse to create a CAR and obtain {pieceCid, pieceSize, carLink}.
+  * Seed defaults via getDefaultDealInputs and let the user review epochs/prices.
+  * Build the DealRequest with createDealObject; ensure piece\_cid is hex bytes.
+  * Submit makeDealProposal (wagmi/viem or ethers); store proposalId from DealProposalCreate.
+  * Poll updateActivationStatus and the explorer until activated.
+
+* title: Deploy & verify on Filecoin
+  steps:
+
+  * Deploy contracts with hardhat-deploy scripts (DealClient, DealInfo).
+  * Set VERIFY=true and re‑run deploy to trigger Filfox verification via verify-contract.
+  * Confirm verification links printed by the task and bookmark them for UIs.
+
+* title: Generate and consume typed ABIs
+  steps:
+
+  * Ensure generateTsAbis runs at the end of deployment.
+  * Import nextjs/contracts/deployedContracts.ts in UI; derive hooks/forms from ABIs.
+  * Use inheritedFunctions metadata to annotate UI for parent‑class methods.
+
+* title: Inspect a deal by id
+  steps:
+
+  * Run npx hardhat get-deal-data --dealId <id> --contract <DealInfo>.
+  * Display DealData fields in your UI (term, label, collaterals, activation status).
+
+troubleshooting\_cheatsheet:
+
+* symptom: Filfox verify returns “Compiled bytecode doesn't match the contract's initCode.”
+  cause: Compiler version/metadata mismatch or missing/incorrect source ordering in posted payload.
+  fix: Use the verify-contract task on Filecoin networks; ensure solc long version and sources from deployments/solcInputs are posted first for the target .sol.
+
+* symptom: Task make-deal-proposal reverts or the provider ignores the proposal.
+  cause: piece\_cid passed as base32 string instead of CommP bytes; or epochs/prices out of policy.
+  fix: Convert to 0x‑prefixed bytes from CID; verify start/end epochs and price/collateral within acceptable ranges.
+
+* symptom: Lighthouse Data Depot never returns pieceCid.
+  cause: Indexing delay after createCar; polling too short.
+  fix: Poll viewCarFiles with bounded retries (as implemented up to 180 attempts with 5s delay); increase timeout in non‑demo scenarios.
+
+faq:
+
+* q: Should I use the Filfox verifier or Hardhat’s Etherscan verifier?
+  a: Use the Filfox‑specific verify-contract task on calibration/filecoin; for non‑Filecoin chains, use hardhat-verify.
+
+* q: What exactly is piece\_cid in DealRequest?
+  a: It’s the CommP (piece commitment) bytes of your CAR, not the DAG CID string. Convert to bytes before calling the contract.
+
+* q: How do I keep my UI ABIs in sync with deployed addresses?
+  a: Keep the generated nextjs/contracts/deployedContracts.ts under version control and re‑run generateTsAbis after each deploy.
+
+external\_resources:
+
+* label: FIL‑Frame repository
+  url: [https://github.com/FIL-Builders/fil-frame](https://github.com/FIL-Builders/fil-frame)
+* label: Create FIL‑Frame (CLI)
+  url: [https://github.com/FIL-Builders/create-fil-frame](https://github.com/FIL-Builders/create-fil-frame)
+* label: Filecoin docs — Direct deal‑making
+  url: [https://docs.filecoin.io/smart-contracts/programmatic-storage/direct-deal-making](https://docs.filecoin.io/smart-contracts/programmatic-storage/direct-deal-making)
+* label: Filfox — Verify contract (UI)
+  url: [https://filfox.info/en/contract](https://filfox.info/en/contract)
+
+[1]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/contracts/DealClient.sol "raw.githubusercontent.com"
+[2]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/contracts/DealInfo.sol "raw.githubusercontent.com"
+[3]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/tasks/deal-client/make-deal-proposal.ts "raw.githubusercontent.com"
+[4]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/tasks/deal-info/get-deal-data.ts "raw.githubusercontent.com"
+[5]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/tasks/verify-contract.ts "raw.githubusercontent.com"
+[6]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/deploy/99_generateTsAbis.ts "raw.githubusercontent.com"
+[7]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/deploy/00_deal_client.ts "raw.githubusercontent.com"
+[8]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/hardhat/deploy/01_deal_info.ts "raw.githubusercontent.com"
+[9]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/api/lighthouse/route.ts "raw.githubusercontent.com"
+[10]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/api/lighthouse/data-depot.ts "raw.githubusercontent.com"
+[11]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/dealClient/_components/Upload.tsx "raw.githubusercontent.com"
+[12]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/dealClient/_components/Pinata.tsx "raw.githubusercontent.com"
+[13]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/dealClient/_components/LighthouseUpload.tsx "raw.githubusercontent.com"
+[14]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/dealClient/utils.ts "raw.githubusercontent.com"
+[15]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/debug/_components/contract/WriteOnlyFunctionForm.tsx "raw.githubusercontent.com"
+[16]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/packages/nextjs/app/blockexplorer/_components/TransactionsTable.tsx "raw.githubusercontent.com"
+[17]: https://raw.githubusercontent.com/FIL-Builders/fil-frame/main/package.json "raw.githubusercontent.com"
+
