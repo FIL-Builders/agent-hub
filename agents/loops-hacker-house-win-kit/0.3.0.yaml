@@ -1,0 +1,1550 @@
+meta:
+spec\_name: agent-hub/loops-hacker-house-winner-kit
+spec\_version: 0.3.0
+library\_version: "multi: randamu-dcipher-sdk^0.1.x; openserv-api 2025-04; near-intents 1Click v0; golem-db json-rpc 2025-06; synapse-sdk^0.24.x"
+generated: "2025-09-19"
+language: javascript
+homepage: [https://github.com/FIL-Builders/agent-hub](https://github.com/FIL-Builders/agent-hub)
+tags: \[hackathon, agents, web3, near, filecoin, golem, randamu, openserv, vrf, storage, json-rpc]
+purpose: >
+A consolidated Expert Knowledge Pack to help agent teams rapidly ship production‑grade MVPs for
+the Loops Hacker House prize tracks (NEAR Intents & Shade Agents, OpenServ, Randamu, Golem DB‑Chain,
+Filecoin Synapse). It merges authoritative API contracts with best‑practice guidance and runnable
+examples targeted at hackathon velocity and judging criteria (PMF, technical excellence, path to production).
+guiding\_principles:
+\- Target a single killer workflow per prize track; integrate two tracks only if it deepens PMF.
+\- Design for demo reliability: add retries, timeouts, and clear user-visible statuses.
+\- Prefer hosted testnets/sandboxes (e.g., NEAR 1Click, Golem Kaolin/Holesky, Filecoin Calibration).
+\- Write to interfaces: keep network URLs, contract addresses, and keys in .env with sane defaults.
+\- Log every on-chain hash and store intent/request IDs for auditability and judge Q\&A.
+\- Fail closed on cryptography (VRF verify, blocklock decrypt): verify before acting.
+\- Cache quotes and read-only calls; batch queries to stay under rate limits.
+\- Ship minimal UI with real telemetry (progress bars, copyable IDs, errors with next steps).
+\- Use prebuilt SDK helpers before hand-rolling RPC calls; upgrade only if you must.
+\- Document your runbook (README: setup, .env, commands, E2E test) and add a one-click deploy.
+design\_notes: >
+Sources: NEAR Intents 1Click & Solver Relay docs; NEAR Shade Agents overview; Randamu dCipher SDK agent spec;
+Golem Base DB‑Chain JSON‑RPC docs; FilOzone Synapse SDK README/API. Grouping follows prize tracks; symbol selection
+favors high‑ROI primitives for a weekend build.
+
+groups:
+
+* name: near/intents-1click
+  exports:
+
+  * GetSupportedTokens
+  * RequestQuote
+  * SubmitDepositTx
+  * GetSwapStatus
+    symbols:
+    GetSupportedTokens:
+    kind: http
+    summary: List tokens supported by 1Click Swap API.
+    definition:
+    lang: openapi
+    code: |
+    openapi: 3.0.0
+    paths:
+    /v0/tokens:
+    get:
+    summary: Get supported tokens
+    responses:
+    '200':
+    description: Array of supported token objects
+    content:
+    application/json:
+    schema:
+    type: array
+    items:
+    type: object
+    properties:
+    assetId: { type: string }
+    decimals: { type: integer }
+    blockchain: { type: string }
+    symbol: { type: string }
+    price: { type: string }
+    priceUpdatedAt: { type: string, format: date-time }
+    contractAddress: { type: string }
+    guidance:
+
+    * Cache this list client-side for the session to reduce latency.
+    * Use `assetId` values directly when forming quote requests.
+      example:
+      lang: javascript
+      description: Fetch supported tokens for asset pickers.
+      code: |
+      const res = await fetch('[https://1click.chaindefuser.com/v0/tokens](https://1click.chaindefuser.com/v0/tokens)');
+      const tokens = await res.json();
+      console.log(tokens\[0]);
+      since: v0
+      source: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+
+  RequestQuote:
+  kind: http
+  summary: Request a 1Click quote for EXACT\_INPUT/OUTPUT or FLEX\_INPUT swaps.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /v0/quote:
+  post:
+  summary: Request a swap quote
+  security:
+  \- bearerAuth: \[]
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  required:
+  \- dry
+  \- swapType
+  \- slippageTolerance
+  \- originAsset
+  \- depositType
+  \- destinationAsset
+  \- amount
+  \- refundTo
+  \- refundType
+  \- recipient
+  \- recipientType
+  \- deadline
+  properties:
+  dry: { type: boolean }
+  depositMode: { type: string, enum: \[SIMPLE, MEMO] }
+  swapType: { type: string, enum: \[EXACT\_INPUT, EXACT\_OUTPUT, FLEX\_INPUT, ANY\_INPUT] }
+  slippageTolerance: { type: number, description: "Basis points" }
+  originAsset: { type: string }
+  depositType: { type: string, enum: \[ORIGIN\_CHAIN, INTENTS] }
+  destinationAsset: { type: string }
+  amount: { type: string }
+  refundTo: { type: string }
+  refundType: { type: string, enum: \[ORIGIN\_CHAIN, INTENTS] }
+  recipient: { type: string }
+  connectedWallets: { type: array, items: { type: string } }
+  sessionId: { type: string }
+  virtualChainRecipient: { type: string }
+  virtualChainRefundRecipient: { type: string }
+  customRecipientMsg: { type: string }
+  recipientType: { type: string, enum: \[DESTINATION\_CHAIN, INTENTS] }
+  deadline: { type: string, format: date-time }
+  referral: { type: string }
+  quoteWaitingTimeMs: { type: number }
+  appFees:
+  type: array
+  items:
+  type: object
+  required: \[recipient, fee]
+  properties:
+  recipient: { type: string }
+  fee: { type: integer }
+  responses:
+  '200':
+  description: Quote + deposit address
+  guidance:
+  \- Use `dry: true` for preview UIs, switch to `dry: false` only on confirm.
+  \- Always display and persist the returned `depositAddress` and `deadline`.
+  example:
+  lang: javascript
+  code: |
+  const body = {
+  dry: true,
+  swapType: "EXACT\_INPUT",
+  slippageTolerance: 100,
+  originAsset: "nep141\:wrap.near",
+  depositType: "ORIGIN\_CHAIN",
+  destinationAsset: "nep141\:usdc.near",
+  amount: "1000000000000000000",
+  refundTo: "user.near",
+  refundType: "INTENTS",
+  recipient: "user.near",
+  recipientType: "INTENTS",
+  deadline: new Date(Date.now() + 30*60*1000).toISOString()
+  };
+  const res = await fetch('[https://1click.chaindefuser.com/v0/quote](https://1click.chaindefuser.com/v0/quote)', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.ONECLICK\_JWT },
+  body: JSON.stringify(body)
+  });
+  console.log(await res.json());
+  since: v0
+  source: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+
+  SubmitDepositTx:
+  kind: http
+  summary: Optional early deposit notification to accelerate processing.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /v0/deposit/submit:
+  post:
+  summary: Submit deposit tx hash
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  required: \[txHash]
+  properties:
+  txHash: { type: string }
+  responses:
+  '200': { description: Accepted }
+  guidance:
+  \- Call after broadcasting deposit to the chain to reduce time-to-execute.
+  \- Validate the tx hash format client-side to avoid 400 responses.
+  example:
+  lang: javascript
+  code: |
+  await fetch('[https://1click.chaindefuser.com/v0/deposit/submit](https://1click.chaindefuser.com/v0/deposit/submit)', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ txHash: '0xabc...' })
+  });
+  since: v0
+  source: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+
+  GetSwapStatus:
+  kind: http
+  summary: Poll current status for a given deposit address.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /v0/status:
+  get:
+  summary: Get swap status
+  parameters:
+  \- in: query
+  name: depositAddress
+  schema: { type: string }
+  required: true
+  responses:
+  '200':
+  description: Status object with current state
+  guidance:
+  \- Back off to 3–5s polling; stop when terminal states appear (SUCCESS/FAILED/REFUNDED).
+  \- Surface `INCOMPLETE_DEPOSIT` with a UI nudge to top up.
+  example:
+  lang: javascript
+  code: |
+  const url = new URL('[https://1click.chaindefuser.com/v0/status](https://1click.chaindefuser.com/v0/status)');
+  url.searchParams.set('depositAddress', '0x76b4c56085ED...');
+  const res = await fetch(url);
+  const status = await res.json();
+  console.log(status.state);
+  since: v0
+  source: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+
+* name: near/solver-relay
+  exports: \[Quote, PublishIntent\_NEP413, GetStatus]
+  symbols:
+  Quote:
+  kind: jsonrpc
+  summary: Request quotes from solver relay based on token pair and amount.
+  definition:
+  lang: json
+  code: |
+  {
+  "jsonrpc": "2.0",
+  "method": "quote",
+  "params": \[{
+  "defuse\_asset\_identifier\_in": "string",
+  "defuse\_asset\_identifier\_out": "string",
+  "exact\_amount\_in": "string (optional)",
+  "exact\_amount\_out": "string (optional)",
+  "min\_deadline\_ms": 60000
+  }],
+  "id": 1
+  }
+  guidance:
+  \- Provide only one of exact\_amount\_in OR exact\_amount\_out.
+  \- Keep the 3000 ms solver wait default unless UI explicitly requests longer.
+  example:
+  lang: javascript
+  code: |
+  const body = {
+  jsonrpc: "2.0",
+  id: 1,
+  method: "quote",
+  params: \[{
+  defuse\_asset\_identifier\_in: "nep141\:wrap.near",
+  defuse\_asset\_identifier\_out: "nep141\:usdc.near",
+  exact\_amount\_in: "1000000000000000000",
+  min\_deadline\_ms: 60000
+  }]
+  };
+  const res = await fetch("[https://solver-relay-v2.chaindefuser.com/rpc](https://solver-relay-v2.chaindefuser.com/rpc)", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body)
+  });
+  console.log(await res.json());
+  since: "2025-08"
+  source: [https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay](https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay)
+
+  PublishIntent\_NEP413:
+  kind: jsonrpc
+  summary: Publish a signed intent (NEP-413 signature) with selected quote hashes.
+  definition:
+  lang: json
+  code: |
+  {
+  "jsonrpc": "2.0",
+  "method": "publish\_intent",
+  "params": \[{
+  "quote\_hashes": \["string"],
+  "signed\_data": {
+  "standard": "nep413",
+  "payload": {
+  "message": "{...stringified JSON...}",
+  "nonce": "base64",
+  "recipient": "intents.near"
+  },
+  "signature": "ed25519:...",
+  "public\_key": "ed25519:..."
+  }
+  }],
+  "id": 1
+  }
+  guidance:
+  \- Sign with the same account intended to settle on-chain (signer\_id).
+  \- Track the returned intent\_hash for subsequent status polling.
+  example:
+  lang: javascript
+  code: |
+  const req = {
+  jsonrpc: "2.0", id: 1, method: "publish\_intent",
+  params: \[{
+  quote\_hashes: \["..."],
+  signed\_data: {
+  standard: "nep413",
+  payload: {
+  message: JSON.stringify({
+  signer\_id: "user.near",
+  deadline: new Date(Date.now()+600000).toISOString(),
+  intents: \[{ intent: "token\_diff", diff: { "nep141\:wrap.near": "-1000000000000000000", "nep141\:usdc.near": "3000000" }}]
+  }),
+  nonce: "base64...",
+  recipient: "intents.near"
+  },
+  signature: "ed25519:...",
+  public\_key: "ed25519:..."
+  }
+  }]
+  };
+  await fetch("[https://solver-relay-v2.chaindefuser.com/rpc](https://solver-relay-v2.chaindefuser.com/rpc)", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(req)
+  });
+  since: "2025-08"
+  source: [https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay](https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay)
+
+  GetStatus:
+  kind: jsonrpc
+  summary: Check status of an intent by intent\_hash.
+  definition:
+  lang: json
+  code: |
+  {
+  "jsonrpc": "2.0",
+  "method": "get\_status",
+  "params": \[{ "intent\_hash": "string" }],
+  "id": 1
+  }
+  guidance:
+  \- Stop polling after terminal states {SETTLED, NOT\_FOUND\_OR\_NOT\_VALID}.
+  \- If status is TX\_BROADCASTED but no settlement, surface the Near tx hash for the user.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 1, method: "get\_status", params: \[{ intent\_hash: "0x..." }] };
+  const res = await fetch("[https://solver-relay-v2.chaindefuser.com/rpc](https://solver-relay-v2.chaindefuser.com/rpc)", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body)
+  });
+  console.log(await res.json());
+  since: "2025-08"
+  source: [https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay](https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay)
+
+* name: openserv/api
+  exports: \[AgentMainEndpoint, Platform\_UploadFile, Platform\_CompleteTask, Platform\_ReportTaskError, Platform\_SendChatMessage]
+  symbols:
+  AgentMainEndpoint:
+  kind: http
+  summary: Your agent's single POST endpoint that handles actions by `type`.
+  definition:
+  lang: typescript
+  code: |
+  // Express-style TypeScript signature
+  type Action =
+  \| { type: "do-task"; taskId: number; workspaceId: number; payload?: unknown }
+  \| { type: "respond-chat-message"; workspace: { id: number; goal?: string }, me: { id: number; name: string }, messages: Array<{ author: string; id: number; message: string; createdAt: string }> };
+
+  ```
+      // POST "/" -> 200 { message: "OK" }
+      // Immediately acknowledge; process asynchronously.
+  guidance:
+    - Always respond immediately with `{ message: 'OK' }` and process the action asynchronously.
+    - Use the OpenServ Platform API to post results (file upload, chat message, task complete/error).
+  example:
+    lang: javascript
+    description: Minimal Express server for OpenServ actions.
+    code: |
+      import express from "express";
+      const app = express();
+      app.use(express.json());
+      app.post("/", async (req, res) => {
+        const action = req.body;
+        res.json({ message: "OK" });
+        if (action.type === "respond-chat-message") {
+          // ... process and call OpenServ API with a reply
+        }
+      });
+      app.listen(7378);
+  since: "2025-04"
+  source: https://docs.openserv.ai/getting-started/agent-tutorial
+  ```
+
+  Platform\_UploadFile:
+  kind: http
+  summary: Upload a file to a workspace: POST /workspaces/{workspaceId}/file.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /workspaces/{workspaceId}/file:
+  post:
+  summary: Upload file
+  parameters:
+  \- in: path
+  name: workspaceId
+  required: true
+  schema: { type: integer }
+  requestBody:
+  required: true
+  content:
+  multipart/form-data:
+  schema:
+  type: object
+  required: \[file, path]
+  properties:
+  file: { type: string, format: binary }
+  path: { type: string }
+  taskIds: { type: string }
+  skipSummarizer: { type: string }
+  responses:
+  '200': { description: Uploaded }
+  guidance:
+  \- Send `skipSummarizer=true` when uploading plain outputs to avoid double-summarization.
+  \- Include `taskIds` to link artifacts to tasks for auditability.
+  example:
+  lang: javascript
+  code: |
+  import FormData from "form-data";
+  import fetch from "node-fetch";
+  const form = new FormData();
+  form.append("file", Buffer.from("hello"), { filename: "hello.txt", contentType: "text/plain" });
+  form.append("path", "hello.txt");
+  form.append("taskIds", "42");
+  form.append("skipSummarizer", "true");
+  await fetch(`${process.env.OPENSERV_API}/workspaces/53/file`, {
+  method: "POST", headers: { "Authorization": `Bearer ${process.env.OPENSERV_API_KEY}` }, body: form
+  });
+  since: "2025-04"
+  source: [https://docs.openserv.ai/getting-started/agent-tutorial](https://docs.openserv.ai/getting-started/agent-tutorial)
+
+  Platform\_CompleteTask:
+  kind: http
+  summary: Mark a task complete with a final output.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /workspaces/{workspaceId}/tasks/{taskId}/complete:
+  put:
+  summary: Complete task
+  parameters:
+  \- in: path
+  name: workspaceId
+  required: true
+  schema: { type: integer }
+  \- in: path
+  name: taskId
+  required: true
+  schema: { type: integer }
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  output: { type: string }
+  responses:
+  '200': { description: Completed }
+  guidance:
+  \- Call only after uploading artifacts to include links in the output message.
+  \- If downstream agents need to read outputs, also send a chat message with the path.
+  example:
+  lang: javascript
+  code: |
+  await fetch(`${process.env.OPENSERV_API}/workspaces/53/tasks/77/complete`, {
+  method: "PUT",
+  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.OPENSERV_API_KEY}` },
+  body: JSON.stringify({ output: "File uploaded to path text-summary.txt" })
+  });
+  since: "2025-04"
+  source: [https://docs.openserv.ai/getting-started/agent-tutorial](https://docs.openserv.ai/getting-started/agent-tutorial)
+
+  Platform\_ReportTaskError:
+  kind: http
+  summary: Report an error for a task.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /workspaces/{workspaceId}/tasks/{taskId}/error:
+  post:
+  summary: Report task error
+  parameters:
+  \- in: path
+  name: workspaceId
+  required: true
+  schema: { type: integer }
+  \- in: path
+  name: taskId
+  required: true
+  schema: { type: integer }
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  error: { type: string }
+  responses:
+  '200': { description: Error recorded }
+  guidance:
+  \- Surface actionable errors to the user; include next steps or retries.
+  \- Also log errors server-side with correlation IDs.
+  example:
+  lang: javascript
+  code: |
+  await fetch(`${process.env.OPENSERV_API}/workspaces/53/tasks/77/error`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.OPENSERV_API_KEY}` },
+  body: JSON.stringify({ error: "Upstream API timeout after 10s" })
+  });
+  since: "2025-04"
+  source: [https://docs.openserv.ai/getting-started/agent-tutorial](https://docs.openserv.ai/getting-started/agent-tutorial)
+
+  Platform\_SendChatMessage:
+  kind: http
+  summary: Send a chat message into the workspace's agent chat.
+  definition:
+  lang: openapi
+  code: |
+  openapi: 3.0.0
+  paths:
+  /workspaces/{workspaceId}/agent-chat/{agentId}/message:
+  post:
+  summary: Send chat message
+  parameters:
+  \- in: path
+  name: workspaceId
+  required: true
+  schema: { type: integer }
+  \- in: path
+  name: agentId
+  required: true
+  schema: { type: integer }
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  required: \[message]
+  properties:
+  message: { type: string }
+  responses:
+  '200': { description: Message sent }
+  guidance:
+  \- Use chat messages to explain progress and provide links while long tasks run.
+  \- Keep messages short; include IDs/paths for traceability.
+  example:
+  lang: javascript
+  code: |
+  await fetch(`${process.env.OPENSERV_API}/workspaces/53/agent-chat/12/message`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.OPENSERV_API_KEY}` },
+  body: JSON.stringify({ message: "Uploaded piece to Filecoin. PieceCID: bafk..." })
+  });
+  since: "2025-04"
+  source: [https://docs.openserv.ai/getting-started/agent-tutorial](https://docs.openserv.ai/getting-started/agent-tutorial)
+
+* name: randamu/randomness-js
+  exports:
+
+  * Randomness.createFromChainId
+  * Randomness.createBaseSepolia
+  * Randomness.requestRandomness
+  * Randomness.verify
+    symbols:
+    Randomness.createFromChainId:
+    kind: function
+    summary: Initialize a `Randomness` client bound to a specific chain ID using an ethers Wallet.
+    definition:
+    lang: typescript
+    code: declare class Randomness { static createFromChainId(wallet: import("ethers").Wallet, chainId: number): Randomness; }
+    guidance:
+
+    * Use when your target chain lacks a convenience initializer; pass a Wallet with a connected provider.
+    * Keep the wallet funded for tx fees; the SDK sends a transaction to RandomnessSender.
+      example:
+      lang: javascript
+      code: |
+      import { Randomness } from "randomness-js";
+      import { JsonRpcProvider, Wallet } from "ethers";
+      const rpc = new JsonRpcProvider("[https://api.calibration.node.glif.io/rpc/v1](https://api.calibration.node.glif.io/rpc/v1)");
+      const wallet = new Wallet(process.env.PRIVATE\_KEY, rpc);
+      const rnd = Randomness.createFromChainId(wallet, 314159); // Filecoin Calibration
+      console.log("Randomness client ready for chain 314159");
+      since: "^0.1.0"
+      source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Randomness.createBaseSepolia:
+  kind: function
+  summary: Convenience initializer for the Base Sepolia network.
+  definition:
+  lang: typescript
+  code: declare class Randomness { static createBaseSepolia(wallet: import("ethers").Wallet): Randomness; }
+  guidance:
+  \- Prefer this over manual addresses to avoid misconfigured contract endpoints.
+  \- If you need a different network, switch to createFromChainId with the documented chain ID.
+  example:
+  lang: javascript
+  code: |
+  import { Randomness } from "randomness-js";
+  import { JsonRpcProvider, Wallet } from "ethers";
+  const provider = new JsonRpcProvider("[https://sepolia.base.org](https://sepolia.base.org)");
+  const wallet = new Wallet(process.env.PRIVATE\_KEY, provider);
+  const rnd = Randomness.createBaseSepolia(wallet);
+  console.log("Initialized for Base Sepolia");
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Randomness.requestRandomness:
+  kind: function
+  summary: Send a transaction to RandomnessSender to request a new random value; resolves with tx/result data.
+  definition:
+  lang: typescript
+  code: |
+  declare class Randomness {
+  requestRandomness(): Promise<{
+  requestID?: bigint | number;
+  randomness?: string; // bytes32 hex
+  signature?: string;  // provider signature
+  txHash?: string;
+  \[k: string]: unknown;
+  }>;
+  }
+  guidance:
+  \- Await chain inclusion; capture requestID for correlating your callback and for audits.
+  \- Pair with a client-side verify() step before trusting the value in UX or off-chain logic.
+  example:
+  lang: javascript
+  code: |
+  // assume `rnd` is an initialized Randomness client
+  const resp = await rnd.requestRandomness();
+  console.log("Request:", resp.requestID, "tx:", resp.txHash);
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Randomness.verify:
+  kind: function
+  summary: Client-side cryptographic verification of a randomness response; throws or returns boolean.
+  definition:
+  lang: typescript
+  code: |
+  declare class Randomness {
+  verify(
+  response: Record\<string, unknown>,
+  options?: { shouldBlowUp?: boolean }
+  ): Promise\<boolean | void>;
+  }
+  guidance:
+  \- Default “strict” mode throws on failure; pass { shouldBlowUp: false } to get a boolean.
+  \- Keep the full response object; do not strip fields needed for verification.
+  example:
+  lang: javascript
+  code: |
+  const strictOk = await rnd.verify(resp).then(() => true).catch(() => false);
+  const ok = await rnd.verify(resp, { shouldBlowUp: false });
+  console.log({ strictOk, ok });
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+* name: randamu/blocklock-js
+  exports:
+
+  * Blocklock.createBaseSepolia
+  * Blocklock.encrypt
+  * Blocklock.encryptAndRegister
+  * Blocklock.fetchBlocklockStatus
+  * Blocklock.calculateRequestPriceNative
+  * Blocklock.decrypt
+  * encodeParams
+  * decodeParams
+  * encodeCondition
+  * encodeCiphertextToSolidity
+    symbols:
+    Blocklock.createBaseSepolia:
+    kind: function
+    summary: Create a Blocklock client for a preconfigured network (e.g., Base Sepolia).
+    definition:
+    lang: typescript
+    code: 'declare class Blocklock { static createBaseSepolia(signer: import("ethers").Signer): Blocklock; }'
+    guidance:
+
+    * Use the network helpers to avoid managing sender addresses/chain IDs yourself.
+    * Keep the signer funded; Blocklock may submit transactions for registration.
+      example:
+      lang: javascript
+      code: |
+      import { Blocklock } from "blocklock-js";
+      import { ethers } from "ethers";
+      const provider = new ethers.JsonRpcProvider(process.env.RPC\_URL);
+      const signer = new ethers.Wallet(process.env.PRIVATE\_KEY, provider);
+      const blocklock = Blocklock.createBaseSepolia(signer);
+      since: "^0.1.0"
+      source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Blocklock.encrypt:
+  kind: function
+  summary: Encrypt encoded bytes for a target block height; returns a ciphertext payload.
+  definition:
+  lang: typescript
+  code: "declare class Blocklock { encrypt(encodedData: Uint8Array, blockHeight: bigint): unknown /\* Ciphertext \*/; }"
+  guidance:
+  \- Always encode your message first (see encodeParams) to maintain type integrity for decoding.
+  \- Use encodeCiphertextToSolidity before passing the ciphertext to a Solidity contract.
+  example:
+  lang: javascript
+  code: |
+  const msgBytes = encodeParams(\["uint256"], \[42n]);
+  const cipher = blocklock.encrypt(msgBytes, BigInt(await provider.getBlockNumber() + 10));
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Blocklock.encryptAndRegister:
+  kind: function
+  summary: One‑shot helper that encrypts, estimates cost, pays, and registers the request; returns { id, ciphertext }.
+  definition:
+  lang: typescript
+  code: |
+  declare class Blocklock {
+  encryptAndRegister(
+  encodedData: Uint8Array,
+  blockHeight: bigint
+  ): Promise<{ id: bigint | number; ciphertext: unknown /\* Ciphertext \*/ }>;
+  }
+  guidance:
+  \- Simplest path for client-side flows; persist id to poll status later.
+  \- For advanced control (pricing/funding), call calculateRequestPriceNative and your own contract methods.
+  example:
+  lang: javascript
+  code: |
+  const { id, ciphertext } = await blocklock.encryptAndRegister(msgBytes, targetBlock);
+  console.log("Registered blocklock id:", id);
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Blocklock.fetchBlocklockStatus:
+  kind: function
+  summary: Query the network for a request’s status and decryption material when fulfilled.
+  definition:
+  lang: typescript
+  code: |
+  declare class Blocklock {
+  fetchBlocklockStatus(requestId: bigint | number): Promise<{
+  status?: string;
+  ciphertext?: string | Uint8Array;
+  decryptionKey?: string | Uint8Array;
+  \[k: string]: unknown;
+  }>;
+  }
+  guidance:
+  \- Check the on-chain isInFlight flag before polling to save RPC calls.
+  \- Only attempt decryption once the status indicates fulfillment and a key is present.
+  example:
+  lang: javascript
+  code: |
+  const status = await blocklock.fetchBlocklockStatus(id);
+  if (status.decryptionKey) { console.log("Ready to decrypt"); }
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Blocklock.calculateRequestPriceNative:
+  kind: function
+  summary: Estimate the native‑token cost for a callback with a given gas limit (client wrapper over sender’s view).
+  definition:
+  lang: typescript
+  code: "declare class Blocklock { calculateRequestPriceNative(callbackGasLimit: bigint | number): Promise<\[bigint] | \[string]>; }"
+  guidance:
+  \- Add a safety buffer to the returned estimate to absorb gas volatility between blocks.
+  \- Keep callbackGasLimit aligned with your Solidity callback’s worst‑case path.
+  example:
+  lang: javascript
+  code: |
+  const \[priceWei] = await blocklock.calculateRequestPriceNative(700\_000n);
+  console.log("Estimated callback price (wei):", priceWei.toString());
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  Blocklock.decrypt:
+  kind: function
+  summary: Decrypt a fulfilled ciphertext using the delivered decryption key; returns raw bytes.
+  definition:
+  lang: typescript
+  code: "declare class Blocklock { decrypt(ciphertext: string | Uint8Array, decryptionKey: string | Uint8Array): Promise<Uint8Array>; }"
+  guidance:
+  \- Convert the result to hex and decode with decodeParams into original Solidity types.
+  \- Keep your encryption/decoding type list symmetric (encode and decode must match).
+  example:
+  lang: javascript
+  code: |
+  const bytes = await blocklock.decrypt(status.ciphertext, status.decryptionKey);
+  const hex = ethers.hexlify(bytes);
+  const \[value] = decodeParams(\["uint256"], hex);
+  console.log("Decrypted value:", value);
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  encodeParams:
+  kind: function
+  summary: Encode Solidity‑typed data to bytes for encryption/contract calls.
+  definition:
+  lang: typescript
+  code: "declare function encodeParams(types: readonly string\[], values: readonly unknown\[]): Uint8Array;"
+  guidance:
+  \- Use canonical Solidity ABI type strings (e.g., uint256, bytes32, address).
+  \- Avoid JS number for big integers; use bigint or string to preserve precision.
+  example:
+  lang: javascript
+  code: 'const encoded = encodeParams(\["address", "uint256"], \["0xabc...", 123n]);'
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  decodeParams:
+  kind: function
+  summary: Decode hex/bytes back into Solidity‑typed values after decryption.
+  definition:
+  lang: typescript
+  code: "declare function decodeParams(types: readonly string\[], dataHex: string | Uint8Array): unknown;"
+  guidance:
+  \- Ensure the types list exactly matches what you used in encodeParams.
+  \- If you encoded a tuple/struct, pass the same tuple signature for proper decoding.
+  example:
+  lang: javascript
+  code: 'const decoded = decodeParams(\["uint256"], "0x" + Buffer.from(bytes).toString("hex"));'
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  encodeCondition:
+  kind: function
+  summary: Build the block‑height condition bytes for a blocklock request.
+  definition:
+  lang: typescript
+  code: "declare function encodeCondition(targetBlockHeight: bigint | number): Uint8Array;"
+  guidance:
+  \- Set targetBlockHeight ≥ current block; add headroom to account for mempool delays.
+  \- Store alongside your ciphertext for later auditing/replay tests.
+  example:
+  lang: javascript
+  code: "const cond = encodeCondition(BigInt(await provider.getBlockNumber() + 10));"
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  encodeCiphertextToSolidity:
+  kind: function
+  summary: Convert a JS ciphertext object into ABI‑encodable bytes for Solidity calls.
+  definition:
+  lang: typescript
+  code: "declare function encodeCiphertextToSolidity(ciphertext: unknown /\* Ciphertext */): string; // 0x‑prefixed hex"
+  guidance:
+  \- Use this when passing the ciphertext to your on‑chain create*Request functions.
+  \- Keep ciphertext as returned by encrypt/encryptAndRegister; avoid mutating fields.
+  example:
+  lang: javascript
+  code: |
+  const wire = encodeCiphertextToSolidity(cipher);
+  await myReceiver.createTimelockRequestWithDirectFunding(gasLimit, cond, wire, { value: priceWei });
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+* name: randamu/randomness-solidity
+  exports:
+
+  * Randomness.sol.verify
+  * RandomnessReceiverBase.onRandomnessReceived
+  * BlocklockReceiverBase.\_onBlocklockReceived
+  * RandomnessSender.calculateRequestPriceNative
+    symbols:
+    Randomness.sol.verify:
+    kind: function
+    summary: On‑chain verifier that checks a random value/signature tuple for a given request ID and scheme.
+    definition:
+    lang: solidity
+    code: |
+    function verify(
+    address randomnessContract,
+    address signatureContract,
+    bytes calldata signature,
+    uint256 requestID,
+    address requester,
+    string calldata schemeID
+    ) external view returns (bool);
+    guidance:
+
+    * Use when a contract other than the requester needs to validate a randomness proof.
+    * Keep schemeID aligned with deployed signature scheme (e.g., "BLS").
+      example:
+      lang: solidity
+      code: 'bool ok = Randomness(randomness).verify(randContract, sigContract, sig, reqId, requester, "BLS");'
+      since: "^0.1.0"
+      source: randamu-dcipher-sdk/0.3.0.yaml
+
+  RandomnessReceiverBase.onRandomnessReceived:
+  kind: function
+  summary: Mandatory callback you override to consume randomness; verify the requestID first.
+  definition:
+  lang: solidity
+  code: "function onRandomnessReceived(uint64 requestID, bytes32 \_randomness) internal virtual;"
+  guidance:
+  \- Store the last requestID at request time and check it here to prevent replay/mixups.
+  \- Keep logic minimal; emit an event and defer heavy work. Gas here is paid via your request model.
+  example:
+  lang: solidity
+  code: |
+  function onRandomnessReceived(uint64 requestID, bytes32 \_randomness) internal override {
+  require(requestId == requestID, "Request ID mismatch");
+  randomness = \_randomness;
+  emit RandomnessReady(requestID, \_randomness);
+  }
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  BlocklockReceiverBase.\_onBlocklockReceived:
+  kind: function
+  summary: Blocklock decryption key delivery callback; decrypt and abi.decode within your override.
+  definition:
+  lang: solidity
+  code: "function \_onBlocklockReceived(uint256 \_requestId, bytes calldata decryptionKey) internal virtual;"
+  guidance:
+  \- Verify `_requestId` matches your stored requestId before using the key.
+  \- Decrypt stored ciphertext and decode using the same types used at encryption time.
+  example:
+  lang: solidity
+  code: |
+  function \_onBlocklockReceived(uint256 \_requestId, bytes calldata decryptionKey) internal override {
+  require(requestId == \_requestId, "Invalid request ID");
+  bytes memory raw = \_decrypt(encryptedValue, decryptionKey);
+  (string memory value) = abi.decode(raw, (string));
+  decryptedAddress = value;
+  }
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+  RandomnessSender.calculateRequestPriceNative:
+  kind: function
+  summary: View function on the sender contract that estimates total native‑token cost for a given callback gas limit.
+  definition:
+  lang: solidity
+  code: "function calculateRequestPriceNative(uint32 \_callbackGasLimit) public view returns (uint256);"
+  guidance:
+  \- Result is an estimate; add buffer for gas price changes and EIP‑150 overhead.
+  \- Re‑estimate shortly before sending to reduce drift on volatile networks.
+  example:
+  lang: solidity
+  code: "uint256 estimate = RandomnessSender(sender).calculateRequestPriceNative(200\_000);"
+  since: "^0.1.0"
+  source: randamu-dcipher-sdk/0.3.0.yaml
+
+* name: golem/db-chain-jsonrpc
+  exports:
+
+  * golembase\_getStorageValue
+  * golembase\_getEntityMetaData
+  * golembase\_getEntityCount
+  * golembase\_getAllEntityKeys
+  * golembase\_getEntitiesToExpireAtBlock
+  * golembase\_getEntitiesOfOwner
+  * golembase\_queryEntities
+    symbols:
+    golembase\_getStorageValue:
+    kind: jsonrpc
+    summary: Read a value stored at a given location in a collection.
+    definition:
+    lang: jsonrpc
+    code: |
+    method: "golembase\_getStorageValue"
+    params:
+    \- collectionId: string
+    \- location: string
+    result: any
+    guidance:
+
+    * Use for direct key/value reads when you know the exact location.
+    * Prefer queryEntities for filtered scans over full tables.
+      example:
+      lang: javascript
+      code: |
+      const body = { jsonrpc: "2.0", id: 1, method: "golembase\_getStorageValue", params: \["social.posts", "post:123"] };
+      const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      console.log(await res.json());
+      since: "2025-06"
+      source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_getEntityMetaData:
+  kind: jsonrpc
+  summary: Get metadata for an entity in a collection.
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_getEntityMetaData"
+  params:
+  \- collectionId: string
+  \- entityKey: string
+  result:
+  owner: string
+  createdAtBlock: string
+  updatedAtBlock: string
+  expiresAtBlock?: string
+  guidance:
+  \- Use to show provenance (owner) and lifecycle (expiry) in UIs.
+  \- Combine with getEntitiesToExpireAtBlock to build dashboards.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 2, method: "golembase\_getEntityMetaData", params: \["social.posts", "post:123"] };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_getEntityCount:
+  kind: jsonrpc
+  summary: Count entities matching constraints.
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_getEntityCount"
+  params:
+  \- collectionId: string
+  \- constraints:
+  owner?: string
+  expiresAtBlockTo?: string
+  annotationEquals?: { \[key: string]: string | number | boolean }
+  result: number
+  guidance:
+  \- Fast path for pagination without fetching full records.
+  \- Mirror the same constraints you pass to queryEntities.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 3, method: "golembase\_getEntityCount", params: \["social.posts", { owner: "0xabc..." }] };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_getAllEntityKeys:
+  kind: jsonrpc
+  summary: List all entity keys in a collection (use with caution on large sets).
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_getAllEntityKeys"
+  params:
+  \- collectionId: string
+  result: string\[]
+  guidance:
+  \- Use for debugging and small collections; prefer filtered queries in production.
+  \- Paginate client-side to avoid large memory usage.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 4, method: "golembase\_getAllEntityKeys", params: \["social.posts"] };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_getEntitiesToExpireAtBlock:
+  kind: jsonrpc
+  summary: Return entities expiring at or before a given block in a block interval.
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_getEntitiesToExpireAtBlock"
+  params:
+  \- collectionId: string
+  \- fromBlock: string
+  \- toBlock: string
+  result: { entityKey: string, expiresAtBlock: string }\[]
+  guidance:
+  \- Drive scheduled cleanups or UI reminders for expiring data.
+  \- Use with getEntityMetaData to show full context.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 5, method: "golembase\_getEntitiesToExpireAtBlock", params: \["social.posts", "1000", "1050"] };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_getEntitiesOfOwner:
+  kind: jsonrpc
+  summary: List entities owned by an address.
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_getEntitiesOfOwner"
+  params:
+  \- collectionId: string
+  \- owner: string
+  result: string\[]
+  guidance:
+  \- Use in profiles and dashboards to fetch user-owned records.
+  \- Combine with getEntityMetaData for richer displays.
+  example:
+  lang: javascript
+  code: |
+  const body = { jsonrpc: "2.0", id: 6, method: "golembase\_getEntitiesOfOwner", params: \["social.posts", "0xabc..."] };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+  golembase\_queryEntities:
+  kind: jsonrpc
+  summary: Query entities with constraints and pagination.
+  definition:
+  lang: jsonrpc
+  code: |
+  method: "golembase\_queryEntities"
+  params:
+  \- collectionId: string
+  \- constraints:
+  owner?: string
+  expiresAtBlockTo?: string
+  annotationEquals?: { \[key: string]: string | number | boolean }
+  \- offset?: number
+  \- limit?: number
+  result: Array<{ key: string, value: any }>
+  guidance:
+  \- Index by annotation values for performant filtering; avoid full scans.
+  \- Use offsets/limits of 50–200 for responsive UIs.
+  example:
+  lang: javascript
+  code: |
+  const body = {
+  jsonrpc: "2.0", id: 7, method: "golembase\_queryEntities",
+  params: \["social.posts", { annotationEquals: { tag: "demo" } }, 0, 50]
+  };
+  const res = await fetch(process.env.GOLEM\_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  console.log(await res.json());
+  since: "2025-06"
+  source: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+
+* name: filecoin/synapse-core
+  exports:
+
+  * Synapse.create
+  * Synapse.storage.upload
+  * Synapse.storage.download
+    symbols:
+    Synapse.create:
+    kind: function
+    summary: Initialize the Synapse SDK with a private key, provider, or RPC URL.
+    definition:
+    lang: typescript
+    code: |
+    import type { Provider } from "ethers";
+    export declare class Synapse {
+    static create(opts: { privateKey?: string; provider?: Provider; rpcURL?: string }): Promise<Synapse>;
+    storage: {
+    upload(data: Uint8Array | ArrayBuffer, options?: { context?: StorageContext; withCDN?: boolean }): Promise<{ pieceCid: string }>;
+    download(pieceCid: string | PieceCID, options?: { context?: StorageContext }): Promise<Uint8Array>;
+    };
+    payments: PaymentsService;
+    getWarmStorageAddress(): Promise<string>;
+    getPaymentsAddress(): Promise<string>;
+    getProvider(): unknown;
+    }
+    export type PieceCID = string;
+    export interface StorageContext { download(pieceCid: string | PieceCID): Promise<Uint8Array>; }
+    export interface PaymentsService {}
+    guidance:
+
+    * Prefer WebSocket RPC URLs (RPC\_URLS.calibration.websocket) for faster confirmations.
+    * Always call provider.destroy() (if available) on teardown to avoid dangling WS connections.
+      example:
+      lang: javascript
+      code: |
+      import { Synapse, RPC\_URLS } from "@filoz/synapse-sdk";
+      const synapse = await Synapse.create({
+      privateKey: process.env.PRIVATE\_KEY,
+      rpcURL: RPC\_URLS.calibration.websocket
+      });
+      console.log("Connected to Synapse");
+      since: "^0.24.0"
+      source: [https://github.com/FilOzone/synapse-sdk#quick-start](https://github.com/FilOzone/synapse-sdk#quick-start)
+
+  Synapse.storage.upload:
+  kind: function
+  summary: Upload bytes to Warm Storage; auto-selects provider and creates a data set if needed.
+  definition:
+  lang: typescript
+  code: "upload(data: Uint8Array | ArrayBuffer, options?: { context?: StorageContext; withCDN?: boolean }): Promise<{ pieceCid: string }>;"
+
+  ```
+  guidance:
+    - First upload may take longer due to context and payment rail setup.
+    - Call payments.deposit and payments.approveService beforehand for smoother UX.
+  example:
+    lang: javascript
+    code: |
+      const data = new TextEncoder().encode("hello filecoin");
+      const result = await synapse.storage.upload(data);
+      console.log("PieceCID:", result.pieceCid);
+  since: "^0.24.0"
+  source: https://github.com/FilOzone/synapse-sdk#quick-start
+  ```
+
+  Synapse.storage.download:
+  kind: function
+  summary: Download bytes by PieceCID from Warm Storage.
+  definition:
+  lang: typescript
+  code: "download(pieceCid: string | PieceCID, options?: { context?: StorageContext }): Promise<Uint8Array>;"
+  guidance:
+  \- For provider-specific reads, create a StorageContext and call context.download to avoid redirects.
+  \- Decode using TextDecoder('utf-8') or persist as a file.
+  example:
+  lang: javascript
+  code: |
+  const bytes = await synapse.storage.download(result.pieceCid);
+  console.log(new TextDecoder().decode(bytes));
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#quick-start](https://github.com/FilOzone/synapse-sdk#quick-start)
+
+* name: filecoin/synapse-payments
+  exports:
+
+  * Payments.deposit
+  * Payments.approveService
+  * Payments.getRailsAsPayer
+  * Payments.getRailsAsPayee
+  * Payments.getSettlementAmounts
+  * Payments.settle
+    symbols:
+    Payments.deposit:
+    kind: function
+    summary: Deposit USDFC tokens to the Payments contract.
+    definition:
+    lang: typescript
+    code: "deposit(amount: bigint): Promise<{ hash: string }>"
+    guidance:
+
+    * Use ethers.parseUnits('100', 18) to size deposits; confirm USDFC decimals.
+    * Wait for .wait() on the returned tx response before approving services.
+      example:
+      lang: javascript
+      code: |
+      import { ethers } from "ethers";
+      const amount = ethers.parseUnits("100", 18);
+      const tx = await synapse.payments.deposit(amount);
+      await (tx.wait?.() ?? Promise.resolve());
+      since: "^0.24.0"
+      source: [https://github.com/FilOzone/synapse-sdk#payment-setup](https://github.com/FilOzone/synapse-sdk#payment-setup)
+
+  Payments.approveService:
+  kind: function
+  summary: Approve the Warm Storage service for a rate and lockup allowance.
+  definition:
+  lang: typescript
+  code: "approveService(serviceAddress: string, rateAllowance: bigint, lockupAllowance: bigint, maxLockupEpochs: bigint): Promise<{ hash: string }>"
+  guidance:
+  \- Call getWarmStorageAddress() to obtain the correct service contract per network.
+  \- Set a conservative rateAllowance and lockupAllowance during demos; document your choices.
+  example:
+  lang: javascript
+  code: |
+  const wsAddr = await synapse.getWarmStorageAddress();
+  const tx = await synapse.payments.approveService(wsAddr, 10n \* 10n**18n, 1000n \* 10n**18n, 86400n);
+  await (tx.wait?.() ?? Promise.resolve());
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#payment-setup](https://github.com/FilOzone/synapse-sdk#payment-setup)
+
+  Payments.getRailsAsPayer:
+  kind: function
+  summary: List payment rails where the current account is the payer.
+  definition:
+  lang: typescript
+  code: "getRailsAsPayer(): Promise\<Array<{ railId: bigint; isTerminated: boolean }>>"
+  guidance:
+  \- Use before settle() to preview obligations via getSettlementAmounts(railId).
+  \- Display outstanding totals in your UI.
+  example:
+  lang: javascript
+  code: |
+  const rails = await synapse.payments.getRailsAsPayer();
+  console.log(rails.length, "payer rails");
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#advanced-payment-control](https://github.com/FilOzone/synapse-sdk#advanced-payment-control)
+
+  Payments.getRailsAsPayee:
+  kind: function
+  summary: List payment rails where the current account is the payee (service provider revenue).
+  definition:
+  lang: typescript
+  code: "getRailsAsPayee(): Promise\<Array<{ railId: bigint; isTerminated: boolean }>>"
+  guidance:
+  \- Pair with settle()/settleTerminatedRail() to collect earnings after uploads.
+  \- Expose amounts to help judges understand your business model.
+  example:
+  lang: javascript
+  code: "const rails = await synapse.payments.getRailsAsPayee(); console.log(rails.length);"
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#advanced-payment-control](https://github.com/FilOzone/synapse-sdk#advanced-payment-control)
+
+  Payments.getSettlementAmounts:
+  kind: function
+  summary: Preview settlement amounts for a rail.
+  definition:
+  lang: typescript
+  code: "getSettlementAmounts(railId: bigint): Promise<{ totalSettledAmount: bigint; totalNetPayeeAmount: bigint }>"
+  guidance:
+  \- Call before settle() to show the user pending amounts and fees.
+  \- If zero, skip submitting the transaction to save fees.
+  example:
+  lang: javascript
+  code: |
+  const preview = await synapse.payments.getSettlementAmounts(rails\[0].railId);
+  console.log(preview\.totalSettledAmount.toString());
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#advanced-payment-control](https://github.com/FilOzone/synapse-sdk#advanced-payment-control)
+
+  Payments.settle:
+  kind: function
+  summary: Settle a rail to clear obligations (payer) or collect (payee).
+  definition:
+  lang: typescript
+  code: "settle(railId: bigint): Promise<{ hash: string }>"
+  guidance:
+  \- Ensure wallet has small FIL for settlement fee (approx 0.0013 FIL).
+  \- Wait for transaction confirmation in demos to show end-to-end flow.
+  example:
+  lang: javascript
+  code: |
+  const tx = await synapse.payments.settle(rails\[0].railId);
+  await (tx.wait?.() ?? Promise.resolve());
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#advanced-payment-control](https://github.com/FilOzone/synapse-sdk#advanced-payment-control)
+
+* name: filecoin/synapse-services
+  exports:
+
+  * SPRegistry.getProvider
+  * WarmStorage.checkAllowanceForStorage
+  * PDPAuthHelper.signCreateDataSet
+    symbols:
+    SPRegistry.getProvider:
+    kind: function
+    summary: Fetch a service provider by ID from the on-chain registry.
+    definition:
+    lang: typescript
+    code: |
+    export declare class SPRegistryService {
+    constructor(provider: unknown, registryAddress: string);
+    getProvider(providerId: number): Promise<{ id: number; address: string; active: boolean }>;
+    getAllActiveProviders(): Promise\<Array<{ id: number; address: string; active: boolean }>>;
+    }
+    guidance:
+
+    * Show provider info in your UI to demystify 'where data goes'.
+    * Cache results for the session; refresh on network change.
+      example:
+      lang: javascript
+      code: |
+      import { SPRegistryService } from "@filoz/synapse-sdk/sp-registry";
+      const reg = new SPRegistryService(synapse.getProvider(), "0xRegistry...");
+      console.log(await reg.getProvider(1));
+      since: "^0.24.0"
+      source: [https://github.com/FilOzone/synapse-sdk#service-provider-registry](https://github.com/FilOzone/synapse-sdk#service-provider-registry)
+
+  WarmStorage.checkAllowanceForStorage:
+  kind: function
+  summary: Check if allowances cover storage cost for given size and CDN option.
+  definition:
+  lang: typescript
+  code: |
+  export declare class WarmStorageService {
+  checkAllowanceForStorage(
+  sizeInBytes: number,
+  withCDN: boolean,
+  payments: PaymentsService
+  ): Promise<{ sufficient: boolean; costs: { perEpoch: bigint; perDay?: bigint; perMonth?: bigint } }>;
+  }
+  guidance:
+  \- Run before uploads to provide cost estimates and avoid failed writes.
+  \- Display per-day/month extrapolations when available.
+  example:
+  lang: javascript
+  code: |
+  import { WarmStorageService } from "@filoz/synapse-sdk/warm-storage";
+  const svc = new WarmStorageService(synapse.getProvider(), await synapse.getWarmStorageAddress());
+  const check = await svc.checkAllowanceForStorage(1024, true, synapse.payments);
+  console.log(check.sufficient, check.costs);
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#warm-storage-service](https://github.com/FilOzone/synapse-sdk#warm-storage-service)
+
+  PDPAuthHelper.signCreateDataSet:
+  kind: function
+  summary: Sign EIP-712 typed data for creating a PDP-protected data set.
+  definition:
+  lang: typescript
+  code: |
+  export declare class PDPAuthHelper {
+  constructor(serviceAddress: string, signer: unknown, chainId: number);
+  signCreateDataSet(clientDataSetId: number, payeeAddress: string, withCDN: boolean): Promise<string>; // EIP-712 signature
+  }
+  guidance:
+  \- Useful when interoperating with low-level PDP operations or custom flows.
+  \- Ensure chainId matches the network of the Warm Storage contract.
+  example:
+  lang: javascript
+  code: |
+  import { PDPAuthHelper } from "@filoz/synapse-sdk/pdp";
+  const helper = new PDPAuthHelper(await synapse.getWarmStorageAddress(), synapse.getProvider().getSigner?.(), 314159);
+  const sig = await helper.signCreateDataSet(1, "0xPayee...", true);
+  console.log(sig);
+  since: "^0.24.0"
+  source: [https://github.com/FilOzone/synapse-sdk#pdp-components](https://github.com/FilOzone/synapse-sdk#pdp-components)
+
+common\_workflows:
+
+* title: Cross-chain Swap + Receipt Storage (NEAR 1Click → Filecoin Synapse)
+  steps:
+
+  * Call near/intents-1click.RequestQuote with dry=true and display price.
+  * On confirm, request quote with dry=false and obtain depositAddress; show countdown to deadline.
+  * User sends tokens; optionally call SubmitDepositTx with the tx hash.
+  * Poll GetSwapStatus until SUCCESS; capture on-chain settlement IDs.
+  * Serialize the receipt (JSON) and upload to Filecoin via Synapse.storage.upload; show PieceCID.
+  * Post a confirmation chat message via OpenServ Platform\_SendChatMessage with links and IDs.
+
+* title: Provable Raffle After Swap (Randamu VRF + NEAR Intent)
+  steps:
+
+  * After successful swap, call Randomness.requestRandomness; persist requestID and txHash.
+  * Wait for callback/on-chain fulfillment; fetch or receive randomness.
+  * Run Randomness.verify client-side; if ok, map randomness to winners.
+  * Store winners list on Golem DB-Chain (owner=organizer); display getEntityMetaData for provenance.
+  * Upload full audit log (inputs, requestID, signature) to Filecoin; link in UI.
+
+* title: Timed Reveal Coupon (Randamu Blocklock + Marketplace)
+  steps:
+
+  * Encode coupon code with encodeParams and block target (encodeCondition).
+  * Use Blocklock.encryptAndRegister to lock; persist id and ciphertext.
+  * Display countdown to target block; poll fetchBlocklockStatus until decryptionKey present.
+  * Blocklock.decrypt and decodeParams to reveal; verify with checksum.
+  * Record redemption in Golem DB with annotationEquals filterable status.
+
+* title: Agent-Orchestrated Data Pipeline (OpenServ → Filecoin → Golem DB)
+  steps:
+
+  * Implement AgentMainEndpoint to handle respond-chat-message.
+  * On user instruction, generate summary, upload via Platform\_UploadFile, and CompleteTask.
+  * Write an index record to Golem DB via golembase\_getStorageValue/golembase\_queryEntities.
+  * Return chat message with PieceCID and entity key.
+
+* title: Cost-safe Upload (Synapse payments preflight)
+  steps:
+
+  * Call WarmStorage.checkAllowanceForStorage(size, withCDN, payments).
+  * If insufficient, call Payments.deposit + Payments.approveService.
+  * Upload via Synapse.storage.upload; on success, Payments.settle relevant rails.
+  * Display preview from Payments.getSettlementAmounts before settling.
+
+* title: Intent Explorer Integration (NEAR solver-relay)
+  steps:
+
+  * Call near/solver-relay.Quote to fetch solvable paths.
+  * Sign NEP-413 payload and call PublishIntent\_NEP413.
+  * Poll GetStatus to terminal state; display tx hashes; store receipt to Filecoin.
+
+troubleshooting\_cheatsheet:
+
+* symptom: 1Click /v0/quote returns 401 Unauthorized.
+  cause: Missing or invalid JWT Authorization header.
+  fix: Obtain a JWT per docs and pass 'Authorization: Bearer <token>'. For previews use dry=true.
+
+* symptom: NEAR solver-relay publish\_intent fails with signature error.
+  cause: NEP-413 payload fields mismatch (recipient, nonce) or wrong signer\_id.
+  fix: Ensure recipient=intents.near, include fresh nonce, and sign with the intended account.
+
+* symptom: Blocklock decryption key never arrives.
+  cause: Target block too close; request not mined before target; or funding/price underestimation.
+  fix: Estimate with calculateRequestPriceNative, add buffer, choose targetBlockHeight >= current+10.
+
+* symptom: Synapse upload throws allowance/insufficient funds error.
+  cause: Payments not deposited/approved for Warm Storage.
+  fix: Run Payments.deposit then Payments.approveService(getWarmStorageAddress(), ...).
+
+* symptom: Golem DB queryEntities is slow or empty.
+  cause: Missing annotations or overly broad constraints.
+  fix: Write and index annotationEquals fields; paginate 50–200; prefer owner filters.
+
+faq:
+
+* q: How many tracks should I combine for a stronger demo?
+  a: One deep, polished workflow beats a shallow 'kitchen sink'. Combine at most two tracks if it creates a compelling user story (e.g., NEAR 1Click + Filecoin receipts, or Randamu VRF + Golem DB audit).
+
+* q: What networks should I use?
+  a: Use NEAR Intents 1Click API (hosted), Golem DB-Chain test endpoints, and Filecoin Calibration with Synapse SDK. Avoid mainnet deployments unless mentors advise.
+
+* q: How do I impress judges beyond code?
+  a: Instrument your app: show IDs (intent\_hash, txHash, PieceCID), statuses, and provide a one-click demo deploy. Add an 'Audit' tab that verifies randomness or signatures.
+
+external\_resources:
+
+* label: NEAR Intents 1Click API
+  url: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+* label: NEAR Solver Relay JSON-RPC
+  url: [https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay](https://docs.near-intents.org/near-intents/market-makers/bus/solver-relay)
+* label: OpenServ API Tutorial
+  url: [https://docs.openserv.ai/getting-started/agent-tutorial](https://docs.openserv.ai/getting-started/agent-tutorial)
+* label: Randamu dCipher SDK Agent Spec
+  url: [https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/randamu-dcipher-sdk/0.3.0.yaml](https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/randamu-dcipher-sdk/0.3.0.yaml)
+* label: Golem DB JSON-RPC API
+  url: [https://docs.golem.network/build/api/json-rpc-api](https://docs.golem.network/build/api/json-rpc-api)
+* label: Filecoin Synapse SDK README
+  url: [https://github.com/FilOzone/synapse-sdk#readme](https://github.com/FilOzone/synapse-sdk#readme)
+
