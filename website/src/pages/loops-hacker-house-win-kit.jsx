@@ -87,9 +87,15 @@ export default function LoopsHackerHouseWinKit() {
         <header className="ai-card" style={{ padding: '1.25rem', marginBottom: '1rem' }}>
           <h1 style={{ margin: 0, color: 'var(--ifm-color-primary)' }}>Loops Hacker House – Win Kit</h1>
           <p style={{ marginTop: '0.5rem' }}>
-            A focused launchpad to build a production‑ready MVP in a weekend. Use these YAML
-            agent specs, examples, and guidance to score on product‑market fit, technical
-            excellence, and a credible path to production.
+            This page is a curated starting point for teams at the Loops Hacker House. It brings together the
+            exact YAML agent specs and reference flows you need to integrate the five prize‑track protocols quickly—
+            without yak‑shaving. The intent is to help you ship a small but production‑sane MVP: clear onboarding,
+            minimal UI, verifiable on‑chain actions, and telemetry you can show during the demo.
+          </p>
+          <p style={{ marginTop: '0.5rem' }}>
+            Use the Win Kit to pick a lane, then open the track‑specific specs below to wire in core flows in hours,
+            not days. Start with one track, add a second only if it deepens product‑market fit. Focus on reliability,
+            crisp UX, and a believable path to production.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
             <Link className="button button--primary" to="#win-kit">Open the Win Kit</Link>
@@ -98,18 +104,43 @@ export default function LoopsHackerHouseWinKit() {
         </header>
 
         <section id="judging" style={{ marginTop: '1rem' }}>
-          <h2 style={{ color: 'var(--ifm-color-primary)' }}>Judging & Prize Tracks</h2>
-          <p style={{ marginBottom: '0.5rem' }}>Total prize pool: $13,000 across five tracks.</p>
           <div className="ai-card">
-            <h3>Prize Tracks</h3>
-            <ul>
-              <li><strong>NEAR ($3,000)</strong> – Build on NEAR Intents and NEAR Shade Agents; consumer UX with intent‑based architecture.</li>
-              <li><strong>OpenServ AI ($3,000)</strong> – Live integration sprint; orchestrate your MVP with OpenServ to ship fast.</li>
-              <li><strong>Randamu ($3,000)</strong> – Use VRF, Blocklock Encryption, OnlySwaps; provable randomness, secure data, seamless swaps.</li>
-              <li><strong>Golem DB ($3,000)</strong> – DB‑Chain L2 for decentralized data; social, gaming infra, analytics, or Web2→Web3 ports.</li>
-              <li><strong>Filecoin ($1,000)</strong> – Integrate Filecoin Synapse SDK for decentralized storage/data layers.</li>
-            </ul>
-            <p><strong>Winning focus</strong>: product‑market fit, technical excellence, and a path to production (onboarding, telemetry, error handling, docs).</p>
+            <h2 style={{ marginTop: 0, color: 'var(--ifm-color-primary)' }}>Judging & Prize Tracks</h2>
+            <p style={{ marginTop: '0.25rem', marginBottom: '0.75rem' }}>Total prize pool: $13,000 across five tracks.</p>
+            <h3 style={{ marginTop: 0 }}>Prizes</h3>
+            <div className="ai-grid" style={{ marginTop: '0.5rem' }}>
+              <div className="ai-card">
+                <h4 style={{ margin: 0 }}>NEAR ($3,000)</h4>
+                <p>Build on NEAR Intents and NEAR Shade Agents; consumer UX with intent‑based architecture.</p>
+                <Link className="button button--secondary button--sm" to="#near">View NEAR specs</Link>
+              </div>
+              <div className="ai-card">
+                <h4 style={{ margin: 0 }}>OpenServ AI ($3,000)</h4>
+                <p>Live integration sprint; orchestrate your MVP with OpenServ to ship fast.</p>
+                <Link className="button button--secondary button--sm" to="#openserv">View OpenServ specs</Link>
+              </div>
+              <div className="ai-card">
+                <h4 style={{ margin: 0 }}>Randamu ($3,000)</h4>
+                <p>Use VRF, Blocklock Encryption, OnlySwaps; provable randomness, secure data, seamless swaps.</p>
+                <Link className="button button--secondary button--sm" to="#randamu">View Randamu specs</Link>
+              </div>
+              <div className="ai-card">
+                <h4 style={{ margin: 0 }}>Golem DB ($3,000)</h4>
+                <p>DB‑Chain L2 for decentralized data; social, gaming infra, analytics, or Web2→Web3 ports.</p>
+                <Link className="button button--secondary button--sm" to="#golem">View Golem specs</Link>
+              </div>
+              <div className="ai-card">
+                <h4 style={{ margin: 0 }}>Filecoin ($1,000)</h4>
+                <p>Integrate the Filecoin Synapse SDK for decentralized storage/data layers.</p>
+                <Link className="button button--secondary button--sm" to="#filecoin">View Filecoin specs</Link>
+              </div>
+            </div>
+            <p style={{ marginTop: '0.75rem' }}>
+              What tends to win: a tight scope with obvious user value, a clean and reliable demo,
+              and a credible path to production. Show how new users get started, surface progress and
+              errors clearly, log on‑chain references, and include light documentation so judges can
+              see this becoming a real product beyond the hackathon.
+            </p>
           </div>
         </section>
 
