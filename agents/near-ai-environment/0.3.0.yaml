@@ -1,0 +1,657 @@
+meta:
+spec\_name: nearai/environment
+spec\_version: "0.3.0"
+library\_version: ">=0.1.0"
+generated: "2025-09-18"
+language: python
+homepage: [https://near.ai](https://near.ai)
+tags:
+\- agents
+\- llm
+\- tools
+\- python
+\- near
+\- blockchain
+purpose: >
+Expert reference for the NEAR AI Python Environment and Tool Registry APIs, including
+message/file utilities, inference helpers, tool-calling, and NEAR blockchain helpers.
+It blends exact contracts from the docs with pragmatic usage guidance to help LLM agents
+run reliably in local or hosted runners.
+guiding\_principles:
+\- Prefer env.completions(...) for programmatic control (streaming, metadata); use env.completion(...) only as a convenience wrapper. &#x20;
+\- When enabling tool-calls, pass tool **definitions** (from ToolRegistry) to \*\_and\_run\_tools helpers; do **not** pass raw callables.&#x20;
+\- Keep conversation state in thread files (e.g., chat.txt) and use env.list\_messages()/env.add\_reply() to drive deterministic loops.&#x20;
+\- Use get\_tool\_registry(new=True) to isolate built-ins if you want a clean tool set; otherwise extend the default registry.&#x20;
+\- For NEAR calls, set credentials via env.set\_near(...) and run inside asyncio; prefer near.view for reads and near.call for writes. Don’t expose secrets in code.&#x20;
+\- Validate tool schemas and docstrings—these drive the LLM’s planner; register\_mcp\_tool when you need schema-first MCP tools.&#x20;
+\- Verify signed outputs in sensitive workflows using verify\_signed\_message(...).&#x20;
+design\_notes: >
+Contracts and signatures were extracted from the NEAR AI docs and API pages. Inference
+helpers and messaging/file utilities are sourced from `nearai/agents/environment.py`;
+Tool registry contracts from `nearai/agents/tool_registry.py`; NEAR helpers from
+`docs/agents/env/near.md`. Key references: Environment.completions/ completion/ signed\_completion /
+\*\_and\_run\_tools (    ), list\_messages/list\_files/read\_file (
+&#x20;), ToolRegistry.register\_tool and helpers ( ), and NEAR view/call/get\_balance and set\_near usage
+( ). Grouping mirrors high-level usage: Inference, Messages & Files,
+Orchestration, Tools, and NEAR Blockchain.
+
+groups:
+
+* name: Inference
+  summary: High-level text generation and tool-aware completions.
+  exports:
+
+  * Environment.completions
+  * Environment.completion
+  * Environment.signed\_completion
+  * Environment.verify\_signed\_message
+  * Environment.completion\_and\_run\_tools
+  * Environment.completions\_and\_run\_tools
+* name: Messages & Files
+  summary: Access thread messages and manage per-thread files.
+  exports:
+
+  * Environment.list\_messages
+  * Environment.add\_reply
+  * Environment.list\_files
+  * Environment.read\_file
+* name: Orchestration
+  summary: Coordinate multiple agents and clean up temp state.
+  exports:
+
+  * Environment.call\_agent
+  * Environment.clear\_temp\_agent\_files
+* name: Tools & Registry
+  summary: Define, register, and expose tools to the LLM.
+  exports:
+
+  * Environment.get\_tool\_registry
+  * ToolRegistry.register\_tool
+* name: NEAR Blockchain
+  summary: Async helpers to query and transact on NEAR via py-near integration.
+  exports:
+
+  * Environment.set\_near
+  * NearClient.view
+  * NearClient.call
+  * NearClient.get\_balance
+
+symbols:
+Environment.completions:
+kind: function
+summary: Return a ModelResponse (or stream wrapper) for chat-style messages.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def completions(
+self,
+messages: Union\[Iterable\[ChatCompletionMessageParam], str],
+model: Union\[Iterable\[ChatCompletionMessageParam], str] = "",
+stream: bool = False,
+thread\_id: Optional\[str] = None,
+attachments: Optional\[Iterable\[Attachment]] = None,
+message\_type: Optional\[str] = None,
+\*\*kwargs: Any,
+) -> Union\[ModelResponse, CustomStreamWrapper]:
+...
+guidance:
+\- Use for structured control and streaming; when stream=True, aggregate from the CustomStreamWrapper.&#x20;
+\- If migrating from deprecated chat APIs, the method tolerates swapped messages/model temporarily—clean inputs as soon as possible.&#x20;
+example:
+lang: python
+description: Synchronous (non-streaming) usage.
+code: |
+from nearai.agents.environment import Environment
+
+```
+    def run(env: Environment):
+        msgs = [{"role": "user", "content": "Say hi in one sentence."}]
+        resp = env.completions(msgs, model="gpt-4o-mini")
+        # resp is a ModelResponse; safest is to stringify or add as a reply
+        env.add_reply(str(resp))
+since: "0.1.0"
+```
+
+Environment.completion:
+kind: function
+summary: Convenience wrapper that returns the first text string of a completion.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def completion(
+self,
+messages: Union\[Iterable\[ChatCompletionMessageParam], str],
+model: Union\[Iterable\[ChatCompletionMessageParam], str] = "",
+\*\*kwargs: Any,
+) -> str:
+...
+guidance:
+\- Internally calls completions(...) and unwraps ModelResponse to a string; prefer completions(...) if you need tokens/metadata.&#x20;
+\- Ensure messages are well-formed; pass env.list\_messages() + your system messages for context.&#x20;
+example:
+lang: python
+code: |
+from nearai.agents.environment import Environment
+
+```
+    def run(env: Environment):
+        system = {"role": "system", "content": "Be concise."}
+        reply = env.completion([system] + env.list_messages(), model="gpt-4o-mini")
+        env.add_reply(reply)
+since: "0.1.0"
+```
+
+Environment.signed\_completion:
+kind: function
+summary: Generate a completion and return payload + agent signature.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def signed\_completion(
+self,
+messages: Union\[Iterable\[ChatCompletionMessageParam], str],
+model: Union\[Iterable\[ChatCompletionMessageParam], str] = "",
+\*\*kwargs: Any,
+) -> Dict\[str, Any]:
+...
+guidance:
+\- Use for provenance-sensitive tasks; store the signature alongside outputs for auditability.&#x20;
+\- Pair with verify\_signed\_message(...) before acting on results from untrusted agents.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+result = env.signed\_completion(\[{"role": "user", "content": "Sign this."}], model="gpt-4o-mini")
+\# result typically includes completion text and signature fields
+env.add\_reply(str(result))
+Environment.verify\_signed\_message:
+kind: function
+summary: Validate a completion against a signature and optional public key.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def verify\_signed\_message(
+self,
+completion: str,
+messages: Union\[Iterable\[ChatCompletionMessageParam], str],
+public\_key: Union\[str, None] = None,
+signature: Union\[str, None] = None,
+model: Union\[Iterable\[ChatCompletionMessageParam], str] = "",
+\*\*kwargs: Any,
+) -> bool:
+...
+guidance:
+\- Returns False if key/signature are missing; obtain keys from your agent registry or secret store.&#x20;
+\- Validate the ordered, ID-less messages as the function does internally to avoid mismatches.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+signed = env.signed\_completion(\[{"role":"user","content":"ok"}], model="gpt-4o-mini")
+ok = env.verify\_signed\_message(
+completion=signed.get("completion",""),
+messages=\[{"role":"user","content":"ok"}],
+public\_key=signed.get("public\_key"),
+signature=signed.get("signature"),
+model="gpt-4o-mini",
+)
+env.add\_reply(f"signature\_valid={ok}")
+Environment.completion\_and\_run\_tools:
+kind: function
+summary: Return a completion and execute any tool calls within it.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def completion\_and\_run\_tools(
+self,
+messages: List\[ChatCompletionMessageParam],
+model: str = "",
+tools: Optional\[List] = None,
+\*\*kwargs: Any,
+) -> Optional\[str]:
+...
+guidance:
+\- Pass tool definitions (e.g., env.get\_tool\_registry().get\_all\_tool\_definitions()); the helper runs selected tools and appends results to messages. &#x20;
+\- Use add\_to\_messages=False (if supported) when you want to handle tool outputs manually.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+tools = env.get\_tool\_registry().get\_all\_tool\_definitions()
+reply = env.completion\_and\_run\_tools(
+\[{"role":"user","content":"List files under '.'"}],
+model="gpt-4o-mini",
+tools=tools,
+)
+env.add\_reply(reply or "")
+Environment.completions\_and\_run\_tools:
+kind: function
+summary: Return a full ModelResponse and execute tool calls, adding outputs to messages by default.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def completions\_and\_run\_tools(
+self,
+messages: List\[ChatCompletionMessageParam],
+model: str = "",
+tools: Optional\[List] = None,
+add\_responses\_to\_messages: bool = True,
+agent\_role\_name="assistant",
+tool\_role\_name="tool",
+\*\*kwargs: Any,
+) -> ModelResponse:
+...
+guidance:
+\- Prefer this when you need usage metrics or multiple choices; use agent\_role\_name/tool\_role\_name to align with your message schema.&#x20;
+\- For Llama-family models, defs are injected in a system message; confirm your tool schemas are concise.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+reg = env.get\_tool\_registry()
+reg.register\_tool(lambda: "pong")  # simple tool (will be named '<lambda>')
+tools = reg.get\_all\_tool\_definitions()
+resp = env.completions\_and\_run\_tools(\[{"role":"user","content":"call your tools"}], tools=tools)
+env.add\_reply(str(resp))
+Environment.list\_messages:
+kind: function
+summary: Return messages for the current (or specified) thread; legacy-friendly format.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def list\_messages(
+self,
+thread\_id: Optional\[str] = None,
+limit: Union\[int, NotGiven] = LIST\_MESSAGES\_LIMIT,
+order: Literal\["asc", "desc"] = "asc",
+):
+...
+guidance:
+\- Use asc order for chronological planning; filter out system/agent logs in debug contexts as the environment does.&#x20;
+\- When integrating with Assistants API threads, ensure thread\_id consistency to avoid cache mixing.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+msgs = env.list\_messages()
+env.add\_reply(f"Loaded {len(msgs)} messages")
+Environment.add\_reply:
+kind: function
+summary: Append an assistant/user reply to the current thread and chat log.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def add\_reply(
+self,
+message: str,
+\# (other optional params may exist in the implementation)
+) -> None:
+...
+guidance:
+\- Keep replies short and append them frequently so the next loop step has updated context (chat.txt).&#x20;
+\- Prefer add\_reply over deprecated add\_message for future compatibility.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+env.add\_reply("Done ✅")
+Environment.list\_files:
+kind: function
+summary: List files under the agent’s temp directory path.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def list\_files(
+self,
+path: str,
+order: Literal\["asc", "desc"] = "asc",
+) -> List\[str]:
+...
+guidance:
+\- Namespace file operations under get\_primary\_agent\_temp\_dir()/get\_agent\_temp\_path when composing paths. &#x20;
+\- Combine with write\_file/read\_file to persist loop state or artifacts across steps.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+env.add\_reply(str(env.list\_files(".")))
+Environment.read\_file:
+kind: function
+summary: Read a file from the current thread’s storage.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def read\_file(
+self,
+file\_name: str,
+encoding: Optional\[str] = "utf-8",
+) -> Optional\[str]:
+...
+guidance:
+\- Returns None if missing; check for existence with list\_files first for robust flows.&#x20;
+\- Use UTF‑8 unless you know the file’s binary or alternate encoding.
+example:
+lang: python
+code: |
+def run(env):
+content = env.read\_file("chat.txt") or ""
+env.add\_reply(content\[-160:] if content else "(empty)")
+Environment.call\_agent:
+kind: function
+summary: Invoke a sub‑agent by index with a task string.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def call\_agent(self, agent\_index: int, task: str) -> None:
+...
+guidance:
+\- Use for simple orchestration inside one trust boundary; consider threads/subthreads for complex handoffs.&#x20;
+\- Keep task strings explicit; the callee agent reads env.list\_messages() to continue context.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+env.call\_agent(0, "summarize the last 5 messages")
+Environment.clear\_temp\_agent\_files:
+kind: function
+summary: Remove per-agent temp folders created during runpy execution.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def clear\_temp\_agent\_files(self, verbose: bool = True) -> None:
+...
+guidance:
+\- Clean temp dirs between long‑running dev sessions to avoid stale imports or artifacts.&#x20;
+\- In CI or hosted runners, enable verbose to audit cleanup paths.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+env.clear\_temp\_agent\_files(verbose=True)
+Environment.get\_tool\_registry:
+kind: function
+summary: Return the ToolRegistry (optionally fresh) used for tool-calls.
+definition:
+lang: python
+source: nearai/agents/environment.py
+code: |
+def get\_tool\_registry(self, new: bool = False) -> ToolRegistry:
+...
+guidance:
+\- Pass new=True to start from an empty registry (no built‑ins); otherwise extend the default registry.&#x20;
+\- After registering tools, call get\_all\_tool\_definitions() to pass to \*\_and\_run\_tools.&#x20;
+example:
+lang: python
+code: |
+def run(env):
+reg = env.get\_tool\_registry(new=True)
+def ping(): "ping"  # simple tool
+reg.register\_tool(ping)
+tools = reg.get\_all\_tool\_definitions()
+env.completions\_and\_run\_tools(\[{"role":"user","content":"use ping"}], tools=tools)
+ToolRegistry.register\_tool:
+kind: function
+summary: Register a Python callable as a tool by name.
+definition:
+lang: python
+source: nearai/agents/tool\_registry.py
+code: |
+def register\_tool(self, tool: Callable) -> None:
+...
+guidance:
+\- The callable’s **name** is used as the tool name; add a descriptive docstring and (optionally) a **schema** attribute.&#x20;
+\- For schema‑first flows or remote MCP tools, use register\_mcp\_tool(...) instead.&#x20;
+example:
+lang: python
+code: |
+def add(a: int, b: int) -> int:
+"""Add two numbers."""
+return a + b
+
+```
+    def run(env):
+        reg = env.get_tool_registry()
+        reg.register_tool(add)
+        tools = reg.get_all_tool_definitions()
+        env.completions_and_run_tools(
+            [{"role":"user","content":"Use add with a=2, b=3"}],
+            tools=tools
+        )
+```
+
+Environment.set\_near:
+kind: function
+summary: Initialize a NEAR client bound to an account and optional RPC endpoint.
+definition:
+lang: python
+source: docs/agents/env/near.md
+code: |
+def set\_near(
+self,
+account\_id: Optional\[str] = None,
+private\_key: Optional\[str] = None,
+rpc\_addr: Optional\[str] = None,
+) -> "NearClient":
+...
+guidance:
+\- Use secrets for account\_id/private\_key; never hard-code credentials.&#x20;
+\- You can call near.view without credentials; credentials are required for near.call and for get\_balance of other accounts as needed.&#x20;
+example:
+lang: python
+code: |
+from nearai.agents.environment import Environment
+import asyncio
+
+```
+    async def run(env: Environment):
+        near = env.set_near("user.near", "ed25519:XXXXX")
+        bal = await near.get_balance("user.near")
+        env.add_reply(f"balance={bal}")
+
+    # asyncio.run(run(env))  # executed by the runner
+```
+
+NearClient.view:
+kind: method
+summary: Read-only contract query; no state change.
+definition:
+lang: python
+source: docs/agents/env/near.md
+code: |
+async def view(
+contract\_id: str,
+method\_name: str,
+args: dict,
+block\_id: Optional\[int] = None,
+threshold: Optional\[int] = None,
+max\_retries: int = 3,
+) -> Any:
+...
+guidance:
+\- Safe to use without credentials (set\_near() without account); responses include block metadata and result.&#x20;
+\- Tune max\_retries conservatively to avoid undue RPC load; defaults are sensible.&#x20;
+example:
+lang: python
+code: |
+async def run(env):
+near = env.set\_near()
+res = await near.view("wrap.near", "ft\_balance\_of", {"account\_id": "example.near"})
+env.add\_reply(f"wrap balance={res.result}")
+NearClient.call:
+kind: method
+summary: State-changing contract call; requires gas/amount and credentials.
+definition:
+lang: python
+source: docs/agents/env/near.md
+code: |
+async def call(
+contract\_id: str,
+method\_name: str,
+args: dict,
+gas: int = DEFAULT\_ATTACHED\_GAS,
+amount: int = 0,
+nowait: bool = False,
+included: bool = False,
+max\_retries: int = 3,
+) -> Any:
+...
+guidance:
+\- Use nowait=True for fire-and-forget; use included=True when your logic depends on inclusion before continuing.&#x20;
+\- Be cautious with retries to avoid duplicate sends; cap max\_retries appropriately.&#x20;
+example:
+lang: python
+code: |
+async def run(env):
+near = env.set\_near("user.near", "ed25519\:XXXXX")
+tx = await near.call(
+"wrap.near", "ft\_transfer",
+{"receiver\_id": "example.near", "amount": "1"}, gas=30\_000\_000\_000\_000, amount=1
+)
+env.add\_reply("sent" if "status" in tx else "failed")
+NearClient.get\_balance:
+kind: method
+summary: Return the NEAR balance for the provided or default account.
+definition:
+lang: python
+source: docs/agents/env/near.md
+code: |
+async def get\_balance(self, account\_id: Optional\[str] = None) -> int:
+...
+guidance:
+\- Call with no args to read the bound account’s balance; pass an account\_id to query another.&#x20;
+\- Combine with view/call to report pre/post state to users.&#x20;
+example:
+lang: python
+code: |
+async def run(env):
+near = env.set\_near("alice.near", "ed25519\:XXXXX")
+env.add\_reply(str(await near.get\_balance()))
+
+common\_workflows:
+
+* name: Basic agent loop with memory
+  steps:
+
+  * "Read the current thread messages: msgs = env.list\_messages()."
+  * "Generate a concise reply: text = env.completion(\[system] + msgs, model='gpt-4o-mini')."
+  * "Append the reply so the next step has context: env.add\_reply(text)."
+    code: |
+    def run(env):
+    system = {"role":"system","content":"Be helpful and brief."}
+    text = env.completion(\[system] + env.list\_messages(), model="gpt-4o-mini")
+    env.add\_reply(text)
+    notes: "List/append operations are thread-scoped; rely on them for deterministic loops. "
+* name: Tool calling with the built-in registry
+  steps:
+
+  * "Get the default registry and tool definitions."
+  * "Pass definitions to completions\_and\_run\_tools so the LLM can invoke them."
+  * "Inspect appended tool responses in the next loop iteration."
+    code: |
+    def run(env):
+    tools = env.get\_tool\_registry().get\_all\_tool\_definitions()
+    resp = env.completions\_and\_run\_tools(
+    \[{"role":"user","content":"List files"}],
+    model="gpt-4o-mini",
+    tools=tools
+    )
+    env.add\_reply(str(resp))
+    notes: "Pass *definitions*, not callables. Built-ins include file ops. "
+* name: Streaming generation
+  steps:
+
+  * "Set stream=True in env.completions(...)."
+  * "Aggregate the stream wrapper’s output (implementation aggregates to a ModelResponse)."
+    code: |
+    def run(env):
+    wrapper = env.completions(\[{"role":"user","content":"stream me"}], model="gpt-4o-mini", stream=True)
+    env.add\_reply(str(wrapper))
+    notes: "Streaming aggregates to a ModelResponse; for fine control, consume chunks directly. "
+* name: NEAR read and write
+  steps:
+
+  * "Initialize NEAR with secrets: env.set\_near(account\_id, private\_key)."
+  * "Use near.view for read-only queries."
+  * "Use near.call for state-changing operations with gas/amount."
+    code: |
+    import asyncio
+    async def run(env):
+    near = env.set\_near("user.near", "ed25519\:XXXXX")
+    bal = await near.get\_balance("user.near")
+    res = await near.view("wrap.near","ft\_balance\_of",{"account\_id":"user.near"})
+    env.add\_reply(f"bal={bal} view={res.result}")
+    notes: "Keep credentials out of source; use runner-provided secrets. "
+* name: Verify signed completions
+  steps:
+
+  * "Generate signed output via env.signed\_completion(...)."
+  * "Verify with verify\_signed\_message before executing sensitive actions."
+    code: |
+    def run(env):
+    signed = env.signed\_completion(\[{"role":"user","content":"sign this"}], model="gpt-4o-mini")
+    ok = env.verify\_signed\_message(
+    signed.get("completion",""),
+    \[{"role":"user","content":"sign this"}],
+    signed.get("public\_key"),
+    signed.get("signature"),
+    "gpt-4o-mini"
+    )
+    env.add\_reply(f"verified={ok}")
+    notes: "Treat unverified signatures as untrusted. "
+
+troubleshooting\_cheatsheet:
+
+* symptom: "Tool never executes; LLM proposes a call but nothing happens."
+  cause: "Passed raw callables instead of tool *definitions*."
+  fix: "Use env.get\_tool\_registry().get\_all\_tool\_definitions() and pass to \*\_and\_run\_tools. "
+* symptom: "Type or schema errors during tool invocation."
+  cause: "Missing docstrings or schema; LLM can’t infer arguments."
+  fix: "Add docstring; for schema-first, use register\_mcp\_tool(...) with inputSchema. "
+* symptom: "Completions return unexpected format."
+  cause: "Using env.completion(...) when metadata is needed."
+  fix: "Switch to env.completions(...); it returns ModelResponse for richer control. "
+* symptom: "NEAR call sent twice."
+  cause: "Over-aggressive retries."
+  fix: "Lower max\_retries; understand duplication risk in docs. "
+* symptom: "Missing messages or wrong order."
+  cause: "Thread/caching mismatch."
+  fix: "Ensure consistent thread\_id and specify order='asc' for planning. "
+
+faq:
+
+* q: "When should I use completion(...) vs completions(...)?"
+  a: "Use completion(...) for quick string replies; use completions(...) for streaming, token usage, or multi-choice handling.  "
+* q: "How do I let the model call my Python function?"
+  a: "Register with env.get\_tool\_registry().register\_tool(fn), then pass registry.get\_all\_tool\_definitions() into \*\_and\_run\_tools. "
+* q: "Can I query NEAR without credentials?"
+  a: "Yes—near.view works without account\_id/private\_key; near.call requires credentials. "
+* q: "Where are my per-run files stored?"
+  a: "In a per-thread temp dir; use get\_agent\_temp\_path/get\_primary\_agent\_temp\_dir helpers and list\_files/read\_file.  "
+* q: "How do I verify agent outputs?"
+  a: "Use signed\_completion(...) and verify\_signed\_message(...) with your public key management.  "
+
+external\_resources:
+
+* label: NEAR AI • Environment — Inference
+  url: [https://near.ai/docs/agents/env/inference/](https://near.ai/docs/agents/env/inference/)
+* label: NEAR AI • Environment — Messages & Files
+  url: [https://near.ai/docs/agents/env/messages\_files/](https://near.ai/docs/agents/env/messages_files/)
+* label: NEAR AI • Tools & Commands
+  url: [https://near.ai/docs/agents/env/tools/](https://near.ai/docs/agents/env/tools/)
+* label: NEAR AI • NEAR Blockchain helpers
+  url: [https://near.ai/docs/agents/env/near/](https://near.ai/docs/agents/env/near/)
+* label: NEAR AI • API Index
+  url: [https://near.ai/docs/api/](https://near.ai/docs/api/)
+

@@ -1,0 +1,576 @@
+meta:
+spec\_name: openserv-labs/sdk
+spec\_version: "0.3.0"
+generated: "2025-09-18"
+library\_version: ">=0.0.0"
+language: typescript
+homepage: "[https://openserv.ai](https://openserv.ai)"
+tags:
+\- ai-agents
+\- task-management
+\- chat
+\- files
+\- integrations
+\- mcp
+\- openai
+\- zod
+purpose: >
+Expert Knowledge Pack for the OpenServ TypeScript SDK. It teaches an LLM to stand up an
+autonomous Agent, register strongly‑typed Zod capabilities, manage tasks and chat, work
+with workspace files, call third‑party integrations, and connect Model Context Protocol
+(MCP) servers—using the SDK’s idiomatic API and production‑safe patterns.&#x20;
+guiding\_principles:
+\- Prefer small, composable capabilities with explicit Zod schemas; keep `run` side‑effect free except for logging/status updates.&#x20;
+\- Always log progress (`addLogToTask`) and advance task status (`updateTaskStatus`) so humans and agents can coordinate.&#x20;
+\- Use `requestHumanAssistance` to escalate ambiguity; include a concise `agentDump` only when necessary to avoid leaking secrets.&#x20;
+\- Attach uploads to tasks via `taskIds` so artifacts are discoverable in the workspace timeline.&#x20;
+\- For deterministic external calls, route through `callIntegration` instead of ad‑hoc HTTP; auth is handled by the platform.&#x20;
+\- If using MCP, set `autoRegisterTools` judiciously; generated capabilities are prefixed and should be documented for operators.&#x20;
+\- Keep environment minimal: set `OPENSERV_API_KEY` and only add `OPENAI_API_KEY` if you actually call `process()`.&#x20;
+\- Start the agent after capability registration; avoid racing `start()` with dynamic registration.&#x20;
+design\_notes: >
+Structure mirrors the README’s API Reference sections (Task Management, Chat, Workspace,
+Integrations) plus Agent setup and MCP configuration. All `definition.code` blocks are
+extracted verbatim (or lightly compressed) from the provided documentation, with each
+symbol’s `source` pointing back to the exact snippet. The YAML itself conforms to
+Open Agent Spec v0.3.0 and uses the new per‑symbol `definition` field. Schema source:
+Open Agent Spec v0.3 (required fields and shape). &#x20;
+
+groups:
+
+* name: Agent Setup & Capabilities
+  exports:
+
+  * Agent
+  * Agent.addCapability
+  * Agent.addCapabilities
+  * Agent.start
+  * Agent.process
+    symbols:
+    Agent:
+    kind: class
+    summary: Core class that hosts an autonomous agent runtime; initialize with a system prompt (and optional API/MCP settings) then start the server.&#x20;
+    definition:
+    lang: typescript
+    source: "Initialize your agent (README Getting Started). "
+    code: |
+    import { Agent } from '@openserv-labs/sdk'
+    const agent = new Agent({
+    systemPrompt: 'You are a specialized agent that...'
+    })
+    guidance:
+
+    * Keep the `systemPrompt` short and role‑defining; put dynamic instructions into capabilities.
+    * Provide `apiKey` only if not using `OPENSERV_API_KEY` env; prefer env for deployment parity.&#x20;
+    * Register all capabilities before calling `start()` to avoid cold‑start races.&#x20;
+      example:
+      lang: typescript
+      description: Minimal boot with one inline capability then start.
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      import { z } from 'zod'
+
+      const agent = new Agent({ systemPrompt: 'You are helpful.' })
+      agent.addCapability({
+      name: 'ping',
+      description: 'Health check',
+      schema: z.object({}),
+      async run() { return 'pong' }
+      })
+
+      await agent.start()
+      Agent.addCapability:
+      kind: function
+      summary: Register a single typed capability with a Zod schema and an async `run` handler.&#x20;
+      definition:
+      lang: typescript
+      source: "Capability example (README Core Concepts / Capabilities). "
+      code: |
+      agent.addCapability({
+      name: 'summarize',
+      description: 'Summarize a piece of text',
+      schema: z.object({
+      text: z.string().describe('Text content to summarize'),
+      maxLength: z.number().optional().describe('Maximum length of summary')
+      }),
+      async run({ args, action }) {
+      const { text, maxLength = 100 } = args
+      const summary = `Summary of text (${text.length} chars): ...`
+      await this.addLogToTask({
+      workspaceId: action.workspace.id,
+      taskId: action.task.id,
+      severity: 'info',
+      type: 'text',
+      body: 'Generated summary successfully'
+      })
+      return summary
+      }
+      })
+      guidance:
+    * Name capabilities with a stable, verb‑noun slug (e.g., `file.summarize`) to keep the command surface predictable.
+    * Validate aggressively with Zod; prefer `.describe()` to make parameters self‑documenting for UIs.
+    * Use `action` to relate work to the current task and workspace when present; always log meaningful milestones.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      import { z } from 'zod'
+      const agent = new Agent({ systemPrompt: 'You are concise.' })
+      agent.addCapability({
+      name: 'greet',
+      description: 'Greet by name',
+      schema: z.object({ name: z.string() }),
+      async run({ args }) { return `Hello, ${args.name}!` }
+      })
+      await agent.start()
+      Agent.addCapabilities:
+      kind: function
+      summary: Bulk‑register multiple capabilities at once using an array of capability definitions.&#x20;
+      definition:
+      lang: typescript
+      source: "Quick Start multi‑capability example. "
+      code: |
+      agent.addCapabilities(\[
+      {
+      name: 'farewell',
+      description: 'Say goodbye to a user',
+      schema: z.object({ name: z.string().describe('The name of the user to bid farewell') }),
+      async run({ args }) { return `Goodbye, ${args.name}!` }
+      },
+      {
+      name: 'help',
+      description: 'Show available commands',
+      schema: z.object({}),
+      async run() { return 'Available commands: greet, farewell, help' }
+      }
+      ])
+      guidance:
+    * Prefer `addCapabilities` when booting to minimize init overhead and keep capability registration declarative.&#x20;
+    * Group related small capabilities into one call; still keep each `name` unique.
+      example:
+      lang: typescript
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      import { z } from 'zod'
+      const agent = new Agent({ systemPrompt: 'You are organized.' })
+      agent.addCapabilities(\[
+      { name: 'a', description: 'A', schema: z.object({}), async run(){ return 'A' } },
+      { name: 'b', description: 'B', schema: z.object({}), async run(){ return 'B' } }
+      ])
+      await agent.start()
+      Agent.start:
+      kind: function
+      summary: Start the agent server so it can receive tasks/chats and serve capabilities.&#x20;
+      definition:
+      lang: typescript
+      source: "Start server snippet (README). "
+      code: |
+      // Start the agent server
+      await agent.start()
+      guidance:
+    * Call only once after all capabilities are registered.
+    * Expose a public endpoint for marketplace use; update the Agent Endpoint field in the platform UI post‑deploy.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      const agent = new Agent({ systemPrompt: 'Ready.' })
+      await agent.start()
+      Agent.process:
+      kind: function
+      summary: Invoke OpenAI‑backed function‑calling/runtime processing with chat‑style `messages`.&#x20;
+      definition:
+      lang: typescript
+      source: "OpenAI Process Runtime example. "
+      code: |
+      const result = await agent.process({
+      messages: \[
+      { role: 'system', content: 'You are a helpful assistant' },
+      { role: 'user', content: 'Create a task to analyze the latest data' }
+      ]
+      })
+      guidance:
+    * Requires `OPENAI_API_KEY`; omit it if you don’t call `process()` in your runtime.&#x20;
+    * Keep prompts small; use capabilities for tool‑use rather than long monologues.
+
+* name: Task Management
+  exports:
+
+  * createTask
+  * updateTaskStatus
+  * addLogToTask
+    symbols:
+    createTask:
+    kind: function
+    summary: Create a new task in a workspace with description, input, expected output, and optional dependencies.&#x20;
+    definition:
+    lang: typescript
+    source: "API Reference – Create Task. "
+    code: |
+    const task = await agent.createTask({
+    workspaceId: number | string,
+    assignee: number,
+    description: string,
+    body: string,
+    input: string,
+    expectedOutput: string,
+    dependencies: number\[]
+    })
+    guidance:
+
+    * Use string `workspaceId` when your platform uses non‑numeric IDs; both number and string are accepted.&#x20;
+    * Create early, update status often; pair with `addLogToTask` for transparency.
+      example:
+      lang: typescript
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      const agent = new Agent({ systemPrompt: 'Tasker.' })
+      const t = await agent.createTask({
+      workspaceId: 123,
+      assignee: 456,
+      description: 'Analyze customer feedback',
+      body: 'Process the latest survey results',
+      input: 'survey\_results.csv',
+      expectedOutput: 'Key findings',
+      dependencies: \[]
+      })
+      console.log('Task id:', t.id)
+      updateTaskStatus:
+      kind: function
+      summary: Transition a task through states like `to-do`, `in-progress`, `done`, or `human-assistance-required`.&#x20;
+      definition:
+      lang: typescript
+      source: "API Reference – Update Task Status. "
+      code: |
+      await agent.updateTaskStatus({
+      workspaceId: number | string,
+      taskId: number | string,
+      status: 'to-do' | 'in-progress' | 'human-assistance-required' | 'error' | 'done' | 'cancelled'
+      })
+      guidance:
+    * Emit status before and after long‑running steps to improve traceability.
+    * When escalating, pair `human-assistance-required` with a `requestHumanAssistance` call.
+      example:
+      lang: typescript
+      code: |
+      await agent.updateTaskStatus({
+      workspaceId: 123,
+      taskId: 789,
+      status: 'in-progress'
+      })
+      addLogToTask:
+      kind: function
+      summary: Append structured progress logs (info/warning/error) to a task timeline.&#x20;
+      definition:
+      lang: typescript
+      source: "API Reference – Add Task Log. "
+      code: |
+      await agent.addLogToTask({
+      workspaceId: number | string,
+      taskId: number | string,
+      severity: 'info' | 'warning' | 'error',
+      type: 'text' | 'openai-message',
+      body: string | object
+      })
+      guidance:
+    * Prefer concise, user‑legible text; attach large artifacts via `uploadFile` instead of massive log bodies.
+    * Log at boundaries (start, external call, parse complete, status change, result) for clean post‑mortems.
+      example:
+      lang: typescript
+      code: |
+      await agent.addLogToTask({
+      workspaceId: 123,
+      taskId: 789,
+      severity: 'info',
+      type: 'text',
+      body: 'Starting analysis...'
+      })
+
+* name: Chat & Communication
+  exports:
+
+  * sendChatMessage
+  * getChatMessages
+  * requestHumanAssistance
+    symbols:
+    sendChatMessage:
+    kind: function
+    summary: Send a chat message from your agent into a workspace conversation.&#x20;
+    definition:
+    lang: typescript
+    source: "API Reference – Send Message. "
+    code: |
+    await agent.sendChatMessage({
+    workspaceId: number | string,
+    agentId: number,
+    message: string
+    })
+    guidance:
+
+    * Keep messages short and reference task IDs when relevant.
+    * Do not include secrets; prefer secure integrations for sensitive operations.
+      example:
+      lang: typescript
+      code: |
+      await agent.sendChatMessage({
+      workspaceId: 123,
+      agentId: 456,
+      message: 'How can I assist you today?'
+      })
+      getChatMessages:
+      kind: function
+      summary: Retrieve recent chat messages for an agent within a workspace to maintain context.&#x20;
+      definition:
+      lang: typescript
+      source: "Chat Interactions example – Get agent chat. "
+      code: |
+      await agent.getChatMessages({
+      workspaceId: 123,
+      agentId: 456
+      })
+      guidance:
+    * Page or filter on the client after retrieval; cache summaries in files if you need long‑term context.
+    * Pair with capability outputs to build compact, durable state.
+      example:
+      lang: typescript
+      code: |
+      const history = await agent.getChatMessages({ workspaceId: 123, agentId: 456 })
+      console.log(history.length, 'messages')
+      requestHumanAssistance:
+      kind: function
+      summary: Escalate a task to a human with a typed question/payload and optional agent dump.&#x20;
+      definition:
+      lang: typescript
+      source: "API Reference – Request Human Assistance. "
+      code: |
+      await agent.requestHumanAssistance({
+      workspaceId: number | string,
+      taskId: number | string,
+      type: 'text' | 'project-manager-plan-review',
+      question: string | object,
+      agentDump?: object
+      })
+      guidance:
+    * Provide a crisp, single question; attach only minimal structured context in `agentDump`.
+    * Update task status to `human-assistance-required` around this call for clarity.
+      example:
+      lang: typescript
+      code: |
+      await agent.requestHumanAssistance({
+      workspaceId: 123,
+      taskId: 789,
+      type: 'text',
+      question: 'Please confirm the scope for the next sprint.'
+      })
+
+* name: Workspace Files
+  exports:
+
+  * getFiles
+  * uploadFile
+    symbols:
+    getFiles:
+    kind: function
+    summary: List files available in a workspace; useful for locating inputs/outputs tied to tasks.&#x20;
+    definition:
+    lang: typescript
+    source: "API Reference – Get Files. "
+    code: |
+    const files = await agent.getFiles({
+    workspaceId: number | string
+    })
+    guidance:
+
+    * Use file metadata to enrich logs instead of inlining large content into task bodies.
+    * Combine with `uploadFile` to round‑trip artifacts through your pipeline.
+      example:
+      lang: typescript
+      code: |
+      const files = await agent.getFiles({ workspaceId: 123 })
+      console.log('files:', files.length)
+      uploadFile:
+      kind: function
+      summary: Upload a file (Buffer or string) to a workspace; optionally associate with one or more tasks.&#x20;
+      definition:
+      lang: typescript
+      source: "API Reference – Upload File. "
+      code: |
+      await agent.uploadFile({
+      workspaceId: number | string,
+      path: string,
+      file: Buffer | string,
+      skipSummarizer?: boolean,
+      taskIds?: number\[]
+      })
+      guidance:
+    * Use `Buffer` for binary; pass `skipSummarizer: true` for large or sensitive blobs.&#x20;
+    * Include `taskIds` so uploads appear in the correct task context automatically.
+      example:
+      lang: typescript
+      code: |
+      import { readFileSync } from 'fs'
+      const bin = readFileSync('./report.pdf')
+      await agent.uploadFile({
+      workspaceId: 123,
+      path: 'reports/report.pdf',
+      file: bin,
+      taskIds: \[789]
+      })
+
+* name: Integrations & MCP
+  exports:
+
+  * callIntegration
+  * mcpServers
+    symbols:
+    callIntegration:
+    kind: function
+    summary: Invoke a configured third‑party integration endpoint securely via the OpenServ platform.&#x20;
+    definition:
+    lang: typescript
+    source: "API Reference – Call Integration (signature + example). "
+    code: |
+    const response = await agent.callIntegration({
+    workspaceId: number | string,
+    integrationId: string,
+    details: {
+    endpoint: string,
+    method: string,
+    data?: object
+    }
+    })
+    guidance:
+
+    * Prefer `callIntegration` for deterministic, auditable API calls; platform handles auth and scoping.&#x20;
+    * Validate upstream limits and handle non‑200s; log both request intent and summarized response.
+      example:
+      lang: typescript
+      code: |
+      const res = await agent.callIntegration({
+      workspaceId: 123,
+      integrationId: 'twitter-v2',
+      details: { endpoint: '/2/tweets', method: 'POST', data: { text: 'Hello from my AI agent!' } }
+      })
+      console.log(res)
+      mcpServers:
+      kind: object
+      summary: Agent option that configures one or more MCP servers (http/sse/stdio) and optionally auto‑registers their tools as capabilities.&#x20;
+      definition:
+      lang: typescript
+      source: "MCP configuration examples (http, stdio, sse). "
+      code: |
+      // When creating the Agent:
+      const agent = new Agent({
+      systemPrompt: 'You are a search-engine assistant.',
+      mcpServers: {
+      Exa: {
+      transport: 'http',
+      url: '[https://server.smithery.ai/exa/mcp?api\_key=YOUR\_API\_KEY](https://server.smithery.ai/exa/mcp?api_key=YOUR_API_KEY)',
+      autoRegisterTools: true
+      },
+      LocalLLM: {
+      transport: 'stdio',
+      command: 'my-mcp-binary',
+      args: \['--model', 'gpt-4o'],
+      env: { OPENAI\_API\_KEY: process.env.OPENAI\_API\_KEY },
+      autoRegisterTools: true
+      },
+      Anthropic: {
+      transport: 'sse',
+      url: '[https://my-mcp-server.com/sse](https://my-mcp-server.com/sse)',
+      autoRegisterTools: false
+      }
+      }
+      })
+      guidance:
+    * With `autoRegisterTools: true`, each MCP tool becomes a capability named with an `mcp__` prefix; document these for users.&#x20;
+    * Access raw clients via `agent.mcpClients[serverId]` to introspect (`getTools`) or call (`executeTool`) tools directly when you need custom flows.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { Agent } from '@openserv-labs/sdk'
+      const agent = new Agent({
+      systemPrompt: 'Search and cite.',
+      mcpServers: { Exa: { transport: 'http', url: '[https://server](https://server)...', autoRegisterTools: true } }
+      })
+      await agent.start()
+
+common\_workflows:
+
+* title: Register capabilities, start the agent, and run
+  steps:
+
+  * Define Zod schemas and concise descriptions for each capability.&#x20;
+  * Call `agent.addCapabilities([...])` during boot.&#x20;
+  * `await agent.start()` once registration is complete.&#x20;
+* title: Create a task and track progress
+  steps:
+
+  * `createTask` with description, input, expected output.&#x20;
+  * Log milestones via `addLogToTask` (start, external call, parse, finish).&#x20;
+  * Advance state with `updateTaskStatus` to `done`.&#x20;
+* title: Upload an artifact and link it to a task
+  steps:
+
+  * Read file as `Buffer` or string.
+  * `uploadFile({ workspaceId, path, file, taskIds: [taskId] })`.&#x20;
+  * Confirm presence with `getFiles`.&#x20;
+* title: Chat handoff and escalation
+  steps:
+
+  * Send a message with `sendChatMessage`.&#x20;
+  * Fetch context using `getChatMessages`.&#x20;
+  * If blocked, call `requestHumanAssistance` and mark status accordingly.&#x20;
+* title: Deterministic third‑party call
+  steps:
+
+  * Prepare payload; avoid secrets in plaintext.
+  * Use `callIntegration({ integrationId, details })` and log outcome.&#x20;
+* title: Connect an MCP server and auto‑import tools
+  steps:
+
+  * Add an entry under `mcpServers` (http/sse/stdio).&#x20;
+  * Set `autoRegisterTools: true` to expose tools as capabilities.&#x20;
+  * Start the agent; test a tool via newly added capability.
+
+troubleshooting\_cheatsheet:
+
+* symptom: "401/Forbidden when calling SDK methods"
+  cause: "Missing or invalid OPENSERV\_API\_KEY"
+  fix: "Export `OPENSERV_API_KEY` in the environment or pass `apiKey` to Agent."&#x20;
+* symptom: "Integration call fails with unknown integration"
+  cause: "Wrong `integrationId` or not configured in the workspace"
+  fix: "Verify the integration ID in the platform and workspace scope; retry via `callIntegration`."&#x20;
+* symptom: "Uploaded file not visible on task"
+  cause: "Upload not associated with the task"
+  fix: "Provide `taskIds: [taskId]` in `uploadFile` payload."&#x20;
+* symptom: "Capability throws validation errors"
+  cause: "Args don’t match Zod schema"
+  fix: "Align inputs with the declared Zod schema; add `.describe()` hints for clarity."&#x20;
+* symptom: "MCP tools not appearing as capabilities"
+  cause: "`autoRegisterTools` is false or server misconfigured"
+  fix: "Enable `autoRegisterTools` and verify transport/url/command settings."&#x20;
+
+faq:
+
+* q: "What’s the difference between `addCapability` and `addCapabilities`?"
+  a: "`addCapability` registers one capability; `addCapabilities` takes an array and is ideal for boot‑time bulk registration."&#x20;
+* q: "Do I need an OpenAI key?"
+  a: "Only if you call `agent.process(...)`. Otherwise `OPENSERV_API_KEY` is sufficient." &#x20;
+* q: "How do I attach artifacts to a task?"
+  a: "Use `uploadFile` with the `taskIds` array, then confirm via `getFiles`."&#x20;
+* q: "How do I escalate to a human?"
+  a: "Use `requestHumanAssistance` with a concise `question`, and set status to `human-assistance-required`."&#x20;
+* q: "Can I call external APIs directly?"
+  a: "Prefer `callIntegration` for deterministic, authenticated calls governed by the workspace’s integration settings."&#x20;
+
+external\_resources:
+
+* label: OpenServ Platform
+  url: "[https://platform.openserv.ai](https://platform.openserv.ai)"
+* label: NPM – @openserv-labs/sdk
+  url: "[https://www.npmjs.com/package/@openserv-labs/sdk](https://www.npmjs.com/package/@openserv-labs/sdk)"
+* label: Examples directory
+  url: "[https://github.com/openserv-labs/agent/tree/main/examples](https://github.com/openserv-labs/agent/tree/main/examples)"
+* label: Model Context Protocol (MCP)
+  url: "[https://modelcontextprotocol.org](https://modelcontextprotocol.org)"

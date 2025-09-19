@@ -1,0 +1,575 @@
+meta:
+spec\_name: golem-base/json-rpc
+spec\_version: "0.3.0"
+library\_version: ">=0.1.0 <1.0.0"
+generated: "2025-09-18"
+language: "json-rpc"
+tags: \[evm, json-rpc, blockchain, storage, rlp, annotations, ttl]
+purpose: >
+Teach LLMs to read and mutate data on Golem‑Base DB‑Chain via JSON‑RPC: how
+to RLP‑encode mutation transactions sent to the storage precompile address,
+and how to query entities, metadata, and indexes efficiently and safely.
+guiding\_principles:
+\- Prefer indexed lookups first. Use dedicated endpoints for annotations (string/numeric) and owner/expiry before falling back to free‑form queries.&#x20;
+\- Decode values correctly. Storage payloads and query results return Base64 payloads; decode to bytes/text before use.&#x20;
+\- Think in blocks, not seconds. BTL (“blocks‑to‑live”) is hex and measured in blocks; Golem‑Base block time is \~2s, so TTL≈BTL×2s. Use Extend to renew.&#x20;
+\- Batch mutations. Create/Update/Delete/Extend can be bundled in one RLP “storageTransaction” and sent once to the mutation address to save gas.&#x20;
+\- Treat entity IDs as opaque 0x‑hex hashes (keys). Fetch metadata/payload separately as needed.&#x20;
+\- Respect JSON‑RPC wire types. Quantities should be hex‑prefixed strings (0x…) even if docs show numbers in prose; align to Ethereum JSON‑RPC norms.&#x20;
+\- Start local when iterating. The local DBChain exposes RPC on :8545 and is ideal for smoke tests of queries and mutation encoding.&#x20;
+design\_notes: >
+Consolidated from Golem‑Base docs: JSON‑RPC API (“Creating/Updating/Deleting
+Entities” and “Querying Entities”), storage architecture, and getting‑started
+SDK pages. Key anchors: mutation address 0x…60138453 and the RLP “storageTransaction”
+layout. Source excerpts include: mutation address & tx schema, RLP shape and
+example, query endpoints (getStorageValue, getEntityMetaData, annotation/owner/expiry
+lookups, counts & keys, free‑form query), Base64 payload note, and block‑time/BTL
+semantics.
+
+groups:
+
+* name: Mutations (transactions)
+  exports:
+
+  * GOLEMBASE\_MUTATION\_ADDRESS
+  * TransactionObject
+  * StorageTransactionRlp
+  * CreateObject
+  * UpdateObject
+  * DeleteItem
+  * ExtendItem
+  * eth\_sendTransaction
+    symbols:
+    GOLEMBASE\_MUTATION\_ADDRESS:
+    kind: constant
+    summary: Hard‑coded storage precompile address that processes mutation RLP payloads.
+    definition:
+    lang: typescript
+    source: "dev/architecture/data-storage/index.html"
+    code: |
+    export const GOLEMBASE\_MUTATION\_ADDRESS =
+    "0x0000000000000000000000000000000060138453" as const;
+    guidance:
+
+    * All create/update/delete/extend operations must be sent to this address.&#x20;
+    * Use a standard Ethereum JSON‑RPC node method (eth\_sendTransaction / eth\_sendRawTransaction) to deliver the transaction.&#x20;
+      example:
+      lang: shell
+      code: |
+      curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+      "jsonrpc":"2.0","id":1,"method":"eth\_sendTransaction",
+      "params":\[{
+      "from":"0xYourSender","to":"0x0000000000000000000000000000000060138453",
+      "data":"0x..."  // RLP-encoded storageTransaction
+      }]
+      }'
+      description: Send a mutation to the storage precompile.
+
+  TransactionObject:
+  kind: interface
+  summary: Ethereum JSON‑RPC transaction object for mutation calls.
+  definition:
+  lang: typescript
+  code: |
+  type HexQuantity = `0x${string}`;
+  type Address = `0x${string}`;
+  type HexData = `0x${string}`;
+
+  ```
+      export interface TransactionObject {
+        from: Address;
+        to: Address;             // must be GOLEMBASE_MUTATION_ADDRESS
+        gas?: HexQuantity;       // optional
+        gasPrice?: HexQuantity;  // optional
+        value?: HexQuantity;     // should be omitted for mutations
+        nonce?: HexQuantity;     // optional
+        data: HexData;           // RLP-encoded StorageTransactionRlp
+      }
+  guidance:
+    - Prefer hex‑quantity strings for gas/gasPrice/nonce/value to match Ethereum JSON‑RPC. :contentReference[oaicite:10]{index=10}
+    - Omit value for storage mutations; it’s not used by the precompile. :contentReference[oaicite:11]{index=11}
+  example:
+    lang: shell
+    code: |
+      curl http://localhost:8545 -H 'Content-Type: application/json' -d '{
+        "jsonrpc":"2.0","id":2,"method":"eth_sendTransaction",
+        "params":[{
+          "from":"0xYourSender",
+          "to":"0x0000000000000000000000000000000060138453",
+          "gas":"0x5208","gasPrice":"0x3b9aca00","data":"0x..."
+        }]
+      }'
+  ```
+
+  StorageTransactionRlp:
+  kind: type
+  summary: RLP payload layout bundling create/update/delete/extend arrays in one call.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // RLP top-level tuple (array) with four arrays in fixed order:
+  // \[ creates\[], updates\[], deletes\[], extends\[] ]
+  export type StorageTransactionRlp = \[
+  CreateObject\[],   // creates
+  UpdateObject\[],   // updates
+  DeleteItem\[],     // deletes (entityKey hashes)
+  ExtendItem\[]      // extends
+  ];
+  guidance:
+  \- Batch heterogeneous operations to amortize gas and RPC overhead.&#x20;
+  \- Keep arrays reasonably sized to avoid node RPC size limits. Split into multiple txs if large.
+  example:
+  lang: shell
+  code: |
+  \# Example RLP layout (illustrative):
+  \# \[ \[CreateObject...], \[UpdateObject...], \[DeleteItem...], \[ExtendItem...] ]
+  \# See separate type definitions for each inner element.
+
+  CreateObject:
+  kind: type
+  summary: Element format for “Create” inside the RLP storageTransaction.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // Array with parameters in sequence:
+  // \[ BTL, payloadBytes, stringAnnotations\[], numericAnnotations\[] ]
+  // BTL: hex-quantity blocks-to-live; payloadBytes: arbitrary bytes
+  // stringAnnotations/numericAnnotations: flattened key/value hex byte sequences.
+  export type HexBytes = `0x${string}`;
+  export type CreateObject = \[
+  /*BTL*/ HexBytes,
+  /*payload*/ HexBytes,
+  /*stringAnnotations*/ HexBytes\[],   // e.g., \[key1, val1, key2, val2, ...]
+  /*numericAnnotations*/ HexBytes\[]   // e.g., \[key1, val1, key2, val2, ...]
+  ];
+  guidance:
+  \- BTL is expressed as a hex value in blocks (≈2s per block on Golem‑Base).&#x20;
+  \- Encode annotation keys and values as bytes (hex). Choose clear ASCII keys where feasible, but send as bytes.&#x20;
+  example:
+  lang: shell
+  code: |
+  \# RLP example in docs (conceptual):
+  \# \[\[ "0x012c", "0x<bytes>", \["0x6b6579","0x76616c"], \["0x6978","0x00000002"] ], \[], \[], \[]]
+
+  UpdateObject:
+  kind: type
+  summary: Element format for “Update” inside the RLP storageTransaction.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // Array with parameters in sequence:
+  // \[ entityKey, BTL, payloadBytes, stringAnnotations, numericAnnotations ]
+  // Update overrides the entity's payload, annotations, and BTL.
+  export type UpdateObject = \[
+  /*entityKey*/ `0x${string}`,
+  /*BTL*/       `0x${string}`,
+  /*payload*/   `0x${string}`,
+  /*stringAnnotations*/ `0x${string}`\[],
+  /*numericAnnotations*/ `0x${string}`\[]
+  ];
+  guidance:
+  \- Updates replace all elements: payload, annotations, and BTL—supply full state.&#x20;
+  \- If you only need to extend TTL, prefer ExtendItem to minimize writes.&#x20;
+  example:
+  lang: shell
+  code: |
+  \# Update single entity (illustrative inner array):
+  \# \[ "0x<entityKey>", "0x04b0", "0x<payload>", \["0x6b","0x76"], \["0x6978","0x03"] ]
+
+  DeleteItem:
+  kind: type
+  summary: Element format for “Delete” inside the RLP storageTransaction.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // Delete is an array of entity keys (hashes) to remove.
+  export type DeleteItem = `0x${string}`; // entityKey hash
+  guidance:
+  \- Deletions accept multiple entity IDs; batching is encouraged.&#x20;
+  \- Consider querying by annotations first to collect keys to delete.&#x20;
+  example:
+  lang: shell
+  code: |
+  \# Deletes: \["0xdead...","0xbeef..."]
+
+  ExtendItem:
+  kind: type
+  summary: Element format for “Extend” inside the RLP storageTransaction.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // \[ entityKey, numberOfBlocksToExtend ]
+  export type ExtendItem = \[
+  /*entityKey*/ `0x${string}`,
+  /*extendBy*/  `0x${string}`
+  ];
+  guidance:
+  \- Use Extend to renew TTL without rewriting payload or annotations.&#x20;
+  \- Choose modest extend deltas to match expected refresh cadence.
+  example:
+  lang: shell
+  code: |
+  \# Extends: \[\["0x<entityKey1>","0x1000"], \["0x<entityKey2>","0x0200"]]
+
+  eth\_sendTransaction:
+  kind: function
+  summary: Submit a transaction containing an RLP‑encoded StorageTransactionRlp to the mutation address.
+  definition:
+  lang: typescript
+  source: "JSON-RPC 2.0; dev/json-rpc-api.html#creatingupdatingdeleting-entities"
+  code: |
+  // JSON-RPC call:
+  // method: "eth\_sendTransaction"
+  // params: \[ TransactionObject ]
+  // returns: `0x${string}`  // tx hash
+  declare function eth\_sendTransaction(
+  tx: TransactionObject
+  ): Promise<`0x${string}`>;
+  guidance:
+  \- For remote nodes that do not manage keys, sign offline and use eth\_sendRawTransaction instead. (Wire format remains standard JSON‑RPC.)
+  \- Inspect receipt logs for emitted storage events to verify effects.&#x20;
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":3,"method":"eth\_sendTransaction",
+  "params":\[{"from":"0xYourSender","to":"0x0000000000000000000000000000000060138453","data":"0x..."}]
+  }'
+
+* name: Querying (read endpoints)
+  exports:
+
+  * golembase\_getStorageValue
+  * golembase\_getEntityMetaData
+  * golembase\_getEntitiesToExpireAtBlock
+  * golembase\_getEntitiesForStringAnnotationValue
+  * golembase\_getEntitiesForNumericAnnotationValue
+  * golembase\_getEntityCount
+  * golembase\_getAllEntityKeys
+  * golembase\_getEntitiesOfOwner
+  * golembase\_queryEntities
+    symbols:
+    golembase\_getStorageValue:
+    kind: function
+    summary: Return the entity’s Base64‑encoded payload bytes by entity ID (key hash).
+    definition:
+    lang: typescript
+    source: "dev/json-rpc-api.html#golembase\_getstoragevalue"
+    code: |
+    // method: "golembase\_getStorageValue"
+    // params: \[ entityId: `0x${string}` ]
+    // result: string (Base64-encoded payload)
+    declare function golembase\_getStorageValue(
+    entityId: `0x${string}`
+    ): Promise<string>;
+    guidance:
+
+    * Always Base64‑decode the result to recover the original bytes/text.&#x20;
+    * If you also need TTL/annotations/owner, call getEntityMetaData.&#x20;
+      example:
+      lang: shell
+      code: |
+      curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+      "jsonrpc":"2.0","id":1,
+      "method":"golembase\_getStorageValue",
+      "params":\["0x<entityId>"]
+      }'
+
+  golembase\_getEntityMetaData:
+  kind: function
+  summary: Fetch metadata (expiresAtBlock, owner, numeric/string annotations) for an entity.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitymetadata"
+  code: |
+  export interface NumericAnnotation { key: string; value: number; }
+  export interface StringAnnotation  { key: string; value: string; }
+
+  ```
+      export interface EntityMetaData {
+        expiresAtBlock: number;
+        owner: `0x${string}`;
+        numericAnnotations: NumericAnnotation[];
+        stringAnnotations: StringAnnotation[];
+      }
+
+      // method: "golembase_getEntityMetaData"
+      // params: [ entityId: `0x${string}` ]
+      // result: EntityMetaData
+      declare function golembase_getEntityMetaData(
+        entityId: `0x${string}`
+      ): Promise<EntityMetaData>;
+  guidance:
+    - Use with getEntitiesToExpireAtBlock to track upcoming expirations. :contentReference[oaicite:23]{index=23}
+    - Treat annotation values as exact matches; numeric values are unsigned integers. :contentReference[oaicite:24]{index=24}
+  example:
+    lang: shell
+    code: |
+      curl http://localhost:8545 -H 'Content-Type: application/json' -d '{
+        "jsonrpc":"2.0","id":2,
+        "method":"golembase_getEntityMetaData",
+        "params":["0x<entityId>"]
+      }'
+  ```
+
+  golembase\_getEntitiesToExpireAtBlock:
+  kind: function
+  summary: List entity IDs scheduled to expire at the given block number.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitiestoexpireatblock"
+  code: |
+  // method: "golembase\_getEntitiesToExpireAtBlock"
+  // params: \[ blockNumber: number ]
+  // result: `0x${string}`\[]  // entity IDs
+  declare function golembase\_getEntitiesToExpireAtBlock(
+  blockNumber: number
+  ): Promise<`0x${string}`\[]>;
+  guidance:
+  \- Monitor expiring entities and proactively Extend BTL when needed.&#x20;
+  \- Use with chain head subscriptions (ws) for continuous TTL management.
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":3,
+  "method":"golembase\_getEntitiesToExpireAtBlock",
+  "params":\[123456]
+  }'
+
+  golembase\_getEntitiesForStringAnnotationValue:
+  kind: function
+  summary: Return entity IDs that carry a specific string annotation key=value.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitiesforstringannotationvalue"
+  code: |
+  // method: "golembase\_getEntitiesForStringAnnotationValue"
+  // params: \[ annotationKey: string, annotationValue: string ]
+  // result: `0x${string}`\[]  // entity IDs
+  declare function golembase\_getEntitiesForStringAnnotationValue(
+  annotationKey: string,
+  annotationValue: string
+  ): Promise<`0x${string}`\[]>;
+  guidance:
+  \- Case‑sensitive, exact matching on values; pre‑filter before full scans.&#x20;
+  \- Useful to collect IDs for subsequent deletes/updates in a batch.&#x20;
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":4,
+  "method":"golembase\_getEntitiesForStringAnnotationValue",
+  "params":\["type","Offer"]
+  }'
+
+  golembase\_getEntitiesForNumericAnnotationValue:
+  kind: function
+  summary: Return entity IDs that carry a specific numeric annotation key=value.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitiesfornumericannotationvalue"
+  code: |
+  // method: "golembase\_getEntitiesForNumericAnnotationValue"
+  // params: \[ annotationKey: string, annotationValue: number ]
+  // result: `0x${string}`\[]  // entity IDs
+  declare function golembase\_getEntitiesForNumericAnnotationValue(
+  annotationKey: string,
+  annotationValue: number
+  ): Promise<`0x${string}`\[]>;
+  guidance:
+  \- Numeric values must be unsigned integers; avoid quotes when sending via JSON‑RPC.&#x20;
+  \- Ideal for range bucketing when combined with client‑side filters.
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":5,
+  "method":"golembase\_getEntitiesForNumericAnnotationValue",
+  "params":\["version",2]
+  }'
+
+  golembase\_getEntityCount:
+  kind: function
+  summary: Return the total number of stored entities.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitycount"
+  code: |
+  // method: "golembase\_getEntityCount"
+  // params: \[]
+  // result: number
+  declare function golembase\_getEntityCount(): Promise<number>;
+  guidance:
+  \- Use for sanity checks or pagination planning; combine with getAllEntityKeys for sampling.&#x20;
+  \- Expect changing results on active chains; don’t cache aggressively.
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":6,
+  "method":"golembase\_getEntityCount",
+  "params":\[]
+  }'
+
+  golembase\_getAllEntityKeys:
+  kind: function
+  summary: Return all entity IDs (key hashes) currently stored.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getallentitykeys"
+  code: |
+  // method: "golembase\_getAllEntityKeys"
+  // params: \[]
+  // result: `0x${string}`\[]  // entity IDs
+  declare function golembase\_getAllEntityKeys(): Promise<`0x${string}`\[]>;
+  guidance:
+  \- Convenient for small dev chains; on large sets, prefer indexed queries.&#x20;
+  \- Pair with getStorageValue/getEntityMetaData to materialize objects.&#x20;
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":7,
+  "method":"golembase\_getAllEntityKeys",
+  "params":\[]
+  }'
+
+  golembase\_getEntitiesOfOwner:
+  kind: function
+  summary: Return entity IDs belonging to a specific owner address.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_getentitiesofowner"
+  code: |
+  // method: "golembase\_getEntitiesOfOwner"
+  // params: \[ owner: `0x${string}` ]
+  // result: `0x${string}`\[]  // entity IDs
+  declare function golembase\_getEntitiesOfOwner(
+  owner: `0x${string}`
+  ): Promise<`0x${string}`\[]>;
+  guidance:
+  \- Handy for per‑tenant listings and cleanup tools.&#x20;
+  \- Owner address is returned by getEntityMetaData as well.&#x20;
+  example:
+  lang: shell
+  code: |
+  curl [http://localhost:8545](http://localhost:8545) -H 'Content-Type: application/json' -d '{
+  "jsonrpc":"2.0","id":8,
+  "method":"golembase\_getEntitiesOfOwner",
+  "params":\["0x<owner>"]
+  }'
+
+  golembase\_queryEntities:
+  kind: function
+  summary: Free‑form query returning \[{key, value(Base64)}] pairs using annotation predicates.
+  definition:
+  lang: typescript
+  source: "dev/json-rpc-api.html#golembase\_queryentities"
+  code: |
+  export interface QueryHit {
+  key: `0x${string}`;   // entity ID
+  value: string;        // Base64-encoded payload
+  }
+
+  ```
+      // method: "golembase_queryEntities"
+      // params: [ query: string ]
+      // result: QueryHit[]
+      // Query language supports: equality on annotations, &&, ||, parentheses.
+      // Numeric literals are unsigned integers.
+      declare function golembase_queryEntities(query: string): Promise<QueryHit[]>;
+  guidance:
+    - Use quotes for string literals; numeric literals must be unsigned integers. :contentReference[oaicite:34]{index=34}
+    - Decode Base64 ‘value’ for each hit; combine with getEntityMetaData when you also need TTL/owner. 
+  example:
+    lang: shell
+    code: |
+      curl http://localhost:8545 -H 'Content-Type: application/json' -d '{
+        "jsonrpc":"2.0","id":9,
+        "method":"golembase_queryEntities",
+        "params":["(type = \"Offer\" || type = \"Demand\") && version = 2"]
+      }'
+  ```
+
+common\_workflows:
+
+* title: Create an entity then fetch its payload & metadata
+  steps:
+
+  * Build a CreateObject with BTL (hex), payload bytes, and annotations (as bytes).
+  * RLP‑encode \[ \[CreateObject], \[], \[], \[] ] and place into tx.data.
+  * Send eth\_sendTransaction to 0x…60138453 and wait for receipt.
+  * Call golembase\_getStorageValue(entityId) and Base64‑decode.
+  * Call golembase\_getEntityMetaData(entityId) to inspect TTL/owner/annotations.
+* title: Renew TTL for soon‑expiring entities
+  steps:
+
+  * Determine the target block window.
+  * Call golembase\_getEntitiesToExpireAtBlock(blockNumber).
+  * Build ExtendItem arrays for the returned IDs; RLP‑encode in “extends”.
+  * Send a single eth\_sendTransaction to renew many at once.&#x20;
+* title: Delete by annotation
+  steps:
+
+  * Lookup IDs with golembase\_getEntitiesForStringAnnotationValue or …Numeric….
+  * Put the IDs into the Delete list of the RLP top‑level array.
+  * Send one batched mutation; verify deletion in receipt logs.
+* title: Owner inventory
+  steps:
+
+  * Call golembase\_getEntitiesOfOwner(owner).
+  * For each ID, fetch metadata and/or payload as needed.
+  * Use batch patterns or concurrency carefully to avoid RPC limits.&#x20;
+* title: Full‑text‑like filtering via query language
+  steps:
+
+  * Compose a query with equality predicates on annotations; combine with &&, || and parentheses.
+  * Call golembase\_queryEntities(query).
+  * Decode Base64 values; optionally cross‑check with getEntityMetaData.&#x20;
+* title: Enumerate & sample all entities (dev chains)
+  steps:
+
+  * Call golembase\_getEntityCount to gauge size.
+  * If modest, call golembase\_getAllEntityKeys and then fetch values/metadata per key.&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: Query returns payload but text looks garbled after decoding.
+  cause: You forgot to Base64‑decode (or decoded twice); payloads are Base64 on wire.
+  fix: Decode exactly once from Base64 to bytes, then interpret bytes (e.g., UTF‑8).&#x20;
+* symptom: Update appeared to “erase” annotations.
+  cause: UpdateObject replaces the whole annotation set; missing keys are treated as removed.
+  fix: When updating, re‑send the full set of annotations or use Extend when only TTL changes.&#x20;
+* symptom: Mutation tx sent to a normal account address had no effect.
+  cause: Mutations must target the storage precompile address.
+  fix: Set tx.to to 0x0000000000000000000000000000000060138453.&#x20;
+* symptom: getEntitiesForNumericAnnotationValue fails or returns empty unexpectedly.
+  cause: Numeric values must be unsigned integers; quoted numbers are treated as strings and won’t match.
+  fix: Send numeric JSON (no quotes).&#x20;
+
+faq:
+
+* q: What is an “entity ID”?
+  a: It’s the 0x‑hex hash of the entity’s key; use it with storage/metadata read endpoints.&#x20;
+* q: How do I translate BTL into seconds?
+  a: Approximate seconds ≈ BTL × 2s on Golem‑Base testnets; BTL itself is hex blocks.&#x20;
+* q: Can I mix creates, updates, deletes, and extends in one transaction?
+  a: Yes—RLP has four arrays in fixed order; batch for efficiency.&#x20;
+* q: Why does golembase\_queryEntities return Base64 in “value”?
+  a: The DB‑Chain stores raw bytes; JSON‑RPC transports payloads as Base64 for safety. Decode client‑side.&#x20;
+
+external\_resources:
+
+* label: JSON‑RPC 2.0 Specification
+  url: [https://www.jsonrpc.org/specification](https://www.jsonrpc.org/specification)
+* label: Golem‑Base TypeScript SDK
+  url: [https://github.com/Golem-Base/typescript-sdk](https://github.com/Golem-Base/typescript-sdk)
+* label: Golem‑Base Python SDK
+  url: [https://github.com/Golem-Base/python-sdk](https://github.com/Golem-Base/python-sdk)
+

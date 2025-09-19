@@ -1,0 +1,371 @@
+meta:
+spec\_name: fs-upload-dapp/hooks
+spec\_version: "0.3.0"
+generated: "2025-09-18"
+library\_version: ">=0.0.0"
+language: javascript
+homepage: [https://github.com/FIL-Builders/fs-upload-dapp](https://github.com/FIL-Builders/fs-upload-dapp)
+tags:
+\- filecoin
+\- synapse
+\- web3
+\- react
+\- hooks
+\- storage
+purpose: >
+Expert Knowledge Pack for the fs‑upload‑dapp hook surface and configuration
+that demonstrates paying for Filecoin storage with USDFC, uploading files
+through Synapse SDK, and inspecting/Downloading datasets. Focused on the app
+layer APIs actually presented in the tutorial, with authoritative contracts
+extracted from the provided documentation and usage snippets.&#x20;
+guiding\_principles:
+\- Budget storage by setting both the epoch rate and the lockup allowance; they work together to automate and guarantee payments.&#x20;
+\- Always run a preflight balance check before attempting uploads so UX fails fast and clearly.&#x20;
+\- Track wallet vs. Synapse escrow balances separately; top‑ups go to the Synapse contract, not just the wallet.&#x20;
+\- Convert numeric allowance inputs to BigInt before passing into payment mutations to avoid precision/decimals pitfalls.&#x20;
+\- Monitor persistenceDaysLeft against your configured minDaysThreshold to prompt timely renewals.&#x20;
+\- Use dataset resolution (find or create) prior to upload so pieces are registered for PDP verification and later retrieval.&#x20;
+\- Enable CDN when you need faster retrievals and can accept higher cost.&#x20;
+design\_notes: >
+This pack scopes to the fs‑upload‑dapp tutorial’s public surface: custom hooks
+(balances, payment, upload, datasets, download) and a small configuration
+object. Contracts are “lightly normalized” from the tutorial’s usage blocks
+where definitions aren’t shown verbatim; each symbol links back to the
+specific snippet or section used. Schema conformance follows Open Agent Spec
+v0.3’s new `definition` requirement. Sources: Open Agent Spec v0.3 schema and
+the combined tutorial content with code excerpts. &#x20;
+
+groups:
+
+* name: Hooks & Config
+  exports:
+
+  * useBalances
+  * usePayment
+  * useFileUpload
+  * useDatasets
+  * useDownloadPiece
+  * config
+    symbols:
+    useBalances:
+    kind: hook
+    summary: React hook returning wallet/Synapse balances, derived storage metrics, and loading/error state.&#x20;
+    definition:
+    lang: typescript
+    source: "combined.md ▸ Balance & Storage Management (usage block) "
+    code: |
+    // Inferred from documented usage
+    export function useBalances(): {
+    data: {
+    filBalance: unknown;
+    usdfcBalance: unknown;
+    filecoinWarmStorageServiceBalance: unknown;
+    persistenceDaysLeft: number;
+    isSufficient: boolean;
+    rateNeeded: string | number;   // converted to BigInt by caller
+    lockUpNeeded: string | number; // converted to BigInt by caller
+    depositNeeded: string | number; // converted to BigInt by caller
+    };
+    isLoading: boolean;
+    isError: boolean;
+    error?: unknown;
+    };
+    guidance:
+
+    * Use the `isSufficient` flag and `persistenceDaysLeft` to drive renew/top‑up prompts in UI.&#x20;
+    * Treat `rateNeeded`, `lockUpNeeded`, and `depositNeeded` as numeric‑like values and convert to `BigInt` at the callsite for payments.&#x20;
+    * Distinguish FIL/USDFC wallet balances from the Synapse escrow balance; both must cover planned usage.&#x20;
+      example:
+      lang: javascript
+      description: Show days left and whether a renewal is needed.
+      code: |
+      import React from "react";
+      import { useBalances } from "./hooks/useBalances";
+
+      export default function StorageStatus() {
+      const { data, isLoading, isError } = useBalances();
+      if (isLoading) return <p>Loading…</p>;
+      if (isError)  return <p>Failed to load balances</p>;
+
+      const { persistenceDaysLeft, isSufficient } = data;
+      return ( <div> <p>Days remaining: {persistenceDaysLeft}</p>
+      {!isSufficient && <strong>Top‑up recommended</strong>} </div>
+      );
+      }
+
+  usePayment:
+  kind: hook
+  summary: React hook exposing a mutation to approve/deposit USDFC and set per‑epoch and lockup allowances.&#x20;
+  definition:
+  lang: typescript
+  source: "combined.md ▸ Payment handling via usePayment (code) "
+  code: |
+  // Inferred from documented usage
+  type PaymentInput = {
+  lockupAllowance: bigint;
+  epochRateAllowance: bigint;
+  depositAmount: bigint;
+  };
+
+  ```
+      export function usePayment(): {
+        mutation: {
+          mutateAsync: (input: PaymentInput) => Promise<unknown>;
+        };
+        status: string; // e.g., "idle" | "pending" | "success" | "error"
+      };
+  guidance:
+    - Always `BigInt(...)` your numeric inputs before calling `mutateAsync` to avoid rounding issues. :contentReference[oaicite:17]{index=17}
+    - Set both allowances: **rate** (per‑epoch spend cap) and **lockup** (total reserved), per your capacity and persistence policy. :contentReference[oaicite:18]{index=18}
+    - Drive button disabled/loading states off the hook’s `status` to prevent duplicate submissions. :contentReference[oaicite:19]{index=19}
+  example:
+    lang: javascript
+    code: |
+      import React from "react";
+      import { useBalances } from "./hooks/useBalances";
+      import { usePayment } from "./hooks/usePayment";
+
+      export function RenewStorage() {
+        const { data } = useBalances();
+        const { mutation: pay, status } = usePayment();
+
+        const submit = async () => {
+          await pay.mutateAsync({
+            lockupAllowance: BigInt(data.lockUpNeeded),
+            epochRateAllowance: BigInt(data.rateNeeded),
+            depositAmount: BigInt(data.depositNeeded),
+          });
+        };
+
+        return (
+          <button onClick={submit} disabled={status === "pending"}>
+            {status === "pending" ? "Processing…" : "Authorize & Deposit"}
+          </button>
+        );
+      }
+  ```
+
+  useFileUpload:
+  kind: hook
+  summary: React hook that performs preflight checks, resolves or creates a dataset, and uploads a file with PDP registration.&#x20;
+  definition:
+  lang: typescript
+  source: "combined.md ▸ File Uploads with Synapse SDK (usage block) "
+  code: |
+  // Inferred from documented usage
+  export function useFileUpload(): {
+  uploadFileMutation: {
+  mutateAsync: (file: File) => Promise<unknown>;
+  };
+  progress: number;  // 0..1
+  status: string;    // e.g., "idle" | "pending" | "success" | "error"
+  uploadedInfo?: unknown;
+  };
+  guidance:
+  \- Call a **preflight** check first to ensure balance and allowances are in place; surface actionable errors to the user.&#x20;
+  \- Ensure dataset resolution (find or create) completes before sending bytes so the piece is registered for PDP.&#x20;
+  \- Use the `progress` field to render upload progress and prevent navigation during transfers.&#x20;
+  example:
+  lang: javascript
+  code: |
+  import React, { useState } from "react";
+  import { useFileUpload } from "./hooks/useFileUpload";
+
+  ```
+      export function Uploader() {
+        const [file, setFile] = useState(null);
+        const { uploadFileMutation, progress, status } = useFileUpload();
+
+        const onChange = e => setFile(e.target.files?.[0] ?? null);
+        const onUpload = async () => {
+          if (file) await uploadFileMutation.mutateAsync(file);
+        };
+
+        return (
+          <div>
+            <input type="file" onChange={onChange} />
+            <button onClick={onUpload} disabled={!file || status === "pending"}>
+              {status === "pending" ? `Uploading ${Math.round(progress*100)}%` : "Upload"}
+            </button>
+          </div>
+        );
+      }
+  ```
+
+  useDatasets:
+  kind: hook
+  summary: React hook to list datasets tied to the current address, including provider details and piece metadata when available.&#x20;
+  definition:
+  lang: typescript
+  source: "combined.md ▸ Data Set Management & Inspection (usage block) "
+  code: |
+  // Inferred from documented usage
+  export type Piece = { pieceCid: string };
+  export type DatasetDetails = { pieces?: Piece\[] };
+  export type Dataset = { railId: string; details?: DatasetDetails };
+
+  ```
+      export function useDatasets(): {
+        data: { datasets: Dataset[] };
+        isLoading: boolean;
+        isError?: boolean;
+        error?: unknown;
+      };
+  guidance:
+    - Build a quick lookup map of `railId → pieceCid[]` for rendering and download actions. :contentReference[oaicite:27]{index=27}
+    - Handle the case where `details` or `pieces` are undefined while provider APIs are still populating. :contentReference[oaicite:28]{index=28}
+  example:
+    lang: javascript
+    code: |
+      import React from "react";
+      import { useDatasets } from "./hooks/useDatasets";
+
+      export function DatasetsTable() {
+        const { data, isLoading } = useDatasets();
+        if (isLoading) return <p>Loading datasets…</p>;
+
+        const rows = data.datasets.flatMap(d =>
+          (d.details?.pieces ?? []).map(p => ({ railId: d.railId, cid: p.pieceCid }))
+        );
+
+        return (
+          <ul>
+            {rows.map(({ railId, cid }) => (
+              <li key={`${railId}:${cid}`}>{railId} — {cid}</li>
+            ))}
+          </ul>
+        );
+      }
+  ```
+
+  useDownloadPiece:
+  kind: hook
+  summary: React hook returning a mutation that downloads a file from a storage provider by piece CID and filename.&#x20;
+  definition:
+  lang: typescript
+  source: "combined.md ▸ Downloading a file via useDownloadPiece (code) "
+  code: |
+  // Inferred from documented usage
+  export function useDownloadPiece(pieceCID: string, filename: string): {
+  downloadMutation: {
+  mutateAsync: () => Promise<void>;
+  };
+  };
+  guidance:
+  \- Pass a filename with the correct extension so the browser infers the right MIME type on save/open.&#x20;
+  \- Couple this hook with dataset listings so users can click a piece CID to download directly.&#x20;
+  example:
+  lang: javascript
+  code: |
+  import React from "react";
+  import { useDownloadPiece } from "./hooks/useDownloadPiece";
+
+  ```
+      export function DownloadButton({ cid, name }) {
+        const { downloadMutation } = useDownloadPiece(cid, name);
+        const onClick = async () => { await downloadMutation.mutateAsync(); };
+        return <button onClick={onClick}>Download</button>;
+      }
+  ```
+
+  config:
+  kind: constant
+  summary: App‑level storage/payment configuration used by metrics and UI logic (capacity, persistence, threshold, CDN).&#x20;
+  definition:
+  lang: typescript
+  source: "combined.md ▸ Storage Configuration (exact excerpt) "
+  code: |
+  export const config = {
+  storageCapacity: 10, // GB, maximum storage capacity
+  persistencePeriod: 30, // days, data persistence duration
+  minDaysThreshold: 10, // days, threshold for low-balance warnings
+  // Whether to use CDN for the storage for faster retrieval
+  withCDN: true,
+  };
+  guidance:
+  \- Increasing `storageCapacity` and `persistencePeriod` raises both per‑epoch and lockup requirements; reflect this in UI cost estimates.&#x20;
+  \- Use `minDaysThreshold` to gate renewals and notifications; default tutorial value is 10 days.&#x20;
+  \- Toggle `withCDN` for faster retrievals when latency matters.&#x20;
+  example:
+  lang: javascript
+  code: |
+  import { config } from "./config";
+
+  ```
+      // Increase capacity to 50 GB and extend persistence to 60 days
+      config.storageCapacity = 50;
+      config.persistencePeriod = 60;
+  ```
+
+common\_workflows:
+
+* title: Fund & authorize storage for the next 30 days
+  steps:
+
+  * Read balances and required amounts from `useBalances()`.&#x20;
+  * Convert `rateNeeded`, `lockUpNeeded`, and `depositNeeded` to `BigInt`.&#x20;
+  * Call `usePayment().mutation.mutateAsync({ epochRateAllowance, lockupAllowance, depositAmount })`.&#x20;
+  * Verify `persistenceDaysLeft` exceeds `minDaysThreshold`.&#x20;
+* title: Upload a file (with PDP registration)
+  steps:
+
+  * Run preflight balance checks.&#x20;
+  * Resolve or create the target dataset.&#x20;
+  * Kick off `useFileUpload().uploadFileMutation.mutateAsync(file)` and display progress.&#x20;
+* title: Inspect datasets and collect piece CIDs
+  steps:
+
+  * Call `useDatasets()` and list `datasets`.&#x20;
+  * Extract `dataset.details.pieces[].pieceCid` where present.&#x20;
+* title: Download a stored piece by CID
+  steps:
+
+  * Instantiate `useDownloadPiece(pieceCID, filename)`.&#x20;
+  * Invoke `downloadMutation.mutateAsync()` on click.&#x20;
+* title: Optimize for low latency retrieval
+  steps:
+
+  * Enable `config.withCDN = true`.&#x20;
+  * Communicate higher cost vs. speed trade‑off to users.&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: Payment mutation stays pending or fails silently.
+  cause: Wallet not connected or wrong network selected.
+  fix: Prompt wallet connect and ensure Filecoin Calibration/Mainnet per app setup; then retry.&#x20;
+* symptom: Upload preflight fails with “insufficient balance.”
+  cause: Synapse escrow underfunded relative to target persistence and capacity.
+  fix: Use `useBalances()` to read `depositNeeded` and run the payment mutation with that amount.&#x20;
+* symptom: Dataset list shows but pieces array is empty.
+  cause: Provider details still loading or dataset has no registered pieces yet.
+  fix: Handle undefined `details?.pieces` and poll/refresh after upload completes.&#x20;
+* symptom: Downloaded file opens with wrong app/encoding.
+  cause: Filename extension didn’t match content type, so browser guessed poorly.
+  fix: Supply the correct `filename` when calling `useDownloadPiece`.&#x20;
+
+faq:
+
+* q: Why do I need both a rate allowance and a lockup allowance?
+  a: The rate allowance caps per‑epoch spend, while the lockup reserves enough funds up front to cover your full persistence period; both are required for uninterrupted PDP service.&#x20;
+* q: Where should I look to decide when to top‑up?
+  a: Read `persistenceDaysLeft` from `useBalances()` and compare to `config.minDaysThreshold`; prompt users when days left is below the threshold.&#x20;
+* q: Do I need to create a dataset manually before uploads?
+  a: No. The documented flow resolves an existing dataset or creates one as part of the upload process.&#x20;
+
+external\_resources:
+
+* label: Live Demo
+  url: [https://fs-upload-dapp.netlify.app/](https://fs-upload-dapp.netlify.app/)
+* label: Source Code (fs-upload-dapp)
+  url: [https://github.com/FIL-Builders/fs-upload-dapp](https://github.com/FIL-Builders/fs-upload-dapp)
+* label: Synapse SDK (npm)
+  url: [https://www.npmjs.com/package/@filoz/synapse-sdk](https://www.npmjs.com/package/@filoz/synapse-sdk)
+* label: PDP Design
+  url: [https://github.com/FilOzone/pdp/blob/main/docs/design.md](https://github.com/FilOzone/pdp/blob/main/docs/design.md)
+* label: Payments Contracts
+  url: [https://github.com/FilOzone/filecoin-services-payments/blob/main/README.md](https://github.com/FilOzone/filecoin-services-payments/blob/main/README.md)
+* label: FilecoinWarmStorageService Contracts
+  url: [https://github.com/FilOzone/filecoin-services/blob/main/README.md](https://github.com/FilOzone/filecoin-services/blob/main/README.md)
+* label: USDFC Stablecoin Docs
+  url: [https://docs.secured.finance/usdfc-stablecoin/getting-started](https://docs.secured.finance/usdfc-stablecoin/getting-started)
+

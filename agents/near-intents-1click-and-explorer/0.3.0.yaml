@@ -1,0 +1,451 @@
+meta:
+spec\_name: near-intents/1click-and-explorer
+spec\_version: 0.3.0
+library\_version: v0
+generated: '2025-09-18'
+purpose: Senior‑developer reference for NEAR Intents distribution‑channel APIs: the 1Click Swap REST API for creating and tracking swaps, and the Intents Explorer read‑only API for paginating historical 1Click transactions.
+guiding\_principles:
+\- Always fetch a dry quote first (dry=true) to validate inputs and preview pricing before generating a deposit address; only commit with dry=false after user confirmation.
+\- Treat the depositAddress returned by /v0/quote as the primary key for a swap; store it and use it for /v0/status and optional /v0/deposit/submit.
+\- Authenticate with a JWT for reliable rate limits and to avoid extra fees in production environments; assume bearerAuth is required for Explorer API.
+\- Choose depositType/recipientType carefully (ORIGIN\_CHAIN vs INTENTS) based on user flow; mismatches are a common integration bug.
+\- Set deadline conservatively beyond expected finality on the origin chain (e.g., \~1h+ for BTC during congestion); expired deadlines trigger refunds.
+\- Handle lifecycle states idempotently; poll /v0/status until a terminal state (SUCCESS, REFUNDED, FAILED) and surface INCOMPLETE\_DEPOSIT with clear recovery steps.
+\- When backfilling analytics, use Explorer API pagination (lastDepositAddress + direction or /transactions-pages) and filter by statuses and time windows.
+\- Normalize token precision using decimals from /v0/tokens; always send amounts in smallest units (strings to avoid JS bigint rounding).
+design\_notes: Contracts and parameter shapes are extracted from the official NEAR Intents docs for 1Click API and Intents Explorer. Groups mirror product areas: '1Click API (v0)' for swap execution and 'Intents Explorer API (v0)' for historical reads. Definitions are minimal OpenAPI fragments that match the documented routes and fields; examples use standard fetch with Bearer JWT. Optional 1Click parameters such as virtualChainRecipient/virtualChainRefundRecipient and customRecipientMsg are included where documented. See sources for details and full schemas. ([NEAR Intents][1])
+language: http+json
+homepage: [https://docs.near-intents.org/](https://docs.near-intents.org/)
+tags: \[near-intents, defuse, swap, cross-chain, api, rest]
+
+groups:
+
+* name: 1Click API (v0)
+  exports: \[getSupportedTokens, requestQuote, submitDepositTx, getSwapStatus]
+  symbols:
+  getSupportedTokens:
+  kind: function
+  summary: List tokens currently supported by 1Click for swaps. ([NEAR Intents][1])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → 1Click API
+  code: |
+  paths:
+  /v0/tokens:
+  get:
+  summary: Get supported tokens
+  servers: \[{ url: [https://1click.chaindefuser.com](https://1click.chaindefuser.com) }]
+  responses:
+  '200':
+  description: Array of supported tokens
+  content:
+  application/json:
+  schema:
+  type: array
+  items:
+  type: object
+  properties:
+  assetId: { type: string }
+  decimals: { type: integer }
+  blockchain: { type: string }
+  symbol: { type: string }
+  price: { type: string }
+  priceUpdatedAt: { type: string, format: date-time }
+  contractAddress: { type: string }
+  guidance:
+  \- Cache the token list and refresh periodically; do not call it on every quote.
+  \- Use assetId and decimals from this endpoint to build correct /v0/quote payloads.
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const res = await fetch("[https://1click.chaindefuser.com/v0/tokens](https://1click.chaindefuser.com/v0/tokens)");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const tokens = await res.json();
+  console.log(tokens\[0]);
+  }
+  main().catch(console.error);
+  since: v0
+
+  requestQuote:
+  kind: function
+  summary: Create a swap quote; set dry=true to preview or dry=false to allocate a depositAddress. ([NEAR Intents][1])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → 1Click API
+  code: |
+  paths:
+  /v0/quote:
+  post:
+  summary: Request a swap quote
+  servers: \[{ url: [https://1click.chaindefuser.com](https://1click.chaindefuser.com) }]
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  required:
+  \[dry, swapType, slippageTolerance, originAsset, depositType, destinationAsset, amount, refundTo, refundType, recipient, recipientType, deadline]
+  properties:
+  dry: { type: boolean, description: "If true, no deposit address is created" }
+  swapType: { type: string, enum: \[EXACT\_INPUT, EXACT\_OUTPUT] }
+  slippageTolerance: { type: number, description: "Basis points, e.g. 100 = 1%" }
+  originAsset: { type: string }
+  depositType: { type: string, enum: \[ORIGIN\_CHAIN, INTENTS] }
+  destinationAsset: { type: string }
+  amount: { type: string, description: "Smallest unit" }
+  refundTo: { type: string }
+  refundType: { type: string, enum: \[ORIGIN\_CHAIN, INTENTS] }
+  recipient: { type: string }
+  recipientType: { type: string, enum: \[DESTINATION\_CHAIN, INTENTS] }
+  deadline: { type: string, format: date-time }
+  referral: { type: string }
+  quoteWaitingTimeMs: { type: number, default: 3000 }
+  appFees:
+  type: array
+  items:
+  type: object
+  properties:
+  recipient: { type: string }
+  fee: { type: integer, description: "basis points" }
+  virtualChainRecipient: { type: string }
+  virtualChainRefundRecipient: { type: string }
+  customRecipientMsg: { type: string, description: "HIGHLY EXPERIMENTAL" }
+  responses:
+  '200':
+  description: Quote (and depositAddress when dry=false)
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  timestamp: { type: string, format: date-time }
+  signature: { type: string }
+  quoteRequest: { type: object }
+  quote:
+  type: object
+  properties:
+  depositAddress: { type: string }
+  amountIn: { type: string }
+  amountOut: { type: string }
+  deadline: { type: string, format: date-time }
+  timeWhenInactive: { type: string, format: date-time }
+  timeEstimate: { type: integer }
+  guidance:
+  \- Use strings for big integer amounts to avoid precision loss in JavaScript.
+  \- Start with dry=true; only re‑POST with dry=false after user confirms price and slippage.
+  \- Set deadline safely past expected origin‑chain finality; for BTC consider \~1h or more during high fees. ([NEAR Intents][1])
+  \- If you integrate virtual chains or special NEAR transfers, prefer defaults first; customRecipientMsg is experimental and easy to misuse. ([NEAR Intents][2])
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const token = process.env.NEAR\_INTENTS\_JWT || "";
+  const quoteReq = {
+  dry: true,
+  swapType: "EXACT\_INPUT",
+  slippageTolerance: 100,
+  originAsset: "nep141\:wrap.near",
+  depositType: "ORIGIN\_CHAIN",
+  destinationAsset: "nep141\:usdc.fakesol",
+  amount: "1000000000000000000",
+  refundTo: "you.near",
+  refundType: "ORIGIN\_CHAIN",
+  recipient: "dest.near",
+  recipientType: "DESTINATION\_CHAIN",
+  deadline: new Date(Date.now() + 60\_000).toISOString()
+  };
+  const res = await fetch("[https://1click.chaindefuser.com/v0/quote](https://1click.chaindefuser.com/v0/quote)", {
+  method: "POST",
+  headers: { "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  body: JSON.stringify(quoteReq)
+  });
+  const body = await res.json();
+  console.log(body.quote?.depositAddress ?? "(dry run — no deposit address)");
+  }
+  main().catch(console.error);
+  since: v0
+
+  submitDepositTx:
+  kind: function
+  summary: Optionally notify 1Click of the deposit transaction hash to accelerate processing. ([NEAR Intents][1])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → 1Click API
+  code: |
+  paths:
+  /v0/deposit/submit:
+  post:
+  summary: Submit deposit transaction hash
+  servers: \[{ url: [https://1click.chaindefuser.com](https://1click.chaindefuser.com) }]
+  requestBody:
+  required: true
+  content:
+  application/json:
+  schema:
+  type: object
+  required: \[txHash, depositAddress]
+  properties:
+  txHash: { type: string }
+  depositAddress: { type: string }
+  responses:
+  '200':
+  description: Acknowledged with latest status payload
+  content:
+  application/json:
+  schema: { type: object }
+  guidance:
+  \- This call is optional; use it to reduce latency after broadcasting a deposit tx.
+  \- Keep using /v0/status as the source of truth for lifecycle state.
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const token = process.env.NEAR\_INTENTS\_JWT || "";
+  const res = await fetch("[https://1click.chaindefuser.com/v0/deposit/submit](https://1click.chaindefuser.com/v0/deposit/submit)", {
+  method: "POST",
+  headers: { "content-type": "application/json", Authorization: `Bearer ${token}` },
+  body: JSON.stringify({ txHash: "0xabc123", depositAddress: "0xDEPOSIT..." })
+  });
+  console.log(await res.json());
+  }
+  main().catch(console.error);
+  since: v0
+
+  getSwapStatus:
+  kind: function
+  summary: Fetch current swap status and details by depositAddress. ([NEAR Intents][1])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → 1Click API
+  code: |
+  paths:
+  /v0/status:
+  get:
+  summary: Get swap status
+  servers: \[{ url: [https://1click.chaindefuser.com](https://1click.chaindefuser.com) }]
+  parameters:
+  \- in: query
+  name: depositAddress
+  schema: { type: string }
+  required: true
+  responses:
+  '200':
+  description: Status payload
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  quoteResponse: { type: object }
+  status:
+  { type: string,
+  enum: \[PENDING\_DEPOSIT, PROCESSING, SUCCESS, INCOMPLETE\_DEPOSIT, REFUNDED, FAILED, KNOWN\_DEPOSIT\_TX] }
+  guidance:
+  \- Poll with exponential backoff; status transitions are asynchronous.
+  \- Treat REFUNDED and FAILED as terminal; surface INCOMPLETE\_DEPOSIT with instructions to top‑up or retry. ([NEAR Intents][2])
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const token = process.env.NEAR\_INTENTS\_JWT || "";
+  const depositAddress = process.argv\[2];
+  if (!depositAddress) throw new Error("usage: node get-status.js <depositAddress>");
+  const res = await fetch(`https://1click.chaindefuser.com/v0/status?depositAddress=${encodeURIComponent(depositAddress)}`, {
+  headers: { Authorization: `Bearer ${token}` }
+  });
+  console.log(await res.json());
+  }
+  main().catch(console.error);
+  since: v0
+
+* name: Intents Explorer API (v0)
+  exports: \[getTransactions, getTransactionsPages]
+  symbols:
+  getTransactions:
+  kind: function
+  summary: Read-only history: fetch a page of 1Click transactions with cursor-style pagination via lastDepositAddress + direction. ([NEAR Intents][3])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → Intents Explorer API
+  code: |
+  paths:
+  /api/v0/transactions:
+  get:
+  summary: Get transactions
+  servers: \[{ url: [https://explorer.near-intents.org](https://explorer.near-intents.org) }]
+  security: \[{ bearerAuth: \[] }]
+  parameters:
+  \- { in: query, name: numberOfTransactions, schema: { type: number, minimum: 1, maximum: 1000 } }
+  \- { in: query, name: lastDepositAddress, schema: { type: string } }
+  \- { in: query, name: direction, schema: { type: string, enum: \[next, prev] } }
+  \- { in: query, name: search, schema: { type: string } }
+  \- { in: query, name: fromChainId, schema: { type: string, enum: \[near, eth, base, arb, btc, sol, ton, doge, xrp, zec, gnosis, bera, bsc, pol, tron, sui, op, avax, cardano, stellar, aptos] } }
+  \- { in: query, name: fromTokenId, schema: { type: string } }
+  \- { in: query, name: toChainId, schema: { type: string, enum: \[near, eth, base, arb, btc, sol, ton, doge, xrp, zec, gnosis, bera, bsc, pol, tron, sui, op, avax, cardano, stellar, aptos] } }
+  \- { in: query, name: toTokenId, schema: { type: string } }
+  \- { in: query, name: referral, schema: { type: string } }
+  \- { in: query, name: affiliate, schema: { type: string } }
+  \- { in: query, name: statuses, schema: { type: string, description: "CSV of statuses" } }
+  \- { in: query, name: showTestTxs, schema: { type: string } }
+  \- { in: query, name: minUsdPrice, schema: { type: number, nullable: true } }
+  \- { in: query, name: maxUsdPrice, schema: { type: number, nullable: true } }
+  \- { in: query, name: startTimestamp, schema: { type: string, format: date-time, nullable: true } }
+  \- { in: query, name: startTimestampUnix, schema: { type: number, nullable: true } }
+  \- { in: query, name: endTimestamp, schema: { type: string, format: date-time, nullable: true } }
+  \- { in: query, name: endTimestampUnix, schema: { type: number, nullable: true } }
+  responses:
+  '200':
+  description: Array of transactions
+  content:
+  application/json:
+  schema:
+  type: array
+  items: { type: object }
+  guidance:
+  \- Always pass a Bearer JWT; the Explorer API requires authentication.
+  \- For incremental sync: request a page, keep the top/bottom depositAddress, then request the next page with direction=next/prev until empty. ([NEAR Intents][3])
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const token = process.env.NEAR\_EXPLORER\_JWT;
+  if (!token) throw new Error("Set NEAR\_EXPLORER\_JWT");
+  const url = new URL("[https://explorer.near-intents.org/api/v0/transactions](https://explorer.near-intents.org/api/v0/transactions)");
+  url.searchParams.set("numberOfTransactions", "50");
+  url.searchParams.set("statuses", "SUCCESS,FAILED,REFUNDED,PROCESSING");
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const txs = await res.json();
+  console.log(txs.length, "transactions");
+  }
+  main().catch(console.error);
+  since: v0
+
+  getTransactionsPages:
+  kind: function
+  summary: Read-only history with page numbers: fetch paginated transactions plus total counts. ([NEAR Intents][3])
+  definition:
+  lang: openapi
+  source: docs.near-intents.org → Intents Explorer API
+  code: |
+  paths:
+  /api/v0/transactions-pages:
+  get:
+  summary: Get paginated transactions
+  servers: \[{ url: [https://explorer.near-intents.org](https://explorer.near-intents.org) }]
+  security: \[{ bearerAuth: \[] }]
+  parameters:
+  \- { in: query, name: page, schema: { type: number, minimum: 1 }, required: false }
+  \- { in: query, name: perPage, schema: { type: number, minimum: 1, maximum: 1000 }, required: false }
+  \- { in: query, name: search, schema: { type: string } }
+  \- { in: query, name: fromChainId, schema: { type: string, enum: \[near, eth, base, arb, btc, sol, ton, doge, xrp, zec, gnosis, bera, bsc, pol, tron, sui, op, avax, cardano, stellar, aptos] } }
+  \- { in: query, name: fromTokenId, schema: { type: string } }
+  \- { in: query, name: toChainId, schema: { type: string, enum: \[near, eth, base, arb, btc, sol, ton, doge, xrp, zec, gnosis, bera, bsc, pol, tron, sui, op, avax, cardano, stellar, aptos] } }
+  \- { in: query, name: toTokenId, schema: { type: string } }
+  \- { in: query, name: referral, schema: { type: string } }
+  \- { in: query, name: affiliate, schema: { type: string } }
+  \- { in: query, name: statuses, schema: { type: string } }
+  \- { in: query, name: showTestTxs, schema: { type: string } }
+  \- { in: query, name: minUsdPrice, schema: { type: number, nullable: true } }
+  \- { in: query, name: maxUsdPrice, schema: { type: number, nullable: true } }
+  \- { in: query, name: startTimestamp, schema: { type: string, format: date-time, nullable: true } }
+  \- { in: query, name: startTimestampUnix, schema: { type: number, nullable: true } }
+  \- { in: query, name: endTimestamp, schema: { type: string, format: date-time, nullable: true } }
+  \- { in: query, name: endTimestampUnix, schema: { type: number, nullable: true } }
+  responses:
+  '200':
+  description: Page with data and totals
+  content:
+  application/json:
+  schema:
+  type: object
+  properties:
+  data: { type: array, items: { type: object } }
+  totalPages: { type: number }
+  page: { type: number }
+  perPage: { type: number }
+  total: { type: number }
+  nextPage: { type: number, nullable: true }
+  prevPage: { type: number, nullable: true }
+  guidance:
+  \- Use this endpoint when you need total counts and simple page numbers for UIs; prefer /transactions for cursor-like backfills.
+  \- Keep perPage ≤ 1000; enforce server limits and add retries for HTTP 401/429.
+  example:
+  lang: javascript
+  code: |
+  async function main() {
+  const token = process.env.NEAR\_EXPLORER\_JWT;
+  if (!token) throw new Error("Set NEAR\_EXPLORER\_JWT");
+  const url = new URL("[https://explorer.near-intents.org/api/v0/transactions-pages](https://explorer.near-intents.org/api/v0/transactions-pages)");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("perPage", "50");
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const page = await res.json();
+  console.log(page.total, "total; showing", page.data.length);
+  }
+  main().catch(console.error);
+  since: v0
+
+common\_workflows:
+
+* title: Execute a cross‑chain swap with 1Click
+  steps:
+
+  * Call GET /v0/tokens to map assetId/decimals to user input (optional). ([NEAR Intents][1])
+  * POST /v0/quote with dry=true to preview price and validate parameters; show slippage and timeEstimate to the user. ([NEAR Intents][1])
+  * On confirm, re‑POST /v0/quote with identical parameters but dry=false; store the depositAddress from the response. ([NEAR Intents][1])
+  * Transfer the exact amount to depositAddress on the origin chain.
+  * Optionally POST /v0/deposit/submit with txHash to accelerate processing. ([NEAR Intents][1])
+  * Poll GET /v0/status until terminal state (SUCCESS, REFUNDED, FAILED); surface INCOMPLETE\_DEPOSIT with guidance to top‑up or wait for refund. ([NEAR Intents][2])
+* title: Backfill analytics with Intents Explorer API
+  steps:
+
+  * Start with GET /api/v0/transactions?numberOfTransactions=50 (requires Bearer JWT). ([NEAR Intents][3])
+  * Store the first and last depositAddress from the page.
+  * Iterate with lastDepositAddress + direction=next to walk older history (or prev for newer) until the endpoint returns an empty array. ([NEAR Intents][3])
+  * Alternatively, use GET /api/v0/transactions-pages?page=1\&perPage=50 to get totals for UI paging. ([NEAR Intents][3])
+  * Filter by statuses, fromChainId/toChainId, and time bounds to keep payloads lean.
+
+troubleshooting\_cheatsheet:
+
+* symptom: GET /v0/status never progresses beyond PENDING\_DEPOSIT
+  cause: Deposit not detected on depositAddress (wrong chain, wrong amount, or tx not finalized)
+  fix: Verify depositAddress, chain, and confirmations; if deadline passes, funds will be refunded to refundTo per quote.
+* symptom: Status = INCOMPLETE\_DEPOSIT
+  cause: Amount credited below the minimum or bridge requirement
+  fix: Inform user to top‑up the shortfall or await automatic REFUNDED if the swap cannot proceed. ([NEAR Intents][2])
+* symptom: Explorer API 401 Unauthorized
+  cause: Missing/invalid JWT
+  fix: Obtain and include a valid Bearer token with each request. ([NEAR Intents][3])
+* symptom: 1Click quote returns 400 Bad Request
+  cause: Invalid field (e.g., assetId mismatch, deadline too soon, or wrong depositType/recipientType)
+  fix: Validate assetIds from /v0/tokens, use ISO8601 deadline beyond expected finality, and align depositType/recipientType. ([NEAR Intents][1])
+
+faq:
+
+* q: Do I need a JWT token?
+  a: For 1Click, testing can work without auth but production should use a JWT for stability and rate limits—and some deployments waive extra fees with JWT. The Intents Explorer API requires a Bearer JWT for all requests. ([NEAR Intents][1])
+* q: How should I choose deadline?
+  a: Use an ISO‑8601 timestamp comfortably beyond expected deposit finality on the origin chain (e.g., Bitcoin may require \~1h depending on fees). ([NEAR Intents][1])
+* q: Which status values should I handle?
+  a: PENDING\_DEPOSIT, PROCESSING, SUCCESS, INCOMPLETE\_DEPOSIT, REFUNDED, and FAILED. Some responses also include KNOWN\_DEPOSIT\_TX. Treat FAILED/REFUNDED as terminal states. ([NEAR Intents][2])
+
+external\_resources:
+
+* label: 1Click API — Docs
+  url: [https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api)
+* label: Intents Explorer API — Docs
+  url: [https://docs.near-intents.org/near-intents/integration/distribution-channels/intents-explorer-api](https://docs.near-intents.org/near-intents/integration/distribution-channels/intents-explorer-api)
+* label: Intents Explorer — Swagger UI
+  url: [https://explorer.near-intents.org/api/docs](https://explorer.near-intents.org/api/docs)
+* label: Explorer API — OpenAPI YAML
+  url: [https://explorer.near-intents.org/api/v0/openapi.yaml](https://explorer.near-intents.org/api/v0/openapi.yaml)
+* label: Explorer API — API Key Form
+  url: [https://docs.google.com/forms/d/e/1FAIpQLSdrSrqSkKOMb\_a8XhwF0f7N5xZ0Y5CYgyzxiAuoC2g4a2N68g/viewform](https://docs.google.com/forms/d/e/1FAIpQLSdrSrqSkKOMb_a8XhwF0f7N5xZ0Y5CYgyzxiAuoC2g4a2N68g/viewform)
+
+[1]: https://docs.near-intents.org/near-intents/1click-api "1Click API | NEAR Intents"
+[2]: https://docs.near-intents.org/near-intents/integration/distribution-channels/1click-api?utm_source=chatgpt.com "1Click API | NEAR Intents"
+[3]: https://docs.near-intents.org/near-intents/integration/distribution-channels/intents-explorer-api "Intents Explorer API | NEAR Intents"
+

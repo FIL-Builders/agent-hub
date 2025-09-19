@@ -1,0 +1,283 @@
+meta:
+spec\_name: near/twitter-contract-rs
+spec\_version: "0.3.0"
+generated: "2025-09-18"
+library\_version: "^5.0.0" # near-sdk-rs family (assumed from #\[near] and #\[near(contract\_state)] usage)&#x20;
+language: rust
+homepage: [https://github.com/frol/near-twitter-example-rs](https://github.com/frol/near-twitter-example-rs)
+tags: \[near, rust, smart-contracts, example, twitter, blockchain]
+purpose: >
+Teach LLMs (and their users) how to work with a concrete NEAR smart contract in Rust—a
+Twitter‑like example—by pairing the exact public contract signatures with senior‑level,
+task‑oriented guidance and runnable CLI usage.
+guiding\_principles:
+\- Distinguish **call** (state‑changing, paid gas) vs **view** (read‑only, free) methods; use `near call` for writes and `near view` for reads.&#x20;
+\- All writes execute under `env::predecessor_account_id()`; design authorization checks against that identity.&#x20;
+\- On‑chain data access lacks SQL; design pagination and filtering explicitly (iterate + limit/offset).&#x20;
+\- Prefer small, well‑typed arguments and return values; serialize via JSON for views and Borsh/JSON for contract storage structures.&#x20;
+\- Log important state transitions (`env::log_str`) for observability and debugging.&#x20;
+\- Keep write methods idempotent where possible; return the updated entity or an `Option` to signal existence.&#x20;
+\- Treat gas and storage as first‑class constraints; cap list sizes and expose `limit`/`from_index` parameters.&#x20;
+design\_notes: >
+Sources: This pack’s authoritative API surface is extracted from the “Twitter‑like contract”
+example embedded in the NEAR docs compilation (`combined.md`), specifically the `Tweet`
+struct, `TwitterContract` state, and its public methods (`new`, `post_tweet`, `like_tweet`,
+`delete_tweet`, and the three view methods).
+The spec framing and required fields follow AgentHub Open Agent Spec v0.3.0 (notably the new
+`definition` block).&#x20;
+
+groups:
+
+* name: Contract Types
+  exports: \[Tweet, TwitterContract]
+  symbols:
+  Tweet:
+  kind: type
+  summary: On‑chain tweet record; Borsh/JSON serializable data transfer object returned by view methods.&#x20;
+  definition:
+  lang: rust
+  source: combined.md (NEAR for Backend Devs – Twitter example)
+  code: |
+  \#\[near(serializers = \[borsh, json])]
+  \#\[derive(Clone, Debug, PartialEq)]
+  pub struct Tweet {
+  pub id: u64,
+  pub author: AccountId,
+  pub text: String,
+  pub timestamp: Timestamp,
+  pub likes: u64,
+  }
+  guidance:
+  \- IDs and counters are `u64`; ensure your client handles 64‑bit integer ranges safely (e.g., use strings in JS if needed).
+  \- JSON views return field names exactly as defined; keep client models in sync to avoid silent decode issues.
+  example:
+  lang: json
+  description: Typical JSON returned by `get_tweet_by_id` or items in `get_all_tweets`.
+  code: |
+  {
+  "id": 42,
+  "author": "alice.testnet",
+  "text": "Hello, NEAR!",
+  "timestamp": "1712345678901234567",
+  "likes": 3
+  }
+  since: "0.1.0"
+  TwitterContract:
+  kind: type
+  summary: Persistent contract state holding all tweets and the next ID counter.&#x20;
+  definition:
+  lang: rust
+  source: combined.md (NEAR for Backend Devs – Twitter example)
+  code: |
+  \#\[near(contract\_state)]
+  \#\[derive(PanicOnDefault)]
+  pub struct TwitterContract {
+  tweets: IterableMap\<u64, Tweet>,
+  next\_tweet\_id: u64,
+  }
+  guidance:
+  \- Storage is a key‑value map; filtering by author requires iteration (no WHERE clause). Budget gas accordingly.&#x20;
+  \- Use unique storage prefixes (e.g., `IterableMap::new(b"t")`) to avoid key collisions when adding new collections.&#x20;
+  example:
+  lang: rust
+  code: |
+  // Instantiated via the init method; fields are managed internally.
+  // Users interact via public methods below.
+  since: "0.1.0"
+
+* name: Write Methods
+  exports: \[new, post\_tweet, like\_tweet, delete\_tweet]
+  symbols:
+  new:
+  kind: function
+  summary: Initializes contract state; deployer must call once after deployment.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  \#\[init]
+  pub fn new() -> Self
+  guidance:
+  \- Initialization should be gated by `#[init]` to prevent re‑runs; call immediately after deploy with an authorized account.&#x20;
+  \- Keep init inputs minimal to reduce attack surface; derive defaults internally (e.g., storage prefixes).
+  example:
+  lang: bash
+  description: Initialize after deployment (no args).
+  code: |
+  near call \<contract.testnet> new '{}' --accountId \<deployer.testnet>
+  since: "0.1.0"
+  post\_tweet:
+  kind: function
+  summary: Creates a new tweet from the caller; returns the created `Tweet`.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn post\_tweet(\&mut self, text: String) -> Tweet
+  guidance:
+  \- Authorization is implicit: the author is `env::predecessor_account_id()`; never accept `author` as input.&#x20;
+  \- Enforce sensible `text` length limits to bound storage and gas; log the creation for traceability.&#x20;
+  example:
+  lang: bash
+  code: |
+  near call \<contract.testnet> post\_tweet '{"text":"Hello from CLI!"}'&#x20;
+  \--accountId alice.testnet
+  since: "0.1.0"
+  like\_tweet:
+  kind: function
+  summary: Increments a tweet’s like counter; returns `Some(Tweet)` if it exists, else `None`.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn like\_tweet(\&mut self, tweet\_id: u64) -> Option<Tweet>
+  guidance:
+  \- Handle `None` on the client (404‑like case); don’t assume the ID exists.&#x20;
+  \- Consider rate‑limiting or duplicate‑like prevention at the contract layer if needed for your app.
+  example:
+  lang: bash
+  code: |
+  near call \<contract.testnet> like\_tweet '{"tweet\_id": 42}'&#x20;
+  \--accountId bob.testnet
+  since: "0.1.0"
+  delete\_tweet:
+  kind: function
+  summary: Deletes a tweet; only the original author may delete. Returns nothing.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn delete\_tweet(\&mut self, tweet\_id: u64)
+  guidance:
+  \- Enforce ownership: compare `tweet.author` with `env::predecessor_account_id()`; log unauthorized attempts.&#x20;
+  \- Consider emitting a consistent log format for indexers and dashboards.
+  example:
+  lang: bash
+  code: |
+  near call \<contract.testnet> delete\_tweet '{"tweet\_id": 42}'&#x20;
+  \--accountId alice.testnet
+  since: "0.1.0"
+
+* name: View Methods
+  exports: \[get\_all\_tweets, get\_tweet\_by\_id, get\_tweets\_by\_author]
+  symbols:
+  get\_all\_tweets:
+  kind: function
+  summary: Returns a paginated slice of tweets: `from_index` (offset) and `limit`.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn get\_all\_tweets(\&self, from\_index: Option<u64>, limit: Option<u64>) -> Vec<Tweet>
+  guidance:
+  \- Provide small `limit` defaults (e.g., 10) and enforce server‑side caps to avoid excessive gas on iteration.&#x20;
+  \- Use `near view` for quick reads or your preferred SDK’s view call in apps.&#x20;
+  example:
+  lang: bash
+  code: |
+  near view \<contract.testnet> get\_all\_tweets '{"from\_index": 0, "limit": 5}'
+  since: "0.1.0"
+  get\_tweet\_by\_id:
+  kind: function
+  summary: Fetches a single tweet by numeric ID; returns `Option<Tweet>`.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn get\_tweet\_by\_id(\&self, tweet\_id: u64) -> Option<Tweet>
+  guidance:
+  \- Handle `null`/`None` in clients to reflect non‑existent IDs rather than throwing.&#x20;
+  \- Consider exposing a bulk lookup if your UI needs to hydrate multiple IDs efficiently.
+  example:
+  lang: bash
+  code: |
+  near view \<contract.testnet> get\_tweet\_by\_id '{"tweet\_id": 42}'
+  since: "0.1.0"
+  get\_tweets\_by\_author:
+  kind: function
+  summary: Returns tweets by `author_id` with pagination; implemented via in‑contract filtering.&#x20;
+  definition:
+  lang: rust
+  source: combined.md
+  code: |
+  pub fn get\_tweets\_by\_author(
+  \&self,
+  author\_id: AccountId,
+  from\_index: Option<u64>,
+  limit: Option<u64>,
+  ) -> Vec<Tweet>
+  guidance:
+  \- Filtering is O(n) over stored tweets; always bound `limit` and consider indexing off‑chain for heavy queries.&#x20;
+  \- Expect stable ordering only if you define and document it (e.g., insertion order).
+  example:
+  lang: bash
+  code: |
+  near view \<contract.testnet> get\_tweets\_by\_author&#x20;
+  '{"author\_id":"alice.testnet","from\_index":0,"limit":10}'
+  since: "0.1.0"
+
+common\_workflows:
+
+* title: Deploy & initialize the contract
+  steps:
+
+  * Compile and deploy the Wasm to a NEAR account (e.g., `<contract.testnet>`).
+  * Call the `new` initializer once to set up storage prefixes and counters.&#x20;
+* title: Post a tweet (write) and read it back
+  steps:
+
+  * Run `near call <contract> post_tweet '{"text":"gm"}' --accountId alice.testnet`.&#x20;
+  * Confirm via `near view <contract> get_all_tweets '{"from_index":0,"limit":1}'`.&#x20;
+* title: Like a tweet (handle Option)
+  steps:
+
+  * Call `like_tweet` with a known ID; process `null` if it doesn’t exist.&#x20;
+* title: Author‑only deletion
+  steps:
+
+  * Attempt `delete_tweet` as a non‑author to see logged denial; retry as the author.&#x20;
+* title: Paginated listing
+  steps:
+
+  * Use `from_index` and `limit` to paginate lists; keep small limits to control gas.&#x20;
+* title: Filter by author
+  steps:
+
+  * Fetch with `get_tweets_by_author` and client‑paginate if needed; consider off‑chain indexing for large datasets.&#x20;
+* title: Separate views vs calls in apps
+  steps:
+
+  * Route reads through view RPCs and writes through wallet‑signed transactions (SDK or CLI).&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: `get_tweet_by_id` returns `null`
+  cause: The tweet ID does not exist in storage.
+  fix: Validate the ID first (e.g., list recent tweets) or handle `null` in the UI.&#x20;
+* symptom: `delete_tweet` succeeds for some users but not others
+  cause: Only the original author may delete; ownership check fails for other callers.
+  fix: Ensure the signer matches `tweet.author`; switch accounts or change UI affordances.&#x20;
+* symptom: View calls time out or are slow with large data
+  cause: On‑chain iteration and JSON serialization of big lists.
+  fix: Reduce `limit`, paginate more aggressively, or move heavy queries off‑chain.&#x20;
+
+faq:
+
+* q: Why does the contract manually paginate instead of using queries?
+  a: NEAR contract storage is a key‑value store; there is no built‑in SQL WHERE/ORDER BY. Iterate with bounds and paginate.&#x20;
+* q: Who is the “current user” on writes?
+  a: The signer’s account—available as `env::predecessor_account_id()`—is the authoritative caller identity for authorization.&#x20;
+* q: Are views free?
+  a: Views don’t consume contract gas, but RPC providers may impose rate limits; prefer small `limit` and cache on the client.&#x20;
+
+external\_resources:
+
+* label: Full Twitter‑like contract repo
+  url: [https://github.com/frol/near-twitter-example-rs](https://github.com/frol/near-twitter-example-rs)
+* label: NEAR CLI (reference & install)
+  url: [https://github.com/near/near-cli](https://github.com/near/near-cli)
+* label: NEAR Docs – Smart Contracts (Rust & JS)
+  url: [https://docs.near.org/smart-contracts/what-is](https://docs.near.org/smart-contracts/what-is)
+* label: NEAR JSON‑RPC overview
+  url: [https://docs.near.org/api/rpc/introduction](https://docs.near.org/api/rpc/introduction)
+

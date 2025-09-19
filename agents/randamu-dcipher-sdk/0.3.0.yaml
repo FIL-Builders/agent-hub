@@ -1,0 +1,488 @@
+meta:
+spec\_name: dcipher-sdk
+spec\_version: "0.3.0"
+library\_version: "randomness-js:^0.1.0, blocklock-js:^0.1.0, randomness-solidity:^0.1.0"
+generated: "2025-09-18"
+language: javascript
+homepage: [https://dcipher.network/](https://dcipher.network/)
+tags: \[web3, randomness, encryption, threshold-signatures, solidity, ethers.js, typescript]
+purpose: >
+Senior‑level reference for dcipher’s JavaScript SDKs (randomness‑js and blocklock‑js)
+and their Solidity counterparts. It merges the raw contracts/signatures with
+best practices for requesting/verifying randomness and creating conditional
+encryption (“blocklock”) requests that unlock at a target block height.
+guiding\_principles:
+\- Prefer preconfigured initializers (e.g., `createBaseSepolia`) to avoid wrong contract addresses.&#x20;
+\- Always verify randomness client‑side with `verify()` even if on‑chain checks pass.&#x20;
+\- Add price buffers around `calculateRequestPriceNative`—gas moves between request and fulfillment.&#x20;
+\- Overestimate `callbackGasLimit` slightly to prevent out‑of‑gas in callbacks.&#x20;
+\- For blocklock, encode data with `encodeParams` and keep type symmetry for decoding.&#x20;
+\- Always check returned `requestID` in your callback before using results.&#x20;
+\- Use subscriptions for frequent requests; use direct funding for ad‑hoc ones.&#x20;
+\- Keep network lists/addresses in sync with the docs “Networks” page; do not hardcode stale values.&#x20;
+design\_notes: >
+Built against AgentHub Open Agent Spec v0.3 with mandatory `definition.code` for each symbol
+and aligned to the dcipher docs combined export (randomness, blocklock, Solidity).
+Key sources: Open Agent Spec schema (validation rules, required fields) ,
+randomness‑js guide (init, request, verify)   ,
+on‑chain verification signature in `Randomness.sol` ,
+blocklock‑js client flow (encode → encrypt/register → status → decrypt)   ,
+pricing and gas guidance for `calculateRequestPriceNative` .
+groups:
+
+* name: randomness-js (client SDK)
+  exports:
+
+  * Randomness.createFromChainId
+  * Randomness.createBaseSepolia
+  * Randomness.requestRandomness
+  * Randomness.verify
+    symbols:
+    Randomness.createFromChainId:
+    kind: function
+    summary: Initialize a `Randomness` client bound to a specific chain ID using an ethers `Wallet`.&#x20;
+    definition:
+    lang: typescript
+    code: |
+    declare class Randomness {
+    static createFromChainId(wallet: import("ethers").Wallet, chainId: number): Randomness;
+    }
+    source: randomness-js
+    guidance:
+
+    * Use this when your target chain lacks a convenience initializer; pass a Wallet with a connected provider.&#x20;
+    * Keep the wallet funded for tx fees; the SDK sends a transaction to `RandomnessSender`.&#x20;
+      example:
+      lang: javascript
+      code: |
+      import { Randomness } from "randomness-js";
+      import { JsonRpcProvider, Wallet } from "ethers";
+
+      const rpc = new JsonRpcProvider("[https://api.calibration.node.glif.io/rpc/v1](https://api.calibration.node.glif.io/rpc/v1)");
+      const wallet = new Wallet(process.env.PRIVATE\_KEY, rpc);
+      const rnd = Randomness.createFromChainId(wallet, 314159); // Filecoin Calibration
+      console.log("Randomness client ready for chain 314159");
+      Randomness.createBaseSepolia:
+      kind: function
+      summary: Convenience initializer for the Base Sepolia network.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Randomness {
+      static createBaseSepolia(wallet: import("ethers").Wallet): Randomness;
+      }
+      source: randomness-js
+      guidance:
+    * Prefer this over manual addresses to avoid misconfigured contract endpoints.&#x20;
+    * If you need a different network, switch to `createFromChainId` with the documented chain ID.
+      example:
+      lang: javascript
+      code: |
+      import { Randomness } from "randomness-js";
+      import { JsonRpcProvider, Wallet } from "ethers";
+
+      const provider = new JsonRpcProvider("[https://sepolia.base.org](https://sepolia.base.org)");
+      const wallet = new Wallet(process.env.PRIVATE\_KEY, provider);
+      const rnd = Randomness.createBaseSepolia(wallet);
+      console.log("Initialized for Base Sepolia");
+      Randomness.requestRandomness:
+      kind: function
+      summary: Send a transaction to `RandomnessSender` to request a new random value; resolves with tx/result data.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Randomness {
+      requestRandomness(): Promise<{
+      requestID?: bigint | number;
+      randomness?: string;      // bytes32 hex
+      signature?: string;       // provider signature
+      txHash?: string;
+      \[k: string]: unknown;
+      }>;
+      }
+      source: randomness-js
+      guidance:
+    * Await chain inclusion; capture `requestID` for correlating your callback and for audits.&#x20;
+    * Pair with a client‑side `verify()` step before trusting the value in UX or off‑chain logic.&#x20;
+      example:
+      lang: javascript
+      code: |
+      // assume `rnd` is an initialized Randomness client
+      const resp = await rnd.requestRandomness();
+      console.log("Request:", resp.requestID, "tx:", resp.txHash);
+      Randomness.verify:
+      kind: function
+      summary: Client‑side cryptographic verification of a randomness response; throws or returns boolean.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Randomness {
+      verify(
+      response: Record\<string, unknown>,
+      options?: { shouldBlowUp?: boolean }
+      ): Promise\<void | boolean>;
+      }
+      source: randomness-js
+      guidance:
+    * Default “strict” mode throws on failure; pass `{ shouldBlowUp: false }` to get a boolean.&#x20;
+    * Keep the full response object; do not strip fields needed for verification.
+      example:
+      lang: javascript
+      code: |
+      const strictOk = await rnd.verify(resp).then(() => true).catch(() => false);
+      const ok = await rnd.verify(resp, { shouldBlowUp: false });
+      console.log({ strictOk, ok });
+* name: blocklock-js (client SDK)
+  exports:
+
+  * Blocklock.createBaseSepolia
+  * Blocklock.encrypt
+  * Blocklock.encryptAndRegister
+  * Blocklock.fetchBlocklockStatus
+  * Blocklock.calculateRequestPriceNative
+  * Blocklock.decrypt
+  * encodeParams
+  * decodeParams
+  * encodeCondition
+  * encodeCiphertextToSolidity
+    symbols:
+    Blocklock.createBaseSepolia:
+    kind: function
+    summary: Create a Blocklock client for a preconfigured network (e.g., Base Sepolia).&#x20;
+    definition:
+    lang: typescript
+    code: |
+    declare class Blocklock {
+    static createBaseSepolia(signer: import("ethers").Signer): Blocklock;
+    }
+    source: blocklock-js
+    guidance:
+
+    * Use the network helpers to avoid managing sender addresses/chain IDs yourself.&#x20;
+    * Keep the signer funded; Blocklock may submit transactions for registration.&#x20;
+      example:
+      lang: javascript
+      code: |
+      import { Blocklock } from "blocklock-js";
+      import { ethers } from "ethers";
+
+      const provider = new ethers.JsonRpcProvider(process.env.RPC\_URL);
+      const signer = new ethers.Wallet(process.env.PRIVATE\_KEY, provider);
+      const blocklock = Blocklock.createBaseSepolia(signer);
+      Blocklock.encrypt:
+      kind: function
+      summary: Encrypt encoded bytes for a target block height; returns a ciphertext payload.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Blocklock {
+      encrypt(encodedData: Uint8Array, blockHeight: bigint): unknown /\* Ciphertext \*/;
+      }
+      source: blocklock-js
+      guidance:
+    * Always encode your message first (see `encodeParams`) to maintain type integrity for decoding.&#x20;
+    * Use `encodeCiphertextToSolidity` before passing the ciphertext to a Solidity contract.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const msgBytes = encodeParams(\["uint256"], \[42n]);
+      const cipher = blocklock.encrypt(msgBytes,  BigInt(await provider.getBlockNumber() + 10));
+      Blocklock.encryptAndRegister:
+      kind: function
+      summary: One‑shot helper that encrypts, estimates cost, pays, and registers the request; returns `{ id, ciphertext }`.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Blocklock {
+      encryptAndRegister(
+      encodedData: Uint8Array,
+      blockHeight: bigint
+      ): Promise<{ id: bigint | number; ciphertext: unknown /\* Ciphertext \*/ }>;
+      }
+      source: blocklock-js
+      guidance:
+    * Simplest path for client‑side flows; persist `id` to poll status later.&#x20;
+    * For advanced control (pricing/funding), call `calculateRequestPriceNative` and your own contract methods.&#x20;
+      example:
+      lang: javascript
+      code: |
+      const { id, ciphertext } = await blocklock.encryptAndRegister(msgBytes, targetBlock);
+      console.log("Registered blocklock id:", id);
+      Blocklock.fetchBlocklockStatus:
+      kind: function
+      summary: Query the network for a request’s status and decryption material when fulfilled.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Blocklock {
+      fetchBlocklockStatus(requestId: bigint | number): Promise<{
+      status?: string;
+      ciphertext?: string | Uint8Array;
+      decryptionKey?: string | Uint8Array;
+      \[k: string]: unknown;
+      }>;
+      }
+      source: blocklock-js
+      guidance:
+    * Check the on‑chain `isInFlight` flag before polling to save RPC calls.&#x20;
+    * Only attempt decryption once the status indicates fulfillment and a key is present.
+      example:
+      lang: javascript
+      code: |
+      const status = await blocklock.fetchBlocklockStatus(id);
+      if (status.decryptionKey) {
+      console.log("Ready to decrypt");
+      }
+      Blocklock.calculateRequestPriceNative:
+      kind: function
+      summary: Estimate the native‑token cost for a callback with a given gas limit (client wrapper over sender’s view).&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Blocklock {
+      calculateRequestPriceNative(callbackGasLimit: bigint | number): Promise<\[bigint] | \[string]>;
+      }
+      source: blocklock-js
+      guidance:
+    * Add a safety buffer to the returned estimate to absorb gas volatility between blocks.&#x20;
+    * Keep `callbackGasLimit` aligned with your Solidity callback’s worst‑case path.
+      example:
+      lang: javascript
+      code: |
+      const \[priceWei] = await blocklock.calculateRequestPriceNative(700\_000n);
+      console.log("Estimated callback price (wei):", priceWei.toString());
+      Blocklock.decrypt:
+      kind: function
+      summary: Decrypt a fulfilled ciphertext using the delivered decryption key; returns raw bytes.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare class Blocklock {
+      decrypt(ciphertext: string | Uint8Array, decryptionKey: string | Uint8Array): Promise<Uint8Array>;
+      }
+      source: blocklock-js
+      guidance:
+    * Convert the result to hex and decode with `decodeParams` into original Solidity types.&#x20;
+    * Keep your encryption/decoding type list symmetric (encode and decode must match).&#x20;
+      example:
+      lang: javascript
+      code: |
+      const bytes = await blocklock.decrypt(status.ciphertext, status.decryptionKey);
+      const hex = ethers.hexlify(bytes);
+      const \[value] = decodeParams(\["uint256"], hex);
+      console.log("Decrypted value:", value);
+      encodeParams:
+      kind: function
+      summary: Encode Solidity‑typed data to bytes for encryption/contract calls.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare function encodeParams(types: readonly string\[], values: readonly unknown\[]): Uint8Array;
+      source: blocklock-js
+      guidance:
+    * Use canonical Solidity ABI type strings (e.g., `uint256`, `bytes32`, `address`).&#x20;
+    * Avoid JS number for big integers; use `bigint` or string to preserve precision.
+      example:
+      lang: javascript
+      code: |
+      const encoded = encodeParams(\["address", "uint256"], \["0xabc...", 123n]);
+      decodeParams:
+      kind: function
+      summary: Decode hex/bytes back into Solidity‑typed values after decryption.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare function decodeParams(types: readonly string\[], dataHex: string | Uint8Array): unknown;
+      source: blocklock-js
+      guidance:
+    * Ensure the `types` list exactly matches what you used in `encodeParams`.&#x20;
+    * If you encoded a tuple/struct, pass the same tuple signature for proper decoding.
+      example:
+      lang: javascript
+      code: |
+      const decoded = decodeParams(\["uint256"], "0x" + Buffer.from(bytes).toString("hex"));
+      encodeCondition:
+      kind: function
+      summary: Build the block‑height condition bytes for a blocklock request.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare function encodeCondition(targetBlockHeight: bigint | number): Uint8Array;
+      source: blocklock-js
+      guidance:
+    * Set `targetBlockHeight` ≥ current block; add headroom to account for mempool delays.&#x20;
+    * Store alongside your ciphertext for later auditing/replay tests.
+      example:
+      lang: javascript
+      code: |
+      const cond = encodeCondition(BigInt(await provider.getBlockNumber() + 10));
+      encodeCiphertextToSolidity:
+      kind: function
+      summary: Convert a JS ciphertext object into ABI‑encodable bytes for Solidity calls.&#x20;
+      definition:
+      lang: typescript
+      code: |
+      declare function encodeCiphertextToSolidity(ciphertext: unknown /\* Ciphertext \*/): string; // 0x‑prefixed hex
+      source: blocklock-js
+      guidance:
+    * Use this when passing the ciphertext to your on‑chain `create*Request` functions.&#x20;
+    * Keep ciphertext as returned by `encrypt`/`encryptAndRegister`; avoid mutating fields.
+      example:
+      lang: javascript
+      code: |
+      const wire = encodeCiphertextToSolidity(cipher);
+      await myReceiver.createTimelockRequestWithDirectFunding(gasLimit, cond, wire, { value: priceWei });
+* name: randomness-solidity (on‑chain)
+  exports:
+
+  * Randomness.sol.verify
+  * RandomnessReceiverBase.onRandomnessReceived
+  * BlocklockReceiverBase.\_onBlocklockReceived
+  * RandomnessSender.calculateRequestPriceNative
+    symbols:
+    Randomness.sol.verify:
+    kind: function
+    summary: On‑chain verifier that checks a random value/signature tuple for a given request ID and scheme.&#x20;
+    definition:
+    lang: solidity
+    code: |
+    function verify(
+    address randomnessContract,
+    address signatureContract,
+    bytes calldata signature,
+    uint256 requestID,
+    address requester,
+    string calldata schemeID
+    ) external view returns (bool);
+    source: randomness-solidity/Randomness.sol
+    guidance:
+
+    * Use when a contract other than the requester needs to validate a randomness proof.&#x20;
+    * Keep `schemeID` aligned with deployed signature scheme (e.g., "BLS").&#x20;
+      example:
+      lang: solidity
+      code: |
+      bool ok = Randomness(randomness).verify(randContract, sigContract, sig, reqId, requester, "BLS");
+      RandomnessReceiverBase.onRandomnessReceived:
+      kind: function
+      summary: Mandatory callback you override to consume randomness; verify the `requestID` first.&#x20;
+      definition:
+      lang: solidity
+      code: |
+      function onRandomnessReceived(uint64 requestID, bytes32 \_randomness) internal virtual;
+      source: randomness-solidity/RandomnessReceiverBase.sol
+      guidance:
+    * Store the last `requestID` at request time and check it here to prevent replay/mixups.&#x20;
+    * Keep logic minimal; emit an event and defer heavy work. Gas here is paid via your request model.
+      example:
+      lang: solidity
+      code: |
+      function onRandomnessReceived(uint64 requestID, bytes32 \_randomness) internal override {
+      require(requestId == requestID, "Request ID mismatch");
+      randomness = \_randomness;
+      emit RandomnessReady(requestID, \_randomness);
+      }
+      BlocklockReceiverBase.\_onBlocklockReceived:
+      kind: function
+      summary: Blocklock decryption key delivery callback; decrypt and `abi.decode` within your override.&#x20;
+      definition:
+      lang: solidity
+      code: |
+      function \_onBlocklockReceived(uint256 \_requestId, bytes calldata decryptionKey) internal virtual;
+      source: blocklock-solidity/BlocklockReceiverBase.sol
+      guidance:
+    * Verify `_requestId` matches your stored `requestId` before using the key.&#x20;
+    * Decrypt stored ciphertext and decode using the same types used at encryption time.&#x20;
+      example:
+      lang: solidity
+      code: |
+      function \_onBlocklockReceived(uint256 \_requestId, bytes calldata decryptionKey) internal override {
+      require(requestId == \_requestId, "Invalid request ID");
+      bytes memory raw = \_decrypt(encryptedValue, decryptionKey);
+      (string memory value) = abi.decode(raw, (string));
+      decryptedAddress = value;
+      }
+      RandomnessSender.calculateRequestPriceNative:
+      kind: function
+      summary: View function on the sender contract that estimates total native‑token cost for a given callback gas limit.&#x20;
+      definition:
+      lang: solidity
+      code: |
+      function calculateRequestPriceNative(uint32 \_callbackGasLimit) public view returns (uint256);
+      source: randomness-solidity/RandomnessSender.sol
+      guidance:
+    * Result is an estimate; add buffer for gas price changes and EIP‑150 overhead.&#x20;
+    * Re‑estimate shortly before sending to reduce drift on volatile networks.&#x20;
+      example:
+      lang: solidity
+      code: |
+      uint256 estimate = RandomnessSender(sender).calculateRequestPriceNative(200\_000);
+
+common\_workflows:
+
+* title: Request + verify randomness (client)
+  steps:
+
+  * Initialize with `Randomness.createBaseSepolia(wallet)` or `createFromChainId`.&#x20;
+  * Call `requestRandomness()` and capture the `requestID` and tx hash.&#x20;
+  * Run `verify(response)` in strict mode; handle failures explicitly.&#x20;
+* title: End‑to‑end blocklock (client)
+  steps:
+
+  * Encode your payload with `encodeParams`, then `Blocklock.encryptAndRegister(...)`. &#x20;
+  * Poll with `fetchBlocklockStatus` (after checking `isInFlight` on the sender).&#x20;
+  * When key is present, `decrypt` → hexlify → `decodeParams` into Solidity types.&#x20;
+* title: Estimate and fund callback costs
+  steps:
+
+  * Call `calculateRequestPriceNative(callbackGasLimit)` to estimate.&#x20;
+  * Add buffer for gas volatility/EIP‑150; ensure funding before submitting.&#x20;
+* title: On‑chain verification of randomness
+  steps:
+
+  * In a separate contract, hold a `Randomness` instance.&#x20;
+  * Call `randomness.verify(randomnessContract, signatureContract, signature, requestID, requester, schemeID)`.&#x20;
+* title: Secure randomness callback in Solidity
+  steps:
+
+  * Store `requestId` at request time; in `onRandomnessReceived`, require equality.&#x20;
+  * Use event logging and minimal logic in the callback to cap gas.
+
+troubleshooting\_cheatsheet:
+
+* symptom: `verify()` throws even though a random value exists
+  cause: You passed a trimmed/modified response or wrong `schemeID`
+  fix: Pass the original response object; ensure scheme ID matches deployed scheme (e.g., "BLS").&#x20;
+* symptom: Callback reverted with out‑of‑gas
+  cause: Under‑estimated `callbackGasLimit` or unexpected code path
+  fix: Increase limit and re‑estimate cost with `calculateRequestPriceNative`.&#x20;
+* symptom: Blocklock status never fulfills
+  cause: Request still in flight or target block not reached
+  fix: Check `isInFlight` on the sender; ensure target block ≥ current head with margin. &#x20;
+* symptom: Decoding returns garbage after decryption
+  cause: Mismatch between encode/decode type lists
+  fix: Keep `encodeParams` and `decodeParams` types identical and in order.&#x20;
+* symptom: Fees insufficient at fulfillment time
+  cause: Gas price rose between estimate and execution
+  fix: Add buffer to `calculateRequestPriceNative` and monitor balances.&#x20;
+
+faq:
+
+* q: Do I still need client‑side verification if the contract already verified the signature?
+  a: Yes—`verify()` adds an end‑to‑end check in your app/agent and catches integration mistakes or replay issues.&#x20;
+* q: Should I use direct funding or a subscription?
+  a: Use direct funding for sporadic requests (pass value with call). Use subscriptions for steady volume to reduce operational overhead.&#x20;
+* q: How do I pass a ciphertext from JS to Solidity?
+  a: Use `encodeCiphertextToSolidity(cipher)` to get ABI‑encodable bytes, then pass to your contract function.&#x20;
+
+external\_resources:
+
+* label: randomness‑js (GitHub)
+  url: [https://github.com/randa-mu/randomness-js](https://github.com/randa-mu/randomness-js)
+* label: randomness‑solidity (GitHub)
+  url: [https://github.com/randa-mu/randomness-solidity](https://github.com/randa-mu/randomness-solidity)
+* label: blocklock‑js (GitHub)
+  url: [https://github.com/randa-mu/blocklock-js](https://github.com/randa-mu/blocklock-js)
+* label: blocklock‑solidity (GitHub)
+  url: [https://github.com/randa-mu/blocklock-solidity](https://github.com/randa-mu/blocklock-solidity)
+

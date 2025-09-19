@@ -1,0 +1,514 @@
+meta:
+spec\_name: filoz/synapse-sdk
+spec\_version: "0.3.0"
+library\_version: "^0.24.0"
+generated: "2025-09-18"
+purpose: >
+Teach LLM agents to use the Synapse SDK to manage Filecoin payments and storage at a senior‑developer
+level—covering the high‑level Synapse entrypoint, payments rails, storage contexts, and practical tips.
+guiding\_principles:
+\- Prefer the high‑level factory Synapse.create() and reuse one instance per process.&#x20;
+\- Use WebSocket RPC (RPC\_URLS.\*.websocket) for throughput; always destroy the provider on shutdown.&#x20;
+\- Amounts are bigint (18 decimals). Payments ops default to USDFC; FIL is for walletBalance only.&#x20;
+\- Approve Warm Storage as operator (rate, lockup, max period) before creating data sets.&#x20;
+\- For simple flows call synapse.storage.upload()/download(); for precision use an explicit StorageContext.&#x20;
+\- Keep code environment‑agnostic (no Buffer); prefer fetch/WebStreams; ethers v6 only.&#x20;
+\- Follow v0.24.0 terminology: Warm Storage, Data Sets, Pieces, Service Providers.&#x20;
+design\_notes: >
+Pack distilled from the Synapse SDK AI context, Quick Start, API Reference, RPC endpoints, and migration notes
+(combined.md). Symbols emphasize v0.24.0+ terminology, ethers v6 types, and the token‑last API.&#x20;
+language: typescript
+homepage: [https://github.com/FilOzone/synapse-sdk](https://github.com/FilOzone/synapse-sdk)
+tags: \[filecoin, storage, payments, ethers-v6, typescript]
+
+groups:
+
+* name: core
+  exports: \[Synapse, SynapseOptions, RPC\_URLS, TOKENS]
+  symbols:
+  Synapse:
+  kind: class
+  summary: Main SDK entry point exposing payments and storage managers with static async factory.
+  definition:
+  lang: typescript
+  code: |
+  export class Synapse {
+  static create(options: SynapseOptions): Promise<Synapse>;
+  // Subsystems
+  readonly payments: PaymentsService;
+  readonly storage: StorageManager;
+  // Network & provider
+  getProvider(): import('ethers').Provider | null;
+  getNetwork(): 'mainnet' | 'calibration';
+  getChainId(): number;
+  // Discovered addresses
+  getPaymentsAddress(): Promise<string>;
+  getWarmStorageAddress(): Promise<string>;
+  }
+  guidance:
+  \- Always construct via Synapse.create(...) to ensure address discovery and network validation.&#x20;
+  \- Use getProvider() and call destroy() on WebSocket providers when shutting down to avoid hangs.&#x20;
+  example:
+  lang: javascript
+  description: Create a Synapse instance, upload and download a piece.
+  code: |
+  import { Synapse, RPC\_URLS } from '@filoz/synapse-sdk'
+  const synapse = await Synapse.create({
+  privateKey: '0xYOUR\_PK',
+  rpcURL: RPC\_URLS.calibration.websocket
+  })
+  const { pieceCid } = await synapse.storage.upload(new TextEncoder().encode('hi'))
+  const bytes = await synapse.storage.download(pieceCid)
+  console.log(new TextDecoder().decode(bytes))
+  since: "0.24.0"
+
+  SynapseOptions:
+  kind: interface
+  summary: Constructor options for Synapse.create with wallet, network, CDN, and discovery settings.
+  definition:
+  lang: typescript
+  code: |
+  interface SynapseOptions {
+  // Wallet (exactly one)
+  privateKey?: string;
+  provider?: import('ethers').Provider;
+  signer?: import('ethers').Signer;
+
+  ```
+        // Network
+        rpcURL?: string;
+        authorization?: string;
+
+        // Advanced
+        withCDN?: boolean;
+        pieceRetriever?: PieceRetriever;
+        disableNonceManager?: boolean;
+        warmStorageAddress?: string;
+
+        // Subgraph (one of)
+        subgraphService?: SubgraphRetrievalService;
+        subgraphConfig?: SubgraphConfig;
+      }
+      interface SubgraphConfig {
+        endpoint?: string;
+        goldsky?: { projectId: string; subgraphName: string; version: string };
+        apiKey?: string;
+      }
+  guidance:
+    - Provide exactly one of privateKey, provider, or signer; the SDK enforces this. :contentReference[oaicite:10]{index=10}
+    - Prefer RPC_URLS constants for rpcURL; add authorization for GLIF‑hosted endpoints when needed. :contentReference[oaicite:11]{index=11}
+  example:
+    lang: typescript
+    code: |
+      import { Synapse, RPC_URLS } from '@filoz/synapse-sdk'
+      const synapse = await Synapse.create({
+        privateKey: process.env.PRIV_KEY!,
+        rpcURL: RPC_URLS.mainnet.websocket,
+        withCDN: true
+      })
+  since: "0.24.0"
+  ```
+
+  RPC\_URLS:
+  kind: constant
+  summary: Well‑known Filecoin RPC endpoints for mainnet and calibration (HTTP & WebSocket).
+  definition:
+  lang: typescript
+  code: |
+  export const RPC\_URLS: {
+  mainnet: { http: string; websocket: string };
+  calibration: { http: string; websocket: string };
+  };
+  guidance:
+  \- Prefer WebSocket URLs for sustained operations; use HTTP for simple, stateless calls.&#x20;
+  \- Combine with SynapseOptions.authorization for GLIF to increase rate limits.&#x20;
+  example:
+  lang: typescript
+  code: |
+  import { RPC\_URLS } from '@filoz/synapse-sdk'
+  console.log(RPC\_URLS.calibration.websocket)
+  since: "0.24.0"
+
+  TOKENS:
+  kind: constant
+  summary: Token symbols supported by the SDK (USDFC primary; FIL for wallet balance).
+  definition:
+  lang: typescript
+  code: |
+  export const TOKENS = {
+  USDFC: 'USDFC',
+  FIL: 'FIL'
+  } as const;
+  export type Token = typeof TOKENS\[keyof typeof TOKENS];
+  guidance:
+  \- Payments contract operations default to USDFC when token is omitted.&#x20;
+  \- walletBalance() accepts FIL or USDFC; other payment methods are USDFC‑only at present.&#x20;
+  example:
+  lang: typescript
+  code: |
+  import { TOKENS } from '@filoz/synapse-sdk'
+  type T = typeof TOKENS.USDFC // 'USDFC'
+  since: "0.24.0"
+
+* name: payments
+  exports: \[PaymentsService, DepositCallbacks, PaymentRail]
+  symbols:
+  PaymentsService:
+  kind: class
+  summary: Direct interface to Payments contract for balances, approvals, deposits/withdrawals, and rail settlement.
+  definition:
+  lang: typescript
+  code: |
+  export class PaymentsService {
+  constructor(
+  provider: import('ethers').Provider,
+  signer: import('ethers').Signer,
+  paymentsAddress: string,
+  usdfcAddress: string,
+  simulate?: boolean
+  );
+
+  ```
+        // Balances
+        walletBalance(token?: Token): Promise<bigint>;
+        balance(): Promise<bigint>;
+        accountInfo(): Promise<{ availableFunds: bigint; lockedFunds: bigint; pendingWithdrawals: bigint }>;
+        decimals(token?: Token): Promise<number>;
+
+        // ERC20
+        approve(spender: string, amount: bigint, token?: Token): Promise<import('ethers').TransactionResponse>;
+        allowance(spender: string, token?: Token): Promise<bigint>;
+
+        // Funds
+        deposit(amount: bigint, token?: Token, callbacks?: DepositCallbacks): Promise<import('ethers').TransactionResponse>;
+        withdraw(amount: bigint, token?: Token): Promise<import('ethers').TransactionResponse>;
+
+        // Service approvals
+        approveService(
+          service: string,
+          rateAllowance: bigint,
+          lockupAllowance: bigint,
+          maxLockupPeriod: bigint,
+          token?: Token
+        ): Promise<import('ethers').TransactionResponse>;
+        serviceApproval(service: string, token?: Token): Promise<{ isApproved: boolean; rateAllowance: bigint; rateUsed: bigint; maxLockupPeriod: bigint }>;
+        revokeService(service: string, token?: Token): Promise<import('ethers').TransactionResponse>;
+
+        // Rails
+        getRailsAsPayer(token?: Token): Promise<PaymentRail[]>;
+        getRailsAsProvider(token?: Token): Promise<PaymentRail[]>;
+        getSettlementAmounts(railId: bigint): Promise<{ totalSettledAmount: bigint }>;
+        settle(railId: bigint, upToEpoch?: bigint): Promise<import('ethers').TransactionResponse>;
+      }
+  guidance:
+    - Use approveService() once per operator (e.g., Warm Storage) with explicit rate and lockup limits before creating data sets. :contentReference[oaicite:16]{index=16}
+    - Preview with getSettlementAmounts() and only call settle() when totalSettledAmount > 0n. :contentReference[oaicite:17]{index=17}
+  example:
+    lang: typescript
+    code: |
+      import { PaymentsService } from '@filoz/synapse-sdk/payments'
+      import { ethers } from 'ethers'
+      const provider = new ethers.JsonRpcProvider(process.env.RPC!)
+      const signer = await provider.getSigner()
+      const payments = new PaymentsService(provider, signer, '0xPAYMENTS', '0xUSDFC', false)
+      const bal = await payments.walletBalance('USDFC')
+      console.log('USDFC wallet balance:', ethers.formatUnits(bal, 18))
+  since: "0.24.0"
+  ```
+
+  DepositCallbacks:
+  kind: interface
+  summary: Optional callbacks fired during allowance check, approval, and deposit.
+  definition:
+  lang: typescript
+  code: |
+  interface DepositCallbacks {
+  onAllowanceCheck?(current: bigint, required: bigint): void;
+  onApprovalTx?(tx: import('ethers').TransactionResponse): void;
+  onDepositTx?(tx: import('ethers').TransactionResponse): void;
+  }
+  guidance:
+  \- Use callbacks to emit telemetry and UX updates without awaiting each transaction.
+  \- Keep handlers idempotent; they may fire more than once in retry paths.
+  example:
+  lang: typescript
+  code: |
+  const callbacks = {
+  onAllowanceCheck: (cur, req) => console.log('allowance', cur, '/', req),
+  onApprovalTx: tx => console.log('approval tx', tx.hash),
+  onDepositTx: tx => console.log('deposit tx', tx.hash)
+  }
+
+  PaymentRail:
+  kind: interface
+  summary: A payment rail between payer and provider with per‑epoch streaming and settlement state.
+  definition:
+  lang: typescript
+  code: |
+  interface PaymentRail {
+  railId: bigint;
+  token: string;
+  payer: string;
+  payee: string;
+  ratePerEpoch: bigint;
+  settledToEpoch: bigint;
+  isTerminated: boolean;
+  }
+  guidance:
+  \- Rails are created automatically when you create a data set in Warm Storage.&#x20;
+  \- Terminate or reduce rate via service‑level operations if you need to stop accrual before settlement.
+  example:
+  lang: typescript
+  code: |
+  async function settleAll(payments: any) {
+  const rails = await payments.getRailsAsPayer()
+  for (const rail of rails) {
+  const preview = await payments.getSettlementAmounts(rail.railId)
+  if (preview\.totalSettledAmount > 0n) await (await payments.settle(rail.railId)).wait()
+  }
+  }
+
+* name: storage
+  exports: \[StorageManager, StorageContext, StorageServiceOptions, UploadCallbacks, DownloadOptions, UploadResult, PieceRetriever]
+  symbols:
+  StorageManager:
+  kind: class
+  summary: High‑level storage facade providing auto‑managed upload/download and explicit context creation.
+  definition:
+  lang: typescript
+  code: |
+  export class StorageManager {
+  createContext(options?: StorageServiceOptions): Promise<StorageContext>;
+  upload(
+  data: Uint8Array | ArrayBuffer | Blob | File | ReadableStream,
+  options?: { context?: StorageContext; providerAddress?: string; callbacks?: UploadCallbacks }
+  ): Promise<UploadResult>;
+  download(
+  pieceCid: string,
+  options?: DownloadOptions
+  ): Promise<Uint8Array>;
+  }
+  guidance:
+  \- Call upload/download directly for simple flows; createContext to pin a specific provider and data set.&#x20;
+  \- For downloads, prefer SP‑agnostic retrieval; add withCDN: true where available.&#x20;
+  example:
+  lang: javascript
+  code: |
+  const result = await synapse.storage.upload(new TextEncoder().encode('hello'))
+  const bytes = await synapse.storage.download(result.pieceCid, { withCDN: true })
+  since: "0.24.0"
+
+  StorageContext:
+  kind: class
+  summary: Bound to a specific service provider and data set; supports scoped upload/download and status queries.
+  definition:
+  lang: typescript
+  code: |
+  export class StorageContext {
+  readonly dataSetId: number;
+  readonly serviceProvider: string;
+
+  ```
+        upload(
+          data: Uint8Array | ArrayBuffer | Blob | File | ReadableStream,
+          callbacks?: UploadCallbacks
+        ): Promise<UploadResult>;
+
+        download(
+          pieceCid: string,
+          options?: { withCDN?: boolean }
+        ): Promise<Uint8Array>;
+
+        getProviderInfo(): Promise<any>;
+        getPieceStatus(pieceCid: string): Promise<any>;
+      }
+  guidance:
+    - Use explicit contexts for deterministic routing and observability when operating multiple providers. :contentReference[oaicite:21]{index=21}
+    - Reuse a context across many uploads to amortize creation and discovery overhead.
+  example:
+    lang: typescript
+    code: |
+      const ctx = await synapse.storage.createContext({ providerAddress: '0xSP' })
+      const { pieceCid } = await ctx.upload(new Uint8Array([1,2,3]))
+      const bytes = await ctx.download(pieceCid)
+  ```
+
+  StorageServiceOptions:
+  kind: interface
+  summary: Options for creating a StorageContext (provider selection, data set binding, CDN, batching).
+  definition:
+  lang: typescript
+  code: |
+  interface StorageServiceOptions {
+  providerId?: number;
+  providerAddress?: string;
+  dataSetId?: number;
+  withCDN?: boolean;
+  callbacks?: StorageCreationCallbacks;
+  uploadBatchSize?: number; // default 32, min 1
+  }
+  interface StorageCreationCallbacks {
+  onResolveProvider?(address: string): void;
+  onCreateDataSet?(dataSetId: number): void;
+  }
+  guidance:
+  \- If both providerId and providerAddress are set, providerAddress wins; avoid specifying both.
+  \- Tune uploadBatchSize for large multipart transfers; default is 32.&#x20;
+  example:
+  lang: typescript
+  code: |
+  const ctx = await synapse.storage.createContext({
+  providerAddress: '0xSP',
+  withCDN: false,
+  uploadBatchSize: 16
+  })
+
+  UploadCallbacks:
+  kind: interface
+  summary: Lifecycle hooks for upload preflight, progress, and completion.
+  definition:
+  lang: typescript
+  code: |
+  interface PreflightInfo { estimatedCost: bigint; hasAllowance: boolean }
+  interface UploadResult { pieceCid: string; size: number; dataSetId: number; providerAddress: string }
+  interface UploadCallbacks {
+  onPreflight?(info: PreflightInfo): void;
+  onProgress?(bytesSent: number, totalBytes: number): void;
+  onComplete?(result: UploadResult): void;
+  }
+  guidance:
+  \- Use onPreflight to prompt users to approve additional allowance before upload begins.&#x20;
+  \- Report progress in bytes to enable consistent UX across environments.
+  example:
+  lang: typescript
+  code: |
+  const cb = { onProgress: (sent, total) => console.log('progress', sent, '/', total) }
+  const res = await synapse.storage.upload(new Uint8Array(\[1,2]), { callbacks: cb })
+
+  DownloadOptions:
+  kind: interface
+  summary: Optional parameters controlling download routing and CDN usage.
+  definition:
+  lang: typescript
+  code: |
+  interface DownloadOptions {
+  withCDN?: boolean;
+  context?: StorageContext;
+  providerAddress?: string;
+  }
+  guidance:
+  \- Leave options empty to allow SP‑agnostic retrieval; specify providerAddress for locality or compliance.&#x20;
+  \- withCDN may reduce latency and egress costs where supported.&#x20;
+  example:
+  lang: typescript
+  code: |
+  const data = await synapse.storage.download(pieceCid, { withCDN: true })
+
+  UploadResult:
+  kind: interface
+  summary: Result object returned by uploads (piece CID, size, data set, provider).
+  definition:
+  lang: typescript
+  code: |
+  interface UploadResult {
+  pieceCid: string;
+  size: number;
+  dataSetId: number;
+  providerAddress: string;
+  }
+  guidance:
+  \- Persist pieceCid and dataSetId to correlate rails and retrievals across sessions.
+  \- providerAddress identifies the SP that accepted the piece at upload time.
+  example:
+  lang: typescript
+  code: |
+  const { pieceCid, dataSetId } = await synapse.storage.upload(new Uint8Array(\[9,9,9]))
+  console.log(pieceCid, dataSetId)
+
+  PieceRetriever:
+  kind: interface
+  summary: Custom retrieval strategy plug‑in used by StorageManager when provided in SynapseOptions.
+  definition:
+  lang: typescript
+  code: |
+  interface PieceRetriever {
+  download(pieceCid: string, options?: { withCDN?: boolean; providerAddress?: string }): Promise<Uint8Array>;
+  }
+  guidance:
+  \- Implement to add multi‑endpoint or parallel retrieval logic (e.g., Promise.any across sources).&#x20;
+  \- Return raw bytes (Uint8Array) for compatibility with SDK expectations.
+  example:
+  lang: typescript
+  code: |
+  class MyRetriever {
+  async download(cid) { /\* ... \*/ return new Uint8Array() }
+  }
+  const synapse = await Synapse.create({
+  privateKey: '0x..',
+  rpcURL: RPC\_URLS.calibration.http,
+  pieceRetriever: new MyRetriever()
+  })
+
+common\_workflows:
+
+* title: First upload — fund, approve, upload
+  steps:
+
+  * Create Synapse via Synapse.create({ privateKey, rpcURL }).
+  * Deposit USDFC with synapse.payments.deposit(amount).
+  * Approve Warm Storage via approveService(address, rate, lockup, maxPeriod).
+  * Upload bytes with synapse.storage.upload(data); store pieceCid for later retrieval.
+* title: SP‑agnostic download with CDN fallback
+  steps:
+
+  * Ensure Synapse instance is initialized.
+  * Call synapse.storage.download(pieceCid, { withCDN: true }).
+  * If preferred SP fails, rely on manager to try alternates automatically.
+* title: Settle all payable rails
+  steps:
+
+  * List rails with synapse.payments.getRailsAsPayer().
+  * Preview each with getSettlementAmounts(railId).
+  * If totalSettledAmount > 0n, call settle(railId) and wait for confirmation.
+* title: Use an explicit StorageContext
+  steps:
+
+  * Create a context with synapse.storage.createContext({ providerAddress }).
+  * Upload via context.upload(data) to pin routing.
+  * Download via context.download(pieceCid) for deterministic retrieval.
+
+troubleshooting\_cheatsheet:
+
+* symptom: Process hangs after operations when using WebSocket RPC.
+  cause: Provider connection not destroyed.
+  fix: Call synapse.getProvider()?.destroy() on shutdown.&#x20;
+* symptom: Uploads fail with "insufficient allowance".
+  cause: USDFC allowance not set or too low.
+  fix: Use approveService() (operator) or approve() (spender) before deposit/creation.&#x20;
+* symptom: Settlement does nothing.
+  cause: No accrued amount to settle for the rail.
+  fix: Preview via getSettlementAmounts() and only settle when > 0n.&#x20;
+* symptom: Network mismatch errors (unsupported chain).
+  cause: Provider not on Filecoin mainnet or calibration.
+  fix: Use RPC\_URLS.{mainnet,calibration}; others are unsupported.&#x20;
+
+faq:
+
+* q: Do I need to pass addresses for contracts?
+  a: >
+  No. The SDK discovers addresses from Warm Storage; use Synapse.create() and
+  getWarmStorageAddress()/getPaymentsAddress() when needed.&#x20;
+* q: Which token decimals should I use?
+  a: >
+  USDFC uses 18 decimals; ethers.parseUnits(..., 18). The SDK’s decimals() returns 18.&#x20;
+* q: Can I use this in the browser?
+  a: >
+  Yes. Use ethers BrowserProvider (MetaMask) and the browser bundle if needed; keep code environment‑agnostic.&#x20;
+
+external\_resources:
+
+* label: GitHub Repository
+  url: [https://github.com/FilOzone/synapse-sdk](https://github.com/FilOzone/synapse-sdk)
+* label: Docs — RPC Endpoints & Cleanup
+  url: [https://docs.filecoin.io](https://docs.filecoin.io)
+
