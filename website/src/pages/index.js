@@ -13,6 +13,12 @@ export default function Home() {
   const { siteConfig } = useDocusaurusContext();
   const features = [
     {
+      title: 'Loops HH Win Kit',
+      description:
+        'Curated agent specs and strategies to win across NEAR, OpenServ, Randamu, Golem, and Filecoin.',
+      link: '/loops-hacker-house-win-kit',
+    },
+    {
       title: 'Comprehensive Agents',
       description:
         'Browse an extensive catalogue of smart agents ready to integrate into your workflows.',
