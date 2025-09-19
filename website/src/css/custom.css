@@ -79,6 +79,11 @@
   max-width: 1000px;
   margin: 0 auto;
 }
+/* Full-width row for a single prominent card */
+.home-prominent {
+  max-width: 1000px;
+  margin: 0 auto 1.25rem;
+}
 @media (min-width: 768px) {
   .home-features { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
 }

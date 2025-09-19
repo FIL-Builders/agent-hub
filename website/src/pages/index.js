@@ -38,6 +38,9 @@ export default function Home() {
     },
   ];
 
+  const winKit = features.find((f) => f.link === '/loops-hacker-house-win-kit' || /win kit/i.test(f.title));
+  const otherFeatures = features.filter((f) => f !== winKit);
+
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <header className="heroBanner" style={{ padding: '4rem 0', textAlign: 'center' }}>
@@ -71,13 +74,24 @@ export default function Home() {
         </div>
       </header>
       <main className="container" style={{ padding: '2rem 0' }}>
+        {winKit && (
+          <div className="home-prominent">
+            <div className="ai-card" style={{ borderColor: 'var(--ifm-color-primary)' }}>
+              <h3 style={{ marginBottom: '0.25rem' }}>{winKit.title}</h3>
+              <p style={{ marginTop: 0 }}>{winKit.description}</p>
+              <Link className="button button--primary" style={{ marginTop: '0.5rem' }} to={winKit.link}>
+                Open Win Kit
+              </Link>
+            </div>
+          </div>
+        )}
         <div className="home-features">
-          {features.map((feat) => (
+          {otherFeatures.map((feat) => (
             <div key={feat.title} className="ai-card">
               <h3>{feat.title}</h3>
               <p>{feat.description}</p>
               <Link
-                className="button button--outline button--sm"
+                className="button button--primary button--sm"
                 style={{ marginTop: '0.5rem' }}
                 to={feat.link}
               >
