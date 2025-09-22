@@ -1,0 +1,562 @@
+meta:
+spec\_name: onlyswaps/solidity
+spec\_version: "0.3.0"
+generated: "2025-09-22"
+library\_version: "1.0.0"
+language: solidity
+tags: \[evm, uups, upgradeable, bls, bn254, cross-chain, hardhat, foundry]
+purpose: >
+OnlySwaps Solidity provides an upgradeable, BLS‑gated cross‑chain token swap Router plus supporting
+interfaces, libraries, and deployment scripts. This pack captures the authoritative contract signatures and the
+expert practices required to deploy, configure, upgrade, and interact with the system safely.
+guiding\_principles:
+\- Prefer interacting through interfaces (e.g., IRouter, IScheduledUpgradeable) and keep Router behind a UUPS proxy for upgradeability.&#x20;
+\- Enforce domain separation for all BLS signatures (use "swap-v1" vs "upgrade-v1" consistently) to avoid replay across apps or versions.&#x20;
+\- Respect the minimum upgrade delay (default ≥ 2 days) and prepare signatures using contract\*ParamsToBytes helpers before calling schedule/cancel.&#x20;
+\- Map destination chain IDs and token pairs before initiating swaps; Router checks allowedDstChainIds and token mappings.&#x20;
+\- Use custom errors from ErrorsLib for precise reverts and to reduce gas; assert and test against those errors.&#x20;
+\- Keep admin operations (fee withdraws, chain whitelisting, validator updates) restricted by AccessControl; use onlyAdmin where required.&#x20;
+\- Version your implementations; Router prevents same‑version upgrades and tests assert getVersion() invariants.&#x20;
+design\_notes: >
+Consolidated from README/architecture notes and canonical Solidity sources in the repository
+(Router, ScheduledUpgradeable, interfaces, signature schemes, mocks, and deployment scripts). Contract and
+interface signatures are lightly compressed to public API essentials; comments pared for clarity. Key sources:
+README/overview, Router.sol, ScheduledUpgradeable.sol, IScheduledUpgradeable.sol, IRouter.sol, UUPSProxy.sol,
+BLSBN254SignatureScheme.sol, mocks, and deployment scripts.      &#x20;
+groups:
+
+* name: core-contracts
+  exports: \[Router, ScheduledUpgradeable, UUPSProxy]
+  symbols:
+  Router:
+  kind: class
+  summary: Upgradeable cross‑chain swap router with BLS‑gated admin ops and scheduled upgrades.
+  definition:
+  lang: solidity
+  source: src/Router.sol (implements IRouter; UUPS behind proxy).  &#x20;
+  code: |
+  // Key external/public API distilled from Router.sol
+  contract Router is IRouter, ScheduledUpgradeable, AccessControlEnumerableUpgradeable, ReentrancyGuard {
+  // Roles & fee constants
+  bytes32 public constant ADMIN\_ROLE = keccak256("ADMIN\_ROLE");
+  uint256 public constant BPS\_DIVISOR = 10\_000;
+  uint256 public constant MAX\_FEE\_BPS = 5\_000;
+
+  ```
+        // Config
+        uint256 public verificationFeeBps;
+        ISignatureScheme public swapRequestBlsValidator;
+
+        // Initialization
+        function initialize(
+          address _owner,
+          address _swapRequestBlsValidator,
+          address _contractUpgradeBlsValidator,
+          uint256 _verificationFeeBps
+        ) public initializer;
+
+        // Admin: destination chains & token mappings
+        function permitDestinationChainId(uint256 chainId) external;
+        function blockDestinationChainId(uint256 chainId) external;
+        function setTokenMapping(uint256 dstChainId, address dstToken, address srcToken) external;
+        function removeTokenMapping(uint256 dstChainId, address dstToken, address srcToken) external;
+        function withdrawVerificationFee(address token, address to) external;
+
+        // BLS validator admin (overrides ScheduledUpgradeable)
+        function setContractUpgradeBlsValidator(address _contractUpgradeBlsValidator, bytes calldata signature) public override;
+
+        // Upgrades (ScheduledUpgradeable overrides)
+        function scheduleUpgrade(address newImplementation, bytes calldata upgradeCalldata, uint256 upgradeTime, bytes calldata signature) public override;
+        function cancelUpgrade(bytes calldata signature) public override;
+        function executeUpgrade() public override;
+
+        // Versioning
+        function getVersion() public pure returns (string memory);
+      }
+  guidance:
+    - Initialize via UUPS proxy and call initialize once; do not deploy Router as a standalone implementation account. :contentReference[oaicite:17]{index=17}
+    - Before swaps, whitelist destination chain IDs then set src/dst token mapping pairs. Calls revert if chain unsupported or mapping exists. :contentReference[oaicite:18]{index=18}
+    - Keep verificationFeeBps under MAX_FEE_BPS; enforce non‑zero amounts on withdrawals. :contentReference[oaicite:19]{index=19}
+    - Use setContractUpgradeBlsValidator with a valid BLS signature produced from blsValidatorUpdateParamsToBytes. :contentReference[oaicite:20]{index=20}
+    - Upgrades require domain‑separated BLS signatures; SameVersionUpgradeNotAllowed prevents no‑op upgrades. :contentReference[oaicite:21]{index=21}
+  example:
+    lang: javascript
+    description: Read version; then (admin) permit a chain and set token mapping.
+    code: |
+      import { ethers } from "ethers";
+      const rpc = process.env.RPC_URL;
+      const routerAddr = process.env.ROUTER_PROXY;
+      const dstChainId = BigInt(process.env.DST_CHAIN_ID || "84532");
+      const srcToken = process.env.SRC_ERC20;
+      const dstToken = process.env.DST_ERC20;
+
+      // ABI fragment with the functions we call
+      const abi = [
+        "function getVersion() view returns (string)",
+        "function permitDestinationChainId(uint256)",
+        "function setTokenMapping(uint256,address,address)"
+      ];
+
+      const provider = new ethers.JsonRpcProvider(rpc);
+      const signer = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+      const router = new ethers.Contract(routerAddr, abi, signer);
+
+      console.log("Router version:", await router.getVersion()); // "1.0.0"
+      // Admin ops:
+      await (await router.permitDestinationChainId(dstChainId)).wait();
+      await (await router.setTokenMapping(dstChainId, dstToken, srcToken)).wait();
+  since: "1.0.0"
+  ```
+
+  ScheduledUpgradeable:
+  kind: class
+  summary: Abstract base for time‑locked UUPS upgrades with BLS (BN254) gating and replay‑safe nonces.
+  definition:
+  lang: solidity
+  source: src/ScheduledUpgradeable.sol + IScheduledUpgradeable.sol.  &#x20;
+  code: |
+  abstract contract ScheduledUpgradeable is IScheduledUpgradeable, Initializable, UUPSUpgradeable {
+  // State
+  uint256 public currentNonce;
+  address public scheduledImplementation;
+  bytes internal scheduledImplementationCalldata;
+  uint256 public scheduledTimestampForUpgrade;
+  uint256 public minimumContractUpgradeDelay;
+  ISignatureScheme public contractUpgradeBlsValidator;
+
+  ```
+        // Initializer
+        function __ScheduledUpgradeable_init(address _contractUpgradeBlsValidator, uint256 _minimumContractUpgradeDelay)
+          internal onlyInitializing;
+
+        // External
+        function scheduleUpgrade(address newImplementation, bytes calldata upgradeCalldata, uint256 upgradeTime, bytes calldata signature) public virtual;
+        function cancelUpgrade(bytes calldata signature) public virtual;
+        function executeUpgrade() public virtual;
+
+        // Admin
+        function setContractUpgradeBlsValidator(address _contractUpgradeBlsValidator, bytes calldata signature) public virtual;
+        function setMinimumContractUpgradeDelay(uint256 _minimumContractUpgradeDelay) external;
+
+        // Getters/helpers
+        function currentNonce() external view returns (uint256);
+        function scheduledImplementation() external view returns (address);
+        function scheduledTimestampForUpgrade() external view returns (uint256);
+        function contractUpgradeBlsValidator() external view returns (ISignatureScheme);
+        function minimumContractUpgradeDelay() external view returns (uint256);
+        function contractUpgradeParamsToBytes(
+          string memory action,
+          address pendingImplementation,
+          address newImplementation,
+          bytes memory upgradeCalldata,
+          uint256 upgradeTime,
+          uint256 nonce
+        ) external view returns (bytes memory message, bytes memory messageAsG1Bytes);
+        function blsValidatorUpdateParamsToBytes(address blsValidator, uint256 nonce)
+          external view returns (bytes memory message, bytes memory messageAsG1Bytes);
+        function getChainId() external view returns (uint256);
+      }
+  guidance:
+    - Compute message bytes via contractUpgradeParamsToBytes / blsValidatorUpdateParamsToBytes, then sign off‑chain with BN254; pass signature bytes on schedule/cancel/update. :contentReference[oaicite:25]{index=25}
+    - Enforce minimumContractUpgradeDelay (default ≥ 2 days); attempts below this revert with UpgradeTimeMustRespectDelay. :contentReference[oaicite:26]{index=26}
+    - Nonce increments per message; track and use currentNonce()+1 when forming messages to avoid replay. :contentReference[oaicite:27]{index=27}
+  example:
+    lang: javascript
+    description: Prepare upgrade message bytes for BLS signing (read‑only call).
+    code: |
+      import { ethers } from "ethers";
+      const abi = [
+        "function contractUpgradeParamsToBytes(string,address,address,bytes,uint256,uint256) view returns (bytes,bytes)"
+      ];
+      const provider = new ethers.JsonRpcProvider(process.env.RPC_URL);
+      const contract = new ethers.Contract(process.env.ROUTER_PROXY, abi, provider);
+
+      const action = "schedule";
+      const pendingImpl = await contract.getAddress();    // or 0x0
+      const newImpl = process.env.NEW_IMPL;
+      const data = "0x";
+      const minDelay = 2n * 24n * 60n * 60n;
+      const upgradeTime = BigInt(Math.floor(Date.now()/1000)) + minDelay + 1n;
+      const nonce = 1n; // typically currentNonce()+1
+
+      const [message, g1Bytes] = await contract.contractUpgradeParamsToBytes(
+        action, pendingImpl, newImpl, data, upgradeTime, nonce
+      );
+      // Sign g1Bytes with your BN254 BLS signer off-chain, then call scheduleUpgrade(...)
+  since: "1.0.0"
+  ```
+
+  UUPSProxy:
+  kind: class
+  summary: Thin ERC1967 UUPS proxy with a helper to read the current implementation.
+  definition:
+  lang: solidity
+  source: src/proxy/UUPSProxy.sol.&#x20;
+  code: |
+  import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+  contract UUPSProxy is ERC1967Proxy {
+  constructor(address \_implementation, bytes memory \_data) ERC1967Proxy(\_implementation, \_data) {}
+  function getImplementation() external view returns (address) { return \_implementation(); }
+  }
+  guidance:
+  \- Use upgradeToAndCall on the proxy’s implementation logic (via UUPS) from the authorized upgrader when executing upgrades.&#x20;
+  \- getImplementation is a convenience view to introspect the current implementation for audits and CI checks.&#x20;
+  example:
+  lang: javascript
+  code: |
+  import { ethers } from "ethers";
+  const abi = \["function getImplementation() view returns (address)"];
+  const proxy = new ethers.Contract(process.env.ROUTER\_PROXY, abi, new ethers.JsonRpcProvider(process.env.RPC\_URL));
+  console.log("Impl:", await proxy.getImplementation());
+
+* name: interfaces
+  exports: \[IRouter, IScheduledUpgradeable]
+  symbols:
+  IRouter:
+  kind: interface
+  summary: Interface describing Router’s swap structs, events, and core external functions.
+  definition:
+  lang: solidity
+  source: src/interfaces/IRouter.sol (+ tested usage for swap/relay/rebalance). &#x20;
+  code: |
+  import {BLS} from "bls-solidity/libraries/BLS.sol";
+  interface IRouter {
+  // -------- Structs --------
+  struct SwapRequestParameters {
+  address sender;
+  address recipient;
+  address tokenIn;
+  address tokenOut;
+  uint256 amountOut;
+  uint256 srcChainId;
+  uint256 dstChainId;
+  uint256 verificationFee;
+  uint256 solverFee;
+  uint256 nonce;
+  bool executed;
+  uint256 requestedAt;
+  }
+
+  ```
+        struct SwapRequestReceipt {
+          bytes32 requestId;
+          uint256 srcChainId;
+          uint256 dstChainId;
+          address token;
+          bool fulfilled;
+          address solver;
+          address recipient;
+          uint256 amountOut;
+          uint256 fulfilledAt;
+        }
+
+        // -------- Events (subset) --------
+        event SwapRequested(bytes32 indexed requestId, uint256 indexed srcChainId, uint256 indexed dstChainId);
+
+        // -------- Functions (subset) --------
+        function getVersion() external pure returns (string memory);
+        function swapRequestParametersToBytes(bytes32 requestId, address solver)
+          external view returns (bytes memory message, bytes memory messageAsG1Bytes);
+        function relayTokens(address token, address recipient, uint256 amount, bytes32 requestId, uint256 srcChainId) external;
+        function rebalanceSolver(address solver, bytes32 requestId, bytes calldata sigBytes) external;
+        function permitDestinationChainId(uint256 chainId) external;
+        function setTokenMapping(uint256 dstChainId, address dstToken, address srcToken) external;
+      }
+  guidance:
+    - Derive BLS messages for swap/relay from swapRequestParametersToBytes; sign off‑chain using the solver’s BN254 key. :contentReference[oaicite:33]{index=33}
+    - After relaying on the destination chain, call rebalanceSolver on the source chain with the solver’s signature to settle fees. :contentReference[oaicite:34]{index=34}
+  example:
+    lang: javascript
+    code: |
+      import { ethers } from "ethers";
+      const abi = [
+        "function swapRequestParametersToBytes(bytes32,address) view returns (bytes,bytes)",
+        "function rebalanceSolver(address,bytes32,bytes)"
+      ];
+      const provider = new ethers.JsonRpcProvider(process.env.SRC_RPC_URL);
+      const router = new ethers.Contract(process.env.ROUTER_SRC, abi, new ethers.Wallet(process.env.PRIVATE_KEY, provider));
+
+      const requestId = process.env.REQUEST_ID;
+      const solver = process.env.SOLVER_ADDR;
+
+      const [, g1Bytes] = await router.swapRequestParametersToBytes(requestId, solver);
+      // Sign g1Bytes off‑chain with BN254, then submit:
+      // await (await router.rebalanceSolver(solver, requestId, signatureBytes)).wait();
+  ```
+
+  IScheduledUpgradeable:
+  kind: interface
+  summary: Interface for scheduling, cancelling, and executing UUPS upgrades with BN254 BLS authorization.
+  definition:
+  lang: solidity
+  source: src/interfaces/IScheduledUpgradeable.sol. &#x20;
+  code: |
+  import {BLS} from "bls-solidity/libraries/BLS.sol";
+  import {ISignatureScheme} from "bls-solidity/interfaces/ISignatureScheme.sol";
+
+  ```
+      interface IScheduledUpgradeable {
+        // Events
+        event MinimumContractUpgradeDelayUpdated(uint256 newDelay);
+        event UpgradeScheduled(address indexed newImplementation, uint256 executeAfter);
+        event UpgradeCancelled(address indexed cancelledImplementation);
+        event UpgradeExecuted(address indexed newImplementation);
+        event ContractUpgradeBLSValidatorUpdated(address indexed contractUpgradeBlsValidator);
+
+        // Upgrades
+        function scheduleUpgrade(address newImplementation, bytes calldata upgradeCalldata, uint256 upgradeTime, bytes calldata signature) external;
+        function cancelUpgrade(bytes calldata signature) external;
+        function executeUpgrade() external;
+
+        // Admin
+        function setContractUpgradeBlsValidator(address _contractUpgradeBlsValidator, bytes calldata signature) external;
+        function setMinimumContractUpgradeDelay(uint256 _minimumContractUpgradeDelay) external;
+
+        // Getters / helpers
+        function currentNonce() external view returns (uint256);
+        function scheduledImplementation() external view returns (address);
+        function scheduledTimestampForUpgrade() external view returns (uint256);
+        function contractUpgradeBlsValidator() external view returns (ISignatureScheme);
+        function minimumContractUpgradeDelay() external view returns (uint256);
+        function contractUpgradeParamsToBytes(
+          string memory action,
+          address pendingImplementation,
+          address newImplementation,
+          bytes memory upgradeCalldata,
+          uint256 upgradeTime,
+          uint256 nonce
+        ) external view returns (bytes memory, bytes memory);
+        function blsValidatorUpdateParamsToBytes(address blsValidator, uint256 nonce) external view returns (bytes memory, bytes memory);
+        function getChainId() external view returns (uint256);
+      }
+  guidance:
+    - Use getChainId in message formation to prevent cross‑chain signature replay; match the on‑chain DST to your signer. :contentReference[oaicite:37]{index=37}
+    - Emit-and‑watch lifecycle: UpgradeScheduled → (optionally) UpgradeCancelled → UpgradeExecuted; confirm timestamps and nonces. :contentReference[oaicite:38]{index=38}
+  example:
+    lang: javascript
+    code: |
+      import { ethers } from "ethers";
+      const abi = [
+        "function blsValidatorUpdateParamsToBytes(address,uint256) view returns (bytes,bytes)"
+      ];
+      const c = new ethers.Contract(process.env.ROUTER_PROXY, abi, new ethers.JsonRpcProvider(process.env.RPC_URL));
+      const [, g1Bytes] = await c.blsValidatorUpdateParamsToBytes(process.env.NEW_BLS_VALIDATOR, 2n);
+      // Sign g1Bytes with your BN254 BLS keys; then call setContractUpgradeBlsValidator(...)
+  ```
+
+* name: signature-schemes
+  exports: \[BLSBN254SignatureScheme]
+  symbols:
+  BLSBN254SignatureScheme:
+  kind: class
+  summary: BN254 BLS signature verifier with application‑scoped domain separation (e.g., "swap-v1", "upgrade-v1").
+  definition:
+  lang: solidity
+  source: src/signature-schemes/BLSBN254SignatureScheme.sol.&#x20;
+  code: |
+  import {BN254SignatureScheme} from "bls-solidity/signature-schemes/BN254SignatureScheme.sol";
+  import {BLS} from "bls-solidity/libraries/BLS.sol";
+
+  ```
+      contract BLSBN254SignatureScheme is BN254SignatureScheme {
+        constructor(uint256[2] memory x, uint256[2] memory y, string memory application)
+          BN254SignatureScheme(BLS.g2Marshal(BLS.PointG2({x: x, y: y})), application) {}
+      }
+  guidance:
+    - Deploy separate instances for each application context to enforce DST, e.g., one for swap requests and one for upgrades. :contentReference[oaicite:40]{index=40}
+    - Persist deployed addresses (e.g., JSON) and inject into Router.initialize to bind validators. Use provided deployment scripts. :contentReference[oaicite:41]{index=41}
+  example:
+    lang: javascript
+    code: |
+      import { ethers } from "ethers";
+      const abi = ["constructor(uint256[2] x, uint256[2] y, string application)"];
+      // Use real G2 public key coords (x[2], y[2]) for your validator:
+      const factory = await new ethers.ContractFactory(abi, "0x", new ethers.Wallet(process.env.PRIVATE_KEY, new ethers.JsonRpcProvider(process.env.RPC_URL)));
+      // NOTE: In practice, deploy using Foundry scripts shown in the repo.
+  ```
+
+* name: tokens-mocks
+  exports: \[ERC20Token, ERC20FaucetToken]
+  symbols:
+  ERC20Token:
+  kind: class
+  summary: Minimal ERC20 with mint/burn & selectable decimals for testing and demos.
+  definition:
+  lang: solidity
+  source: src/mocks/ERC20Token.sol.&#x20;
+  code: |
+  contract ERC20Token is ERC20, ERC20Permit, ERC20Votes {
+  constructor(string memory name, string memory symbol, uint8 decimals\_);
+  function mint(address account, uint256 amount) external;
+  function burn(address account, uint256 amount) external;
+  function decimals() public view override returns (uint8);
+  }
+  guidance:
+  \- For cross‑chain demos, deploy matching tokens on src/dst and map via Router before testing flows.&#x20;
+  \- Not production‑grade; for governance flows, ERC20Votes hooks are present but unconfigured.
+  example:
+  lang: javascript
+  code: |
+  import { ethers } from "ethers";
+  const abi = \["function mint(address,uint256)", "function decimals() view returns (uint8)"];
+  const t = new ethers.Contract(process.env.TOKEN, abi, new ethers.Wallet(process.env.PRIVATE\_KEY, new ethers.JsonRpcProvider(process.env.RPC\_URL)));
+  await (await t.mint(process.env.WALLET, 10n \*\* 18n)).wait();
+
+  ERC20FaucetToken:
+  kind: class
+  summary: ERC20 with a 24‑hour faucet mint window; owner can adjust faucetAmount.
+  definition:
+  lang: solidity
+  source: src/mocks/ERC20FaucetToken.sol.&#x20;
+  code: |
+  contract ERC20FaucetToken is ERC20, ERC20Permit, ERC20Votes, Ownable {
+  uint8 private \_decimals;
+  uint256 public faucetAmount;
+  uint256 public constant FAUCET\_INTERVAL = 1 days;
+  mapping(address => uint256) public lastMint;
+
+  ```
+        event FaucetAmountSet(uint256 faucetAmount);
+        constructor(string memory name, string memory symbol, uint8 decimals_, uint256 faucetAmount_, address owner);
+        function mint() external;                         // 1x / 24h per address
+        function setFaucetAmount(uint256 faucetAmount_) external onlyOwner;
+        function burn(address account, uint256 amount) external;
+        function decimals() public view override returns (uint8);
+      }
+  guidance:
+    - Faucet enforces a 24h window per address; test timing with block.timestamp controls in local chains. :contentReference[oaicite:45]{index=45}
+    - Prefer stable symbols/names from deployment parameters to match demo scripts and CLI outputs. :contentReference[oaicite:46]{index=46}
+  example:
+    lang: javascript
+    code: |
+      import { ethers } from "ethers";
+      const abi = ["function mint()", "function setFaucetAmount(uint256)"];
+      const f = new ethers.Contract(process.env.RUSD, abi, new ethers.Wallet(process.env.PRIVATE_KEY, new ethers.JsonRpcProvider(process.env.RPC_URL)));
+      await (await f.mint()).wait(); // may revert if called within 24h
+  ```
+
+* name: libraries
+  exports: \[ErrorsLib, Constants]
+  symbols:
+  ErrorsLib:
+  kind: other
+  summary: Custom errors used across Router/ScheduledUpgradeable for precise, gas‑efficient reverts.
+  definition:
+  lang: solidity
+  source: src/libraries/ErrorsLib.sol.&#x20;
+  code: |
+  library ErrorsLib {
+  error AlreadyFulfilled(); error InvalidTokenOrRecipient(); error ZeroAmount(); error FeeTooLow();
+  error TokenMappingAlreadyExists(); error InvalidFeeBps(); error TokenNotSupported(); error UnauthorisedCaller();
+  error NewFeeTooLow(uint256 newFee, uint256 currentFee);
+  error DestinationChainIdNotSupported(uint256 dstChainId);
+  error FeeBpsExceedsThreshold(uint256 maxFeeBps);
+  error BLSSignatureVerificationFailed(); error SwapRequestParametersMismatch();
+  error SourceChainIdMismatch(uint256 swapRequestParamsSrcChainId, uint256 contractChainId);
+  error NoUpgradePending(); error UpgradeTooEarly(uint256 upgradeTime); error TooLateToCancelUpgrade(uint256 upgradeTime);
+  error ZeroAddress(); error GrantRoleFailed(); error UpgradeMustGoThroughExecuteUpgrade(); error UpgradeFailed();
+  error UpgradeDelayTooShort(); error UpgradeTimeMustRespectDelay(uint256 earliestTime); error SameVersionUpgradeNotAllowed();
+  }
+  guidance:
+  \- In tests, assert specific custom errors for negative paths (e.g., BLSSignatureVerificationFailed, SameVersionUpgradeNotAllowed).&#x20;
+  \- Map errors to user‑facing messages in off‑chain tooling to improve DX.
+
+  Constants:
+  kind: other
+  summary: Shared deployment constants used by Foundry scripts (SALT, DEPLOYMENT\_CONFIG\_DIR keys, etc.).
+  definition:
+  lang: solidity
+  source: script/onlyswaps/libraries/Constants.sol.&#x20;
+  code: |
+  library Constants {
+  bytes32 constant SALT = bytes32(uint256(2));
+  string constant SIGNATURE\_SCHEME\_ID = "BN254";
+  string constant DEPLOYMENT\_CONFIG\_DIR = "/script/onlyswaps/json/";
+  string constant KEY\_RUSD = "rusdFaucet";
+  string constant KEY\_BN254\_SWAP\_REQUEST\_SIGNATURE\_SCHEME = "bn254SwapRequestSignatureSchemeAddress";
+  string constant KEY\_BN254\_CONTRACT\_UPGRADE\_SIGNATURE\_SCHEME = "bn254ContractUpgradeSignatureSchemeAddress";
+  string constant KEY\_ROUTER\_PROXY = "routerProxyAddress";
+  string constant KEY\_ROUTER\_IMPLEMENTATION = "routerImplementationAddress";
+  }
+  guidance:
+  \- Keep SALT stable to predict addresses across chains for demos; rotate when you need distinct deployments.&#x20;
+  \- Persist outputs under DEPLOYMENT\_CONFIG\_DIR and feed them into subsequent configure scripts.&#x20;
+
+common\_workflows:
+
+* title: Deploy validators and Router behind UUPS
+  steps:
+
+  * "Deploy BN254 swap‑request validator with application='swap-v1'. "
+  * "Deploy BN254 upgrade validator with application='upgrade-v1'. "
+  * "Deploy Router implementation via CREATE2, then UUPSProxy, then call initialize(owner, swapBLS, upgradeBLS, feeBps). "
+  * "Persist addresses to JSON (DEPLOYMENT\_CONFIG\_DIR/<chainId>.json) for later scripts. "
+
+* title: Configure Router for a destination chain and token mapping
+  steps:
+
+  * "permitDestinationChainId(dstChainId) as ADMIN. "
+  * "setTokenMapping(dstChainId, dstToken, srcToken). Reverts if chain not permitted or mapping exists. "
+
+* title: Form a swap message and relay/settle
+  steps:
+
+  * "On source chain, after SwapRequested, call swapRequestParametersToBytes(requestId, solver) to get message/g1Bytes. "
+  * "Sign g1Bytes with solver’s BN254 key."
+  * "On dest chain, relayTokens(tokenDst, recipient, amount, requestId, srcChainId). "
+  * "On source chain, rebalanceSolver(solver, requestId, sigBytes) to settle fees. "
+
+* title: Schedule → execute a UUPS upgrade
+  steps:
+
+  * "Compute message via contractUpgradeParamsToBytes('schedule', pendingImpl, newImpl, calldata, T, nonce). "
+  * "Sign off‑chain (BN254) and call scheduleUpgrade(..., signature). Enforce T ≥ now + minimumContractUpgradeDelay. "
+  * "After timestamp passes, call executeUpgrade(). Verify new getImplementation() and Router.getVersion().  "
+
+* title: Update BLS validators (admin)
+  steps:
+
+  * "Build validator‑update message via blsValidatorUpdateParamsToBytes(newValidator, nonce). "
+  * "Sign and call setContractUpgradeBlsValidator(newValidator, sig) or Router.setSwapRequestBlsValidator(...) as applicable. "
+
+* title: Withdraw verification fees
+  steps:
+
+  * "Call withdrawVerificationFee(token, to) as ADMIN; reverts if balance is zero. Track per‑token balances off‑chain. "
+
+troubleshooting\_cheatsheet:
+
+* symptom: "BLSSignatureVerificationFailed"
+  cause: "Wrong domain (application), incorrect message bytes, or mismatched public key/curve order."
+  fix: "Recreate message via helper (…ParamsToBytes), confirm chainId/DST, sign with BN254, and pass exact sig bytes. "
+* symptom: "SameVersionUpgradeNotAllowed"
+  cause: "New implementation’s getVersion() equals current Router version."
+  fix: "Deploy a new implementation that returns a different version; tests validate this behavior.  "
+* symptom: "UpgradeTimeMustRespectDelay / UpgradeDelayTooShort"
+  cause: "Scheduled timestamp earlier than minimumContractUpgradeDelay or initializing with < 2 days."
+  fix: "Use now + delay + ε; keep minimum delay ≥ 2 days at init. "
+* symptom: "DestinationChainIdNotSupported / TokenMappingAlreadyExists"
+  cause: "Missing permit for chain ID or duplicate token mapping."
+  fix: "Call permitDestinationChainId first; check mapping existence before setting. "
+* symptom: "AccessControlUnauthorizedAccount"
+  cause: "Non‑admin calling admin‑only method."
+  fix: "Grant ADMIN\_ROLE or execute with admin signer; tests assert reverts on unauthorized access. "
+
+faq:
+
+* q: "Is Router upgradeable and how is authorization enforced?"
+  a: "Yes. Router inherits ScheduledUpgradeable (UUPS). Schedule/cancel/validator updates are authorized via BN254 BLS signatures with domain separation."
+* q: "What’s the default minimum upgrade delay?"
+  a: "Two days by default; attempts below this revert. Adjust via setMinimumContractUpgradeDelay. "
+* q: "Where do I get the message to sign for upgrades or validator updates?"
+  a: "Call contractUpgradeParamsToBytes or blsValidatorUpdateParamsToBytes and sign the returned G1 bytes off‑chain. "
+* q: "How do I map tokens across chains?"
+  a: "As ADMIN, call permitDestinationChainId(dstChainId) then setTokenMapping(dstChainId, dstToken, srcToken). "
+
+external\_resources:
+
+* label: OpenZeppelin UUPSUpgradeable (proxy pattern)
+  url: [https://docs.openzeppelin.com/contracts/4.x/api/proxy#UUPSUpgradeable](https://docs.openzeppelin.com/contracts/4.x/api/proxy#UUPSUpgradeable)
+* label: bls-solidity (BN254 BLS library used by OnlySwaps)
+  url: [https://github.com/randa-mu/bls-solidity](https://github.com/randa-mu/bls-solidity)
+
