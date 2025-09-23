@@ -48,7 +48,7 @@ export default async (req) => {
     return new Response(
       JSON.stringify({
         jsonrpc: "2.0",
-        error: { code: -32603, message: "Internal server error" },
+        error: { code: -32603, message: (error && (error.stack || error.message)) || "Internal server error" },
         id: ""
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
