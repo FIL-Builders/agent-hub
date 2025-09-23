@@ -20,6 +20,25 @@ exports.handler = async function (event) {
   try {
     const { method, params, id } = JSON.parse(event.body);
 
+    // MCP-compatible aliases
+    if (method === "tools/list") {
+      const toolDefs = await mcpListTools();
+      return jsonrpc(id, { tools: toolDefs });
+    }
+
+    if (method === "tools/call") {
+      const { name, arguments: args = {} } = params || {};
+      if (!name) return jsonrpcError(id, "Missing tool name");
+      const version = args.version || "latest";
+      const content = await readAgentByName(name, version);
+      // MCP content array result
+      return jsonrpc(id, { content: [{ type: "text", text: content }] });
+    }
+
+    if (method === "ping") {
+      return jsonrpc(id, { status: "ok", t: Date.now() });
+    }
+
     if (method === "getToolManifest") {
       const { tool_id } = params;
       const manifest = await buildToolManifest(tool_id);
@@ -125,4 +144,30 @@ function corsHeaders() {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With"
   };
+}
+
+// Build MCP tool definitions with input_schema
+async function mcpListTools() {
+  const tools = await listAllTools();
+  return tools.map(({ tool_id, versions }) => ({
+    name: tool_id,
+    description: `Agent for ${tool_id}`,
+    input_schema: {
+      type: "object",
+      properties: {
+        version: { type: "string", enum: versions, description: "Agent file version (or 'latest')" }
+      },
+      required: versions && versions.length ? ["version"] : []
+    }
+  }));
+}
+
+async function readAgentByName(name, version) {
+  // name corresponds to tool_id
+  if (version === "latest") {
+    const all = await listVersions(name);
+    if (!all.length) throw new Error(`No versions found for tool: ${name}`);
+    version = all.sort().reverse()[0];
+  }
+  return await readAgentFile(name, version);
 }
