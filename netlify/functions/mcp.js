@@ -6,9 +6,14 @@ const AGENTS_DIR = path.join(process.cwd(), "agents");
 exports.handler = async function (event) {
   // Basic CORS handling for browsers / clients like ChatGPT or Cursor
   if (event.httpMethod === "OPTIONS") {
+    const reqHeaders = (event.headers && (event.headers["access-control-request-headers"] || event.headers["Access-Control-Request-Headers"])) || "*";
     return {
       statusCode: 204,
-      headers: corsHeaders(),
+      headers: {
+        ...corsHeaders(),
+        "Access-Control-Allow-Headers": reqHeaders,
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD"
+      },
       body: ""
     };
   }
@@ -174,7 +179,8 @@ async function listVersions(tool_id) {
 
 function jsonrpcError(id, message) {
   return {
-    statusCode: 500,
+    // Return 200 so picky clients don't fail transport creation
+    statusCode: 200,
     body: JSON.stringify({
       jsonrpc: "2.0",
       id,
