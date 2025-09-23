@@ -60,10 +60,17 @@ export const config = { path: "/mcp" };
 async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   const server = new McpServer({ name: "agent-hub", version: "1.0.0" }, { capabilities: { logging: {} } });
 
-  server.tool(
+  // Register tools using the new API so inputSchema is honored
+  server.registerTool(
     "agenthub.list",
-    "List available AgentHub tools (paged)",
-    z.object({ q: z.string().optional().default(""), limit: z.number().int().min(1).max(100).default(20), offset: z.number().int().min(0).default(0) }),
+    {
+      description: "List available AgentHub tools (paged)",
+      inputSchema: z.object({
+        q: z.string().optional().default(""),
+        limit: z.number().int().min(1).max(100).default(20),
+        offset: z.number().int().min(0).default(0)
+      })
+    },
     async ({ q = "", limit = 20, offset = 0 }) => {
       const all = await listAllTools({ fs, path, AGENTS_DIR });
       const qnorm = String(q).toLowerCase();
@@ -74,20 +81,24 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "agenthub.versions",
-    "List available versions for a tool_id",
-    z.object({ tool_id: z.string() }),
+    {
+      description: "List available versions for a tool_id",
+      inputSchema: z.object({ tool_id: z.string() })
+    },
     async ({ tool_id }) => {
       const versions = await listVersions({ fs, path, AGENTS_DIR, tool_id });
       return { content: [{ type: "text", text: JSON.stringify({ tool_id, versions }) }] };
     }
   );
 
-  server.tool(
+  server.registerTool(
     "agenthub.fetch",
-    "Fetch a specific AgentHub YAML by tool_id + version",
-    z.object({ tool_id: z.string(), version: z.string().optional().default("latest") }),
+    {
+      description: "Fetch a specific AgentHub YAML by tool_id + version",
+      inputSchema: z.object({ tool_id: z.string(), version: z.string().optional().default("latest") })
+    },
     async ({ tool_id, version = "latest" }) => {
       const yaml = await readAgentByName({ fs, path, AGENTS_DIR, name: tool_id, version });
       return { content: [{ type: "text", text: yaml }] };
