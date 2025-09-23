@@ -12,15 +12,8 @@ const OUTPUT_FILE_MCP = path.join(OUTPUT_DIR, "mcp/ai-plugin.json");
 const OUTPUT_FILE_ROOT = path.join(OUTPUT_DIR, "ai-plugin.json");
 
 (async () => {
-  const tools = [];
-
-  const toolDirs = fs.readdirSync(AGENTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name);
-
-  for (const tool_id of toolDirs) {
-    tools.push({ tool_id });
-  }
+  // Keep manifest tools minimal for client UX; discovery happens via tools/list.
+  const tools = [{ tool_id: "agenthub.fetch" }];
 
   const baseUrl = (process.env.MCP_BASE_URL || process.env.DEPLOY_PRIME_URL || process.env.DEPLOY_URL || process.env.URL || "http://localhost:8888").replace(/\/$/, "");
   const manifest = {

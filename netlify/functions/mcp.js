@@ -22,16 +22,38 @@ exports.handler = async function (event) {
 
     // MCP-compatible aliases
     if (method === "tools/list" || method === "tools.list") {
-      const toolDefs = await mcpListTools();
+      const toolDefs = mcpGenericTools();
       return jsonrpc(id, { tools: toolDefs });
     }
 
     if (method === "tools/call" || method === "tools.call") {
       const { name, arguments: args = {} } = params || {};
       if (!name) return jsonrpcError(id, "Missing tool name");
-      const version = args.version || "latest";
-      const content = await readAgentByName(name, version);
-      // MCP content array result
+      const tool = String(name);
+
+      if (tool === "agenthub.list") {
+        const { q = "", limit = 20, offset = 0 } = args || {};
+        const page = await agenthubList({ q, limit, offset });
+        return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify(page) }] });
+      }
+
+      if (tool === "agenthub.versions") {
+        const { tool_id } = args || {};
+        if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
+        const versions = await listVersions(tool_id);
+        return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify({ tool_id, versions }) }] });
+      }
+
+      if (tool === "agenthub.fetch") {
+        const { tool_id, version = "latest" } = args || {};
+        if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
+        const yaml = await readAgentByName(tool_id, version);
+        return jsonrpc(id, { content: [{ type: "text", text: yaml }] });
+      }
+
+      // Back-compat: treat unknown tool as direct fetch by tool_id
+      const version = (args && args.version) || "latest";
+      const content = await readAgentByName(tool, version);
       return jsonrpc(id, { content: [{ type: "text", text: content }] });
     }
 
@@ -146,20 +168,60 @@ function corsHeaders() {
   };
 }
 
-// Build MCP tool definitions with input_schema
-async function mcpListTools() {
-  const tools = await listAllTools();
-  return tools.map(({ tool_id, versions }) => ({
-    name: tool_id,
-    description: `Agent for ${tool_id}`,
-    input_schema: {
-      type: "object",
-      properties: {
-        version: { type: "string", enum: versions, description: "Agent file version (or 'latest')" }
-      },
-      required: versions && versions.length ? ["version"] : []
+// Small, stable MCP tool surface
+function mcpGenericTools() {
+  return [
+    {
+      name: "agenthub.list",
+      description: "List available AgentHub tools (paged)",
+      input_schema: {
+        type: "object",
+        properties: {
+          q: { type: "string", description: "Filter by tool_id substring" },
+          limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+          offset: { type: "integer", minimum: 0, default: 0 }
+        }
+      }
+    },
+    {
+      name: "agenthub.versions",
+      description: "List available versions for a tool_id",
+      input_schema: {
+        type: "object",
+        properties: {
+          tool_id: { type: "string" }
+        },
+        required: ["tool_id"]
+      }
+    },
+    {
+      name: "agenthub.fetch",
+      description: "Fetch a specific AgentHub YAML by tool_id + version",
+      input_schema: {
+        type: "object",
+        properties: {
+          tool_id: { type: "string" },
+          version: { type: "string", description: "Version or 'latest'", default: "latest" }
+        },
+        required: ["tool_id"]
+      }
     }
-  }));
+  ];
+}
+
+async function agenthubList({ q = "", limit = 20, offset = 0 }) {
+  const all = await listAllTools();
+  const qnorm = String(q || "").toLowerCase();
+  const filtered = qnorm
+    ? all.filter(({ tool_id }) => tool_id.toLowerCase().includes(qnorm))
+    : all;
+
+  const total = filtered.length;
+  const lim = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+  const off = Math.max(0, parseInt(offset, 10) || 0);
+  const items = filtered.slice(off, off + lim);
+
+  return { total, limit: lim, offset: off, q, items };
 }
 
 async function readAgentByName(name, version) {
