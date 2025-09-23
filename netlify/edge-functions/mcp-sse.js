@@ -52,7 +52,8 @@ export default async (request, context) => {
         jsonrpc: "2.0",
         method: "server/config",
         params: {
-          rpcInbox: origin ? `${origin}/mcp` : "/mcp" // your existing POST endpoint
+          // Prefer direct function path to avoid redirects and edge quirks
+          rpcInbox: origin ? `${origin}/.netlify/functions/mcp` : "/.netlify/functions/mcp"
         }
       });
 
