@@ -38,11 +38,21 @@ export default async (request, context) => {
 
       // 2) optional: tell client where to POST JSON-RPC requests
       // so you can do full round-trip (client -> POST /mcp, server -> SSE back)
+      // derive origin dynamically for portability across deploy previews / custom domains
+      const origin = (() => {
+        try {
+          const u = new URL(request.url);
+          return `${u.protocol}//${u.host}`;
+        } catch (_) {
+          return "";
+        }
+      })();
+
       send({
         jsonrpc: "2.0",
         method: "server/config",
         params: {
-          rpcInbox: "https://agent-hub-1.netlify.app/mcp" // your existing POST endpoint
+          rpcInbox: origin ? `${origin}/mcp` : "/mcp" // your existing POST endpoint
         }
       });
 
@@ -86,4 +96,3 @@ export default async (request, context) => {
     }
   });
 };
-

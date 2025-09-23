@@ -1,0 +1,144 @@
+{
+  "schema_version": "v1",
+  "name": "AgentHub MCP Server",
+  "description": "MCP over SSE + JSON-RPC; serves versioned AgentHub YAML tools.",
+  "mcp": {
+    "transport": "sse",
+    "sse_url": "http://localhost:8888/mcp/sse",
+    "rpc_url": "http://localhost:8888/mcp"
+  },
+  "tools": [
+    {
+      "tool_id": "0glabs"
+    },
+    {
+      "tool_id": "1inch"
+    },
+    {
+      "tool_id": "blocklock"
+    },
+    {
+      "tool_id": "chainway"
+    },
+    {
+      "tool_id": "docusaurus"
+    },
+    {
+      "tool_id": "ens"
+    },
+    {
+      "tool_id": "ethers"
+    },
+    {
+      "tool_id": "fetchai"
+    },
+    {
+      "tool_id": "fil-frame"
+    },
+    {
+      "tool_id": "filecoin"
+    },
+    {
+      "tool_id": "filecoin-fs-upload-dapp"
+    },
+    {
+      "tool_id": "filecoin-synapse-sdk"
+    },
+    {
+      "tool_id": "flow"
+    },
+    {
+      "tool_id": "fluence"
+    },
+    {
+      "tool_id": "golem-base-json-rpc"
+    },
+    {
+      "tool_id": "hackathon"
+    },
+    {
+      "tool_id": "hardhat"
+    },
+    {
+      "tool_id": "hedera"
+    },
+    {
+      "tool_id": "helia"
+    },
+    {
+      "tool_id": "impulseai"
+    },
+    {
+      "tool_id": "kadena"
+    },
+    {
+      "tool_id": "lighthouse-web3-sdk"
+    },
+    {
+      "tool_id": "loops-hacker-house-win-kit"
+    },
+    {
+      "tool_id": "monad"
+    },
+    {
+      "tool_id": "mopro"
+    },
+    {
+      "tool_id": "near-ai-environment"
+    },
+    {
+      "tool_id": "near-intents-1click-and-explorer"
+    },
+    {
+      "tool_id": "near-twitter-contract-rs"
+    },
+    {
+      "tool_id": "openserv-labs-sdk"
+    },
+    {
+      "tool_id": "polygon-cdk"
+    },
+    {
+      "tool_id": "polygon-matic"
+    },
+    {
+      "tool_id": "polygon-pos"
+    },
+    {
+      "tool_id": "polygon-zkevm-expert-pack"
+    },
+    {
+      "tool_id": "pyth"
+    },
+    {
+      "tool_id": "randamu-dcipher-sdk"
+    },
+    {
+      "tool_id": "randamu-onlyswaps"
+    },
+    {
+      "tool_id": "react"
+    },
+    {
+      "tool_id": "redux"
+    },
+    {
+      "tool_id": "rootstock"
+    },
+    {
+      "tool_id": "selfxyz-contracts-sdk"
+    },
+    {
+      "tool_id": "the-graph"
+    },
+    {
+      "tool_id": "uniswapx"
+    },
+    {
+      "tool_id": "walrus"
+    },
+    {
+      "tool_id": "worldcoin"
+    }
+  ]
+}

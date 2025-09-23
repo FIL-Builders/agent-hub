@@ -4,8 +4,17 @@ const path = require("path");
 const AGENTS_DIR = path.join(process.cwd(), "agents");
 
 exports.handler = async function (event) {
+  // Basic CORS handling for browsers / clients like ChatGPT or Cursor
+  if (event.httpMethod === "OPTIONS") {
+    return {
+      statusCode: 204,
+      headers: corsHeaders(),
+      body: ""
+    };
+  }
+
   if (event.httpMethod !== "POST") {
-    return { statusCode: 405, body: "Method not allowed" };
+    return { statusCode: 405, headers: corsHeaders(), body: "Method not allowed" };
   }
 
   try {
@@ -71,7 +80,7 @@ function jsonrpc(id, result) {
   return {
     statusCode: 200,
     body: JSON.stringify({ jsonrpc: "2.0", id, result }),
-    headers: { "Content-Type": "application/json" }
+    headers: { ...corsHeaders(), "Content-Type": "application/json" }
   };
 }
 
@@ -91,7 +100,7 @@ function jsonrpcError(id, message) {
       id,
       error: { code: -32000, message }
     }),
-    headers: { "Content-Type": "application/json" }
+    headers: { ...corsHeaders(), "Content-Type": "application/json" }
   };
 }
 
@@ -110,3 +119,10 @@ async function listAllTools() {
   return tools;
 }
 
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With"
+  };
+}
