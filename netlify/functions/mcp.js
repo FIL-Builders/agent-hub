@@ -8,14 +8,15 @@ export default async (req) => {
     const [
       streamableMod,
       mcpMod,
-      zodMod,
+      typesMod,
       fetchToNodeMod,
       fsMod,
       pathMod
     ] = await Promise.all([
       import("@modelcontextprotocol/sdk/server/streamableHttp.js"),
       import("@modelcontextprotocol/sdk/server/mcp.js"),
-      import("zod"),
+      // Import z from the SDK's own bundled zod to avoid version mismatch
+      import("@modelcontextprotocol/sdk/dist/esm/types.js"),
       import("fetch-to-node"),
       import("fs/promises"),
       import("path")
@@ -23,7 +24,7 @@ export default async (req) => {
 
     const { StreamableHTTPServerTransport } = streamableMod;
     const { McpServer } = mcpMod;
-    const { z } = zodMod;
+    const { z } = typesMod;
     const { toFetchResponse, toReqRes } = fetchToNodeMod;
     const fs = fsMod.default || fsMod;
     const path = pathMod.default || pathMod;
@@ -60,16 +61,16 @@ export const config = { path: "/mcp" };
 async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   const server = new McpServer({ name: "agent-hub", version: "1.0.0" }, { capabilities: { logging: {} } });
 
-  // Register tools using the new API so inputSchema is honored
+  // Register tools using the config API so inputSchema is honored (raw Zod shape)
   server.registerTool(
     "agenthub.list",
     {
       description: "List available AgentHub tools (paged)",
-      inputSchema: z.object({
+      inputSchema: {
         q: z.string().optional().default(""),
         limit: z.number().int().min(1).max(100).default(20),
         offset: z.number().int().min(0).default(0)
-      })
+      }
     },
     async ({ q = "", limit = 20, offset = 0 }) => {
       const all = await listAllTools({ fs, path, AGENTS_DIR });
@@ -85,7 +86,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
     "agenthub.versions",
     {
       description: "List available versions for a tool_id",
-      inputSchema: z.object({ tool_id: z.string() })
+      inputSchema: { tool_id: z.string() }
     },
     async ({ tool_id }) => {
       const versions = await listVersions({ fs, path, AGENTS_DIR, tool_id });
@@ -97,7 +98,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
     "agenthub.fetch",
     {
       description: "Fetch a specific AgentHub YAML by tool_id + version",
-      inputSchema: z.object({ tool_id: z.string(), version: z.string().optional().default("latest") })
+      inputSchema: { tool_id: z.string(), version: z.string().optional().default("latest") }
     },
     async ({ tool_id, version = "latest" }) => {
       const yaml = await readAgentByName({ fs, path, AGENTS_DIR, name: tool_id, version });
