@@ -209,7 +209,7 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS, HEAD",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With"
+    "Access-Control-Allow-Headers": "*"
   };
 }
 
