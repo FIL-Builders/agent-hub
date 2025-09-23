@@ -8,6 +8,11 @@
     "build:site": "cd website && npm install && npm run build",
     "build": "npm run gen-mcp && npm run build:site"
   },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.1",
+    "fetch-to-node": "^2.1.0",
+    "zod": "^4.1.11"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
