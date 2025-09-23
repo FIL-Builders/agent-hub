@@ -200,6 +200,10 @@ Tips:
   - `[functions."mcp"].included_files = ["agents/**"]` ensures the YAML agents ship with the function bundle.
 - Push to a Netlify‑connected repo, or build locally with `npm run build` and let Netlify run the same command in CI (`build.command`).
 
+- GET `/.well-known/mcp/health`
+  - Backed by Netlify Function `mcp-health`.
+  - Returns `{ status: "ok", time, mcp: { transport: "sse" }, sse, rpc, manifest }` with CORS enabled.
+
 
 ## MCP Discovery Manifest
 
