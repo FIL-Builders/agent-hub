@@ -287,15 +287,23 @@
 .yaml-actions { display: none; gap: 0.5rem; }
 .yaml-action-btn {
   border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
-  background: transparent;
-  color: #ffffff; /* white text on buttons */
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-color-content);
   border-radius: 0.5rem;
   padding: 0.35rem 0.55rem;
   cursor: pointer;
   text-decoration: none;
 }
-.yaml-action-btn:hover { background-color: rgba(255,255,255,0.08); }
-.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+.yaml-action-btn:hover { background-color: var(--ifm-color-emphasis-100, #f3f4f6); }
+.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5); }
+
+[data-theme='dark'] .yaml-action-btn {
+  border-color: #2b2f36;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+[data-theme='dark'] .yaml-action-btn:hover { background-color: rgba(255,255,255,0.08); }
+[data-theme='dark'] .yaml-action-btn:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
 
 /* Show icon bar on >= 640px; mobile shows kebab */
 @media (min-width: 640px) {
