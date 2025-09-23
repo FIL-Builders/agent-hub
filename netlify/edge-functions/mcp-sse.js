@@ -1,6 +1,31 @@
 // /netlify/edge-functions/mcp-sse.js
 
 export default async (request, context) => {
+  // Handle CORS preflight and head checks for SSE
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive"
+      }
+    });
+  }
+
+  if (request.method === "HEAD") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-cache, no-transform",
+        "Connection": "keep-alive"
+      }
+    });
+  }
+
   if (request.method !== "GET") {
     return new Response("Method Not Allowed", { status: 405 });
   }
