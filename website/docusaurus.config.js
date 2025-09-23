@@ -66,13 +66,12 @@ const config = {
     ],
   ],
 
-  // Microsoft Clarity analytics
-  scripts: [
-    {
-      src: 'https://www.clarity.ms/tag/tf6he9p70s',
-      async: true,
-    },
-  ],
+  // Custom fields for client code
+  customFields: {
+    clarityProjectId: 'tf6he9p70s',
+  },
+
+  // Microsoft Clarity analytics is initialized via NPM in `src/theme/Root.js`.
 
   themeConfig: /** @type {import('@docusaurus/preset-classic').ThemeConfig} */ ({
     image: 'img/agent-hub-logo.png',
