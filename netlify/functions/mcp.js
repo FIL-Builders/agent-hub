@@ -8,15 +8,15 @@ export default async (req) => {
     const [
       streamableMod,
       mcpMod,
-      z3Mod,
+      zodMod,
       fetchToNodeMod,
       fsMod,
       pathMod
     ] = await Promise.all([
       import("@modelcontextprotocol/sdk/server/streamableHttp.js"),
       import("@modelcontextprotocol/sdk/server/mcp.js"),
-      // Import z from the SDK's nested dependency to match versions
-      import("@modelcontextprotocol/sdk/node_modules/zod"),
+      // Use zod from root deps (must be v3.x to match SDK)
+      import("zod"),
       import("fetch-to-node"),
       import("fs/promises"),
       import("path")
@@ -24,7 +24,7 @@ export default async (req) => {
 
     const { StreamableHTTPServerTransport } = streamableMod;
     const { McpServer } = mcpMod;
-    const { z } = z3Mod;
+    const { z } = zodMod;
     const { toFetchResponse, toReqRes } = fetchToNodeMod;
     const fs = fsMod.default || fsMod;
     const path = pathMod.default || pathMod;
