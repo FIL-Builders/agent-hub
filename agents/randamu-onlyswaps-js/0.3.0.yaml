@@ -1,0 +1,450 @@
+meta:
+spec\_name: onlyswaps-js
+spec\_version: "0.3.0"
+generated: "2025-09-23"
+library\_version: "^0.0.0"
+language: typescript
+homepage: [https://github.com/randa-mu/onlyswaps-js](https://github.com/randa-mu/onlyswaps-js)
+tags:
+\- ethereum
+\- viem
+\- cross-chain
+\- defi
+\- sdk
+\- dcipher
+\- typescript
+purpose: >
+A lightweight TypeScript client that lets apps mint/test a faucet ERC‑20 (RUSD),
+approve spend, request cross‑chain swaps through the OnlySwaps Router, check
+request status/receipt, and tune solver fees—built on top of viem clients.
+guiding\_principles:
+\- Use viem’s PublicClient (reads) and WalletClient (writes) against the same chain; keep chain configuration consistent between both.&#x20;
+\- Treat all token values as 18‑decimal fixed‑point integers (bigint). Convert user input with `rusdFromString`/`rusdFromNumber` and format for UI with `rusdToString`.&#x20;
+\- Always approve the Router as spender before calling a swap; the provided client’s `swap` path performs an approval of `amount+fee` for safety.&#x20;
+\- Use `fetchRecommendedFee` to seed a reasonable `fee`, then update with `updateFee` if network conditions change. Units are RUSD (18 dp).&#x20;
+\- After sending a swap, rely on the emitted `SwapRequested` event to obtain `requestId`; handle the edge case where no event is found.&#x20;
+\- Differentiate status on source chain (`fetchStatus`) vs. fulfillment on destination chain (`fetchReceipt`); `executed` (status) vs. `fulfilled` (receipt) mean different things.&#x20;
+\- For clearer error messages on failed writes, simulate and decode revert data (as done by `throwOnError`) instead of surfacing generic failures.&#x20;
+design\_notes: >
+This pack was derived from the project source (TypeScript) and tests. Contracts and router
+interactions come from `src/onlyswaps.ts`; RUSD client and 18‑dp helpers from `src/rusd.ts`;
+request/receipt types from `src/model.ts`; integration usage patterns from `test/integration.test.ts`;
+behavior of fixed‑point helpers from `test/rusd.test.ts`. The structure follows Open Agent Spec v0.3’s
+requirement that each symbol include an authoritative `definition` block (code+lang).     &#x20;
+
+groups:
+
+* name: Clients
+  exports:
+
+  * OnlySwapsViemClient
+  * RUSDViemClient
+    symbols:
+    OnlySwapsViemClient:
+    kind: class
+    summary: Viem‑backed client for the OnlySwaps Router: request swaps, suggest/update fees, and query status/receipt.&#x20;
+    definition:
+    lang: typescript
+    source: src/onlyswaps.ts
+    code: |
+    export class OnlySwapsViemClient implements OnlySwaps {
+    constructor(
+    private account: `0x${string}`,
+    private contractAddress: Address,
+    private publicClient: PublicClient,
+    private walletClient: WalletClient,
+    private abi: Abi = DEFAULT\_ABI,
+    );
+    fetchRecommendedFee(
+    tokenAddress: `0x${string}`,
+    amount: bigint,
+    srcChainId: bigint,
+    dstChainId: bigint
+    ): Promise<bigint>;
+    swap(request: SwapRequest, client?: RUSD): Promise<SwapResponse>;
+    updateFee(requestId: `0x${string}`, newFee: bigint): Promise<void>;
+    fetchStatus(requestId: `0x${string}`): Promise<SwapRequestParameters>;
+    fetchReceipt(requestId: `0x${string}`): Promise<SwapRequestReceipt>;
+    }
+    guidance:
+
+    * Provide both a `PublicClient` and `WalletClient` from viem; they must share the same chain configuration (e.g., Foundry/Anvil in tests).&#x20;
+    * Before swapping, ensure the Router is approved to spend RUSD for `amount + fee`; the client path invokes `approveSpend` to cover both.&#x20;
+    * `fetchRecommendedFee` returns a suggested fee (18‑dp bigint); treat it as a starting point and let users override with `updateFee`.&#x20;
+    * The client extracts `requestId` by parsing the `SwapRequested` event from the transaction receipt; handle the rare case of no matching event.&#x20;
+    * Use `fetchStatus` on the source chain to watch parameters like `solverFee`; use `fetchReceipt` on the destination chain to check `fulfilled` and `amountOut`.&#x20;
+      example:
+      lang: typescript
+      description: Minimal end‑to‑end swap flow on a local Anvil chain.
+      code: |
+      import { createPublicClient, createWalletClient, http } from "viem";
+      import { privateKeyToAccount } from "viem/accounts";
+      import { foundry } from "viem/chains";
+      import { OnlySwapsViemClient, RUSDViemClient, type SwapRequest } from "onlyswaps-js";
+
+      (async () => {
+      const account = privateKeyToAccount("0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d");
+      const publicClient = createPublicClient({ chain: foundry, transport: http("[http://localhost:31337](http://localhost:31337)") });
+      const walletClient  = createWalletClient({ chain: foundry, transport: http("[http://localhost:31337](http://localhost:31337)"), account });
+
+      const MY = account.address as `0x${string}`;
+      const RUSD = "0xEFdbe33D9014FFde884Bf055D5202e3851213805" as const;
+      const ROUTER = "0x3d86B64a0f09Ca611edbcfB68309dFdEed87Ad89" as const;
+
+      const rusd = new RUSDViemClient(MY, RUSD, publicClient, walletClient);
+      const only = new OnlySwapsViemClient(MY, ROUTER, publicClient, walletClient);
+
+      await rusd.mint();
+      const req: SwapRequest = { recipient: MY, tokenAddress: RUSD, amount: 100n, fee: 1n, destinationChainId: 1338n };
+      const { requestId } = await only.swap(req, rusd);
+      const before = await only.fetchStatus(requestId);
+      await only.updateFee(requestId, before.solverFee + 1n);
+      const after = await only.fetchStatus(requestId);
+      console.log({ requestId, before: before.solverFee, after: after.solverFee });
+      })();
+      since: "0.0.0"
+      RUSDViemClient:
+      kind: class
+      summary: Minimal ERC‑20 faucet token (RUSD) viem client for minting, approving, and reading balances.&#x20;
+      definition:
+      lang: typescript
+      source: src/rusd.ts
+      code: |
+      export interface RUSD {
+      mint(): Promise<void>;
+      balanceOf(address: Address): Promise<bigint>;
+      approveSpend(address: Address, amount: bigint): Promise<void>;
+      }
+
+      export class RUSDViemClient implements RUSD {
+      constructor(
+      private account: Address,
+      private contractAddr: Address,
+      private publicClient: PublicClient,
+      private walletClient: WalletClient,
+      private abi: Abi = DEFAULT\_ABI
+      );
+      mint(): Promise<void>;
+      balanceOf(address: Address): Promise<bigint>;
+      approveSpend(address: Address, amount: bigint): Promise<void>;
+      }
+      guidance:
+    * `mint()` uses a faucet‑style method on the token contract; it requires a signer (WalletClient) and succeeds only on supported networks (e.g., local Anvil).&#x20;
+    * `approveSpend(router, amount)` should typically be for `amount + fee` prior to calling the Router client’s `swap`.&#x20;
+    * Prefer formatting balances with `rusdToString(balance, dp)` when displaying to users; keep raw `bigint` for arithmetic.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { RUSDViemClient } from "onlyswaps-js";
+      // assume publicClient/walletClient and addresses are prepared
+      async function demo(rusdAddr: `0x${string}`, me: `0x${string}`, router: `0x${string}`, pc: any, wc: any) {
+      const rusd = new RUSDViemClient(me, rusdAddr, pc, wc);
+      await rusd.mint();
+      const bal = await rusd.balanceOf(me);
+      console.log("Minted:", bal);
+      await rusd.approveSpend(router, bal);
+      }
+      since: "0.0.0"
+
+* name: Interfaces
+  exports:
+
+  * OnlySwaps
+  * RUSD
+    symbols:
+    OnlySwaps:
+    kind: interface
+    summary: High‑level Router operations: swap, fee suggestion/update, and status/receipt queries.&#x20;
+    definition:
+    lang: typescript
+    source: src/model.ts
+    code: |
+    export interface OnlySwaps {
+    swap(options: SwapRequest): Promise<SwapResponse>;
+    updateFee(requestId: `0x${string}`, newFee: bigint): Promise<void>;
+    fetchRecommendedFee(tokenAddress: `0x${string}`, amount: bigint, srcChainId: bigint, destChainId: bigint): Promise<bigint>;
+    fetchStatus(requestId: `0x${string}`): Promise<SwapRequestParameters>;
+    fetchReceipt(requestId: `0x${string}`): Promise<SwapRequestReceipt>;
+    }
+    guidance:
+
+    * `swap` initiates a cross‑chain request; capture the returned `requestId` for subsequent tracking and fee updates.&#x20;
+    * Use `fetchStatus` on the source chain to monitor `solverFee`, `verificationFee`, and `executed`; use `fetchReceipt` on the destination chain to see `fulfilled` and `amountOut`.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { OnlySwaps, SwapRequest } from "onlyswaps-js";
+      async function track(only: OnlySwaps, req: SwapRequest) {
+      const { requestId } = await only.swap(req);
+      const status = await only.fetchStatus(requestId);
+      if (!status.executed) await only.updateFee(requestId, status.solverFee + 1n);
+      return await only.fetchReceipt(requestId);
+      }
+      since: "0.0.0"
+      RUSD:
+      kind: interface
+      summary: Narrow ERC‑20 surface needed by the Router workflow: mint, approve, balanceOf.&#x20;
+      definition:
+      lang: typescript
+      source: src/rusd.ts
+      code: |
+      export interface RUSD {
+      mint(): Promise<void>;
+      balanceOf(address: Address): Promise<bigint>;
+      approveSpend(address: Address, amount: bigint): Promise<void>;
+      }
+      guidance:
+    * This interface can be implemented against any 18‑dp ERC‑20; the provided `RUSDViemClient` is a faucet token for testing.&#x20;
+    * Keep arithmetic in `bigint` and format only at the UI layer with `rusdToString`.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { RUSD } from "onlyswaps-js";
+      async function ensureAllowance(token: RUSD, router: `0x${string}`, amount: bigint) {
+      await token.approveSpend(router, amount);
+      }
+      since: "0.0.0"
+
+* name: Types
+  exports:
+
+  * SwapRequest
+  * SwapResponse
+  * SwapRequestParameters
+  * SwapRequestReceipt
+    symbols:
+    SwapRequest:
+    kind: type
+    summary: Input for `swap`—who receives, what token, how much, fee, and destination chain.&#x20;
+    definition:
+    lang: typescript
+    source: src/model.ts
+    code: |
+    export type SwapRequest = {
+    recipient: `0x${string}`;
+    tokenAddress: `0x${string}`;
+    amount: bigint; // amount of stablecoin in ether, e.g. 100n == 100 USD
+    fee: bigint;    // fee amount in stablecoin expressed as ether, e.g. 1n == 1 USD
+    destinationChainId: bigint;
+    };
+    guidance:
+
+    * All numeric fields are 18‑decimal `bigint`s; never pass JS `number` here—convert first.&#x20;
+    * `recipient` and `tokenAddress` are EVM addresses typed as template literal hex strings.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { SwapRequest } from "onlyswaps-js";
+      const req: SwapRequest = {
+      recipient: "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      tokenAddress: "0xEFdbe33D9014FFde884Bf055D5202e3851213805",
+      amount: 100n,
+      fee: 1n,
+      destinationChainId: 1338n
+      };
+      since: "0.0.0"
+      SwapResponse:
+      kind: type
+      summary: Return value from `swap`, containing the unique `requestId`.&#x20;
+      definition:
+      lang: typescript
+      source: src/model.ts
+      code: |
+      export type SwapResponse = {
+      requestId: `0x${string}`;
+      };
+      guidance:
+    * Persist `requestId` immediately; it’s the key for `fetchStatus`, `updateFee`, and `fetchReceipt`.&#x20;
+    * `requestId` is emitted via the `SwapRequested` event which the client parses from logs.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { SwapResponse } from "onlyswaps-js";
+      function remember(res: SwapResponse) { console.log(res.requestId); }
+      since: "0.0.0"
+      SwapRequestParameters:
+      kind: type
+      summary: Source‑chain view of a swap request (fees, amounts, nonce, execution flag, timing).&#x20;
+      definition:
+      lang: typescript
+      source: src/model.ts
+      code: |
+      export type SwapRequestParameters = {
+      sender: `0x${string}`,
+      recipient: `0x${string}`,
+      tokenIn: `0x${string}`,
+      tokenOut: `0x${string}`,
+      amountOut: bigint,
+      srcChainId: bigint,
+      dstChainId: bigint,
+      verificationFee: bigint,
+      solverFee: bigint,
+      nonce: bigint,
+      executed: boolean,   // verified by the dcipher network
+      requestedAt: bigint,
+      };
+      guidance:
+    * Use to monitor solver and verification fees; update the solver fee if needed with `updateFee`.&#x20;
+    * `executed` reflects dcipher verification of completion (distinct from destination `fulfilled`).&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { SwapRequestParameters } from "onlyswaps-js";
+      function logStatus(s: SwapRequestParameters) {
+      console.log(s.solverFee, s.executed);
+      }
+      since: "0.0.0"
+      SwapRequestReceipt:
+      kind: type
+      summary: Destination‑chain receipt of fulfillment (token, solver, recipient, amountOut, time).&#x20;
+      definition:
+      lang: typescript
+      source: src/model.ts
+      code: |
+      export type SwapRequestReceipt = {
+      requestId: `0x${string}`,
+      srcChainId: bigint,
+      dstChainId: bigint,
+      token: `0x${string}`,
+      fulfilled: boolean,  // solver completed transfer (dcipher verification may be separate)
+      solver: `0x${string}`,
+      recipient: `0x${string}`,
+      amountOut: bigint,
+      fulfilledAt: bigint
+      };
+      guidance:
+    * Check `fulfilled` to confirm solver completion on the destination chain; combine with source `executed` for end‑to‑end state.&#x20;
+    * Use `amountOut` for UI/receipts; format with `rusdToString(amountOut, dp)`.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import type { SwapRequestReceipt } from "onlyswaps-js";
+      function settled(r: SwapRequestReceipt) {
+      if (r.fulfilled) console.log("Done at", r.fulfilledAt.toString());
+      }
+      since: "0.0.0"
+
+* name: RUSD formatting helpers (18‑dp)
+  exports:
+
+  * rusdToString
+  * rusdFromString
+  * rusdFromNumber
+    symbols:
+    rusdToString:
+    kind: function
+    summary: Format a 18‑dp bigint as a decimal string, truncating (not rounding) to the requested places.&#x20;
+    definition:
+    lang: typescript
+    source: src/rusd.ts
+    code: |
+    export function rusdToString(value: bigint, decimals: number = 2): string;
+    guidance:
+
+    * Decimals greater than 18 are clamped to 18; output is truncated, not rounded (e.g., 1.99999 → "1.9999" at 4 dp).&#x20;
+    * Small magnitudes print leading zeros correctly (e.g., 42 wei‑style → "0.000000" at 6 dp).&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { rusdToString } from "onlyswaps-js";
+      console.log(rusdToString(1111000000000000000n, 3)); // "1.111"
+      since: "0.0.0"
+      rusdFromString:
+      kind: function
+      summary: Parse a human string into a 18‑dp bigint; extra fractional digits are truncated to 18 places.&#x20;
+      definition:
+      lang: typescript
+      source: src/rusd.ts
+      code: |
+      export function rusdFromString(input: string): bigint;
+      guidance:
+    * Accepts optional leading sign and decimals; more than 18 fractional digits are truncated (no rounding).&#x20;
+    * Invalid inputs throw `Error("cannot parse string as RUSD value")`; validate user input upstream.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { rusdFromString } from "onlyswaps-js";
+      const v = rusdFromString("1.123456789012345678"); // 1123456789012345678n
+      console.log(v);
+      since: "0.0.0"
+      rusdFromNumber:
+      kind: function
+      summary: Convert a JS number to 18‑dp bigint using Decimal.js rounding to nearest integer of wei‑style units.&#x20;
+      definition:
+      lang: typescript
+      source: src/rusd.ts
+      code: |
+      export function rusdFromNumber(input: number): bigint;
+      guidance:
+    * Values are scaled by 10^18 and rounded; very small magnitudes below 0.5 wei round to 0, ≥0.5 to 1.&#x20;
+    * Handles negatives and zero explicitly; prefer `rusdFromString` for user input to avoid JS float pitfalls.&#x20;
+      example:
+      lang: typescript
+      code: |
+      import { rusdFromNumber } from "onlyswaps-js";
+      console.log(rusdFromNumber(1.1)); // 1100000000000000000n
+      since: "0.0.0"
+
+common\_workflows:
+
+* title: Local integration test loop (Anvil + deploy + enable)&#x20;
+  steps:
+
+  * "Start Anvil via Docker Compose and wait for it to come up."&#x20;
+  * "Deploy OnlySwaps contracts to the test chain with the provided script."&#x20;
+  * "Enable transfers and map the default RUSD token between source/destination chain ids."&#x20;
+  * "Run the Jest integration test suite; inspect logs for request ids and fees."&#x20;
+* title: Approve and request a swap
+  steps:
+
+  * "Mint RUSD on the local faucet contract using `RUSDViemClient.mint()`."&#x20;
+  * "Approve the Router to spend `amount + fee` via `approveSpend(router, total)`."&#x20;
+  * "Call `OnlySwapsViemClient.swap(req)` and store the returned `requestId`."&#x20;
+* title: Track status and receipt across chains
+  steps:
+
+  * "Poll `fetchStatus(requestId)` on the source chain to observe `solverFee`, `verificationFee`, and `executed`."&#x20;
+  * "Check `fetchReceipt(requestId)` on the destination chain for `fulfilled` and `amountOut`."&#x20;
+* title: Fee management best practice
+  steps:
+
+  * "Seed `fee` with `fetchRecommendedFee(token, amount, src, dst)` (18‑dp bigint)."&#x20;
+  * "If the request lingers unfulfilled, bump with `updateFee(requestId, newFee)` and verify via `fetchStatus`."&#x20;
+
+troubleshooting\_cheatsheet:
+
+* symptom: Swap write reverted with an unhelpful error string.
+  cause: The revert reason wasn’t decoded.
+  fix: Simulate and decode revert data like `throwOnError` does to surface the specific contract error.&#x20;
+* symptom: `requestId` is undefined after `swap`.
+  cause: The `SwapRequested` event wasn’t found in the receipt logs.
+  fix: Ensure the Router ABI matches the deployed contract and the event is emitted; the client parses that event to extract the id.&#x20;
+* symptom: Fee values look off by powers of ten.
+  cause: Mixing JS `number`/string with 18‑dp `bigint` amounts.
+  fix: Convert inputs with `rusdFromString`/`rusdFromNumber` and format outputs with `rusdToString`.&#x20;
+* symptom: Increasing fee has no effect.
+  cause: The request is already fulfilled/executed.
+  fix: Check `fetchStatus(requestId).executed` and `fetchReceipt(requestId).fulfilled` before calling `updateFee`.&#x20;
+
+faq:
+
+* q: What units do `amount` and `fee` use?
+  a: Both are 18‑decimal fixed‑point bigints (e.g., `100n` means 100.000000000000000000 RUSD). Comments in the type definitions clarify this.&#x20;
+* q: Does `rusdToString` round?
+  a: No—output is truncated to the requested decimals; more than 18 requested decimals are clamped to 18.&#x20;
+* q: How is `requestId` obtained?
+  a: The client parses the `SwapRequested` event from the transaction receipt and returns its `requestId` argument.&#x20;
+* q: What’s the difference between `executed` and `fulfilled`?
+  a: `executed` in `SwapRequestParameters` indicates dcipher verification on the source chain, while `fulfilled` in `SwapRequestReceipt` means the solver completed the transfer on the destination chain.&#x20;
+
+external\_resources:
+
+* label: viem documentation
+  url: [https://viem.sh/docs/](https://viem.sh/docs/)
+* label: Foundry (Anvil) book
+  url: [https://book.getfoundry.sh/](https://book.getfoundry.sh/)
+* label: Docker — Get started
+  url: [https://docs.docker.com/get-started/](https://docs.docker.com/get-started/)
+* label: Decimal.js docs
+  url: [https://mikemcl.github.io/decimal.js/](https://mikemcl.github.io/decimal.js/)
+
