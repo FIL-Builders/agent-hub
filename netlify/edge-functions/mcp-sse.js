@@ -57,10 +57,48 @@ export default async (request, context) => {
         }
       });
 
-      // 3) heartbeats (keep connection from idling out)
+      // 3) proactively share minimal tool definitions to help clients initialize
+      const genericTools = [
+        {
+          name: "agenthub.list",
+          description: "List available AgentHub tools (paged)",
+          input_schema: {
+            type: "object",
+            properties: {
+              q: { type: "string", description: "Filter by tool_id substring" },
+              limit: { type: "integer", minimum: 1, maximum: 100, default: 20 },
+              offset: { type: "integer", minimum: 0, default: 0 }
+            }
+          }
+        },
+        {
+          name: "agenthub.versions",
+          description: "List available versions for a tool_id",
+          input_schema: {
+            type: "object",
+            properties: { tool_id: { type: "string" } },
+            required: ["tool_id"]
+          }
+        },
+        {
+          name: "agenthub.fetch",
+          description: "Fetch a specific AgentHub YAML by tool_id + version",
+          input_schema: {
+            type: "object",
+            properties: {
+              tool_id: { type: "string" },
+              version: { type: "string", description: "Version or 'latest'", default: "latest" }
+            },
+            required: ["tool_id"]
+          }
+        }
+      ];
+      send({ jsonrpc: "2.0", method: "tools/list", params: { tools: genericTools } });
+
+      // 4) heartbeats (keep connection from idling out)
       const heartbeat = setInterval(ping, 15000);
 
-      // 4) example: push a periodic status (you can remove this)
+      // 5) example: push a periodic status (you can remove this)
       const ticker = setInterval(() => {
         send({
           jsonrpc: "2.0",
