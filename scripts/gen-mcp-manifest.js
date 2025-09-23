@@ -19,12 +19,10 @@ const OUTPUT_FILE_ROOT = path.join(OUTPUT_DIR, "ai-plugin.json");
   const manifest = {
     schema_version: "v1",
     name: "AgentHub MCP Server",
-    description: "MCP over HTTP + SSE; serves versioned AgentHub YAML tools.",
+    description: "MCP over Streamable HTTP; serves versioned AgentHub YAML tools.",
     mcp: {
-      // Prefer HTTP RPC; SSE is optional and used for readiness + push notifications
       transport: "http",
-      rpc_url: `${baseUrl}/.netlify/functions/mcp`,
-      sse_url: `${baseUrl}/mcp/sse`
+      rpc_url: `${baseUrl}/mcp`
     },
     tools
   };
