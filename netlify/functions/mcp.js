@@ -44,7 +44,7 @@ exports.handler = async function (event) {
               sse: "/mcp/sse",
               rpc: "/.netlify/functions/mcp"
             },
-            methods: ["tools/list", "tools/call", "listTools", "getToolManifest", "runTool", "ping"]
+            methods: ["initialize", "tools/list", "tools/call", "listTools", "getToolManifest", "runTool", "ping"]
           }
         })
       };
@@ -70,7 +70,7 @@ exports.handler = async function (event) {
 
 async function handleRpc(method, params, id) {
   // MCP initialize handshake
-  if (method === "initialize") {
+  if (method === "initialize" || method === "server/initialize") {
     const pv = (params && params.protocolVersion) || "2025-03-26";
     return jsonrpc(id, {
       protocolVersion: pv,
