@@ -66,6 +66,14 @@ const config = {
     ],
   ],
 
+  // Microsoft Clarity analytics
+  scripts: [
+    {
+      src: 'https://www.clarity.ms/tag/tf6he9p70s',
+      async: true,
+    },
+  ],
+
   themeConfig: /** @type {import('@docusaurus/preset-classic').ThemeConfig} */ ({
     image: 'img/agent-hub-logo.png',
     navbar: {
@@ -87,8 +95,8 @@ const config = {
         },
         { to: '/blog', label: 'Blog', position: 'left' },
         {
-          href: 'https://github.com/FIL-Builders/agent-hub',
-          label: 'GitHub',
+          href: 'https://github.com/FIL-Builders/agent-hub/issues/new?template=request-new-agent.md',
+          label: 'Suggest Agent',
           position: 'right',
         },
       ],
@@ -108,7 +116,7 @@ const config = {
         {
           title: 'Community',
           items: [
-		  /*
+          /*
             {
               label: 'Stack Overflow',
               href: 'https://stackoverflow.com/questions/tagged/docusaurus',
@@ -117,10 +125,11 @@ const config = {
               label: 'Discord',
               href: 'https://discordapp.com/invite/docusaurus',
             },
-	    */
+          */
             {
-              label: 'Follow @GerminaLabs on X',
-              href: 'https://x.com/germinalabs',
+              html:
+                '<a class="button button--primary" href="https://x.com/germinalabs" target="_blank" rel="noopener noreferrer">Follow @GerminaLabs on X</a>' +
+                '<div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.85;">tag, comment, like</div>',
             },
           ],
         },
