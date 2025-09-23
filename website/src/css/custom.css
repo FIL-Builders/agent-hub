@@ -663,3 +663,22 @@ footer, footer p, footer a {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* Dark mode overrides for version + pill link */
+[data-theme='dark'] .agent-version-latest,
+[data-theme='dark'] .pill-link {
+  background: color-mix(in srgb, var(--accent), #0f172a 85%);
+  border-color: color-mix(in srgb, var(--accent), #0f172a 60%);
+  color: color-mix(in srgb, var(--accent), #fff 70%);
+}
+
+[data-theme='dark'] .agent-lang-pill {
+  background: color-mix(in srgb, var(--accent), #0f172a 80%);
+  border-color: color-mix(in srgb, var(--accent), #0f172a 50%);
+  color: var(--accent);
+}
+
+[data-theme='dark'] .yaml-dropdown-item:hover,
+[data-theme='dark'] .action-sheet-item:hover {
+  background: color-mix(in srgb, var(--accent), #0f172a 75%);
+}
