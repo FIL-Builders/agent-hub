@@ -36,36 +36,7 @@ One request per issue is ideal. For a batch, use the “Batch request (optional)
 
 ---
 
-## 4) Surfaces to add (check all that apply)
-- [ ] **Agent spec (YAML)** in `agents/<project>/<version>.yaml`
-- [ ] **Tools** (callable actions / methods)
-- [ ] **Resources** (read-only fetchers, status, search)
-- [ ] **Prompts** (starter prompts / chains)
-- [ ] **Example agent** (minimal working example)
-- [ ] **Tutorial / docs page** on Agent Hub site
-- [ ] **Smoke tests** (CI)
-
----
-
-## 5) Capabilities & endpoints
-*List key API methods or JSON-RPC calls your agent needs. Include example requests/responses if possible.*
-- **Endpoint / Method:**  
-  **Purpose:**  
-  **Example request:**  
-  **Example response (redact secrets):**  
-
----
-
-## 6) Auth, secrets & scopes
-*How do we authenticate? What scopes are minimally required? Any rate limits to note?*
-- **Auth type:** (API key / OAuth / none / wallet signature / other)  
-- **Scopes:**  
-- **Rate limits / quotas:**  
-- **Test credentials or sandbox:** (share privately if needed)
-
----
-
-## 7) Reference implementations (optional but helpful)
+## 4) Reference implementations (optional but helpful)
 *SDKs, CLIs, code samples we can mirror in tools.*
 - Language SDKs:  
 - Example scripts / curl commands:  
@@ -73,7 +44,7 @@ One request per issue is ideal. For a batch, use the “Batch request (optional)
 
 ---
 
-## 8) Compatibility & versions
+## 5) Compatibility & versions
 *Anything we should support out of the gate?*
 - **Networks / environments:** (mainnet, testnet names)  
 - **Breaking changes to watch:**  
@@ -81,25 +52,7 @@ One request per issue is ideal. For a batch, use the “Batch request (optional)
 
 ---
 
-## 9) Acceptance criteria (Definition of Done)
-*Mark what you consider “shipped” for this request.*
-- [ ] YAML spec published at `agents/<project>/<version>.yaml`
-- [ ] Tools expose the listed endpoints with parameter validation
-- [ ] Resource(s) for common read-only queries
-- [ ] Example agent loads and runs locally with a single config file
-- [ ] Tutorial page linked from “All AgentHub YAML Specs”
-- [ ] Smoke test(s) in CI (happy path + one failure path)
-- [ ] Changelog entry & docs updated
-
----
-
-## 10) Related coverage / duplicates
-*Is there a similar spec already? What’s missing?*  
-Links:
-
----
-
-## 11) Priority
+## 6) Priority
 - [ ] **P0** (launch-critical / hackathon blocking)
 - [ ] **P1** (near-term)
 - [ ] **P2** (nice to have)
@@ -108,14 +61,14 @@ Links:
 
 ---
 
-## 12) Contact
+## 7) Contact
 *Who can answer questions or review PRs?*  
 **Requester / sponsor:**  
 **Preferred contact (GitHub / X / email / Discord):**  
 
 ---
 
-## 13) Additional context / attachments
+## 8) Additional context / attachments
 Screenshots, API schemas, OpenAPI/JSON-RPC specs, example configs, etc.
 
 ---
