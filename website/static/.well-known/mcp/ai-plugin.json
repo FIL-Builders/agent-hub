@@ -1,11 +1,10 @@
 {
   "schema_version": "v1",
   "name": "AgentHub MCP Server",
-  "description": "MCP over HTTP + SSE; serves versioned AgentHub YAML tools.",
+  "description": "MCP over Streamable HTTP; serves versioned AgentHub YAML tools.",
   "mcp": {
     "transport": "http",
-    "rpc_url": "http://localhost:8888/.netlify/functions/mcp",
-    "sse_url": "http://localhost:8888/mcp/sse"
+    "rpc_url": "http://localhost:8888/mcp"
   },
   "tools": [
     {
