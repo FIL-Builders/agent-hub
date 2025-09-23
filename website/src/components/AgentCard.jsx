@@ -1,6 +1,12 @@
 import React from 'react';
 import { buildPrompt } from '@site/src/utils/prompt';
 
+const accentFromString = (s) => {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 33 + s.charCodeAt(i)) % 360;
+  return `hsl(${h} 82% 52%)`;
+};
+
 const parseMeta = (yaml) => {
   try {
     const lines = (yaml || '').split('\n');
@@ -73,13 +79,14 @@ export default function AgentCard({ project, latest, older = [] }) {
   const specPageUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(latest.file)}`;
   const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${latest.file}`;
   const promptText = buildPrompt(rawUrl);
+  const accent = React.useMemo(() => accentFromString(specName || project), [specName, project]);
 
   const handleCopyLink = async () => {
     try { await navigator.clipboard.writeText(specPageUrl); } catch {}
   };
 
   return (
-    <div className="agent-card ai-card">
+    <div className="agent-card ai-card" style={{ '--accent': accent }}>
       <div className="agent-card-header">
         <div>
           <h3 className="agent-card-title"><a className="agent-card-title-link" href={specPageUrl}>{title}</a></h3>

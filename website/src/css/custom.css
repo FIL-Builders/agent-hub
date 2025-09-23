@@ -576,3 +576,81 @@ footer, footer p, footer a {
   text-decoration: none;
 }
 .agent-card-title-link:hover { text-decoration: underline; }
+
+/* === Variant A: Aurora ring + chips === */
+/* Subtle gradient border ring and accent-tinted pills */
+.agents-grid { gap: 20px; }
+
+.agent-card.ai-card{
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent), #111 35%)) border-box;
+  box-shadow: 0 6px 18px rgba(2,6,23,.06);
+  transition: transform .18s ease, box-shadow .18s ease, background .25s ease;
+}
+[data-theme='dark'] .agent-card.ai-card{
+  background:
+    linear-gradient(#0c111a, #0c111a) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--accent), #0c111a 10%), color-mix(in srgb, var(--accent), #000 45%)) border-box;
+  box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--accent), #000 70%);
+}
+.agent-card.ai-card:hover{ transform: translateY(-2px); box-shadow: 0 22px 44px -20px rgba(2,6,23,.22); }
+
+.agent-card-title{ margin: 0 0 6px; font-size: 1.05rem; line-height: 1.2; color: inherit; text-decoration: none; }
+.agent-card-title-link{ color:#0f172a; text-decoration:none; }
+.agent-card-title-link:hover{ text-decoration:underline; }
+[data-theme='dark'] .agent-card-title-link{ color:#e2e8f0; }
+
+.agent-versions-row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+.agent-version-latest{
+  font-size:.78rem; padding:2px 8px; border-radius:999px;
+  border:1px solid color-mix(in srgb, var(--accent), #fff 80%);
+  background: color-mix(in srgb, var(--accent), #fff 94%);
+  color: color-mix(in srgb, var(--accent), #000 35%);
+}
+
+.agent-lang-pill{
+  margin-left:8px; font-size:.72rem; padding:2px 8px; border-radius:9999px;
+  border:1px solid color-mix(in srgb, var(--accent), #fff 72%);
+  background: color-mix(in srgb, var(--accent), #fff 90%);
+  color: color-mix(in srgb, var(--accent), #000 20%);
+}
+
+.agent-card-desc{
+  margin:8px 0 10px; font-size:.9rem; line-height:1.5; color:#334155;
+  display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+}
+[data-theme='dark'] .agent-card-desc{ color:#cbd5e1; }
+
+.pill-link{
+  display:inline-block; padding:6px 10px; font-size:.8rem; border-radius:10px;
+  border:1px solid color-mix(in srgb, var(--accent), #fff 75%);
+  background: color-mix(in srgb, var(--accent), #fff 94%);
+  color: color-mix(in srgb, var(--accent), #000 30%); text-decoration:none;
+}
+.pill-link:hover{ border-color: var(--accent); color: var(--accent); }
+
+.agent-action-btn,.mobile-actions-btn{
+  border-radius:8px; padding:6px 8px; border:1px solid #e5e7eb; background:#fff; cursor:pointer;
+}
+[data-theme='dark'] .agent-action-btn,
+[data-theme='dark'] .mobile-actions-btn{ border-color:#2b2f36; background:#0f172a; color:#e2e8f0; }
+
+.yaml-dropdown-menu{
+  border-radius:12px;
+  border:1px solid color-mix(in srgb, var(--accent), #fff 75%);
+  box-shadow:0 20px 40px -12px rgba(2,6,23,.25);
+}
+.yaml-dropdown-item:hover{ background: color-mix(in srgb, var(--accent), #fff 92%); }
+
+/* Focus rings for accessibility */
+.agent-card a:focus-visible,
+.agent-action-btn:focus-visible,
+.mobile-actions-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
