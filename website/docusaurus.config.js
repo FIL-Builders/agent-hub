@@ -119,7 +119,7 @@ const config = {
             },
 	    */
             {
-              label: 'X',
+              label: 'Follow @GerminaLabs on X',
               href: 'https://x.com/germinalabs',
             },
           ],
@@ -138,7 +138,7 @@ const config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Germina Labs`,
     },
     prism: {
       theme: prismThemes.github,
