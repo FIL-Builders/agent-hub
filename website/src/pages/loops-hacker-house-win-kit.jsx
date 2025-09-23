@@ -36,7 +36,9 @@ export default function LoopsHackerHouseWinKit() {
       title: 'Randamu',
       items: [
         { title: 'Randamu dCipher SDK', project: 'randamu-dcipher-sdk', blurb: 'VRF, Blocklock encryption, and OnlySwaps primitives.' },
-        { title: 'Randamu Onlyswaps', project: 'randamu-onlyswaps', blurb: 'OnlySwaps Solidity provides an upgradeable, BLS‑gated cross‑chain token swap Router plus supporting interfaces, libraries, and deployment scripts.' },
+        { title: 'Randamu Onlyswaps Solidity', project: 'randamu-onlyswaps-solidity', blurb: 'OnlySwaps Solidity provides an upgradeable, BLS‑gated cross‑chain token swap Router plus supporting interfaces, libraries, and deployment scripts.' },
+        { title: 'Randamu Onlyswaps JS', project: 'randamu-onlyswaps-js', blurb: 'A Typescript client for making swaps using the OnlySwaps protocol and dcipher network.' },
+        { title: 'Randamu Onlyswaps Solver', project: 'randamu-onlyswaps-solver', blurb: 'Rust agent that listens to multiple EVM chains, derives executable cross-chain swap trades, and relays tokens via on-chain Router contracts.' },
         { title: 'Blocklock (Encryption)', project: 'blocklock', blurb: 'Time-/height-locked encryption with decrypt workflows.' },
       ],
     },
