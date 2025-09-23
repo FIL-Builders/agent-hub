@@ -69,6 +69,20 @@ exports.handler = async function (event) {
 };
 
 async function handleRpc(method, params, id) {
+  // MCP initialize handshake
+  if (method === "initialize") {
+    const pv = (params && params.protocolVersion) || "2025-03-26";
+    return jsonrpc(id, {
+      protocolVersion: pv,
+      capabilities: {
+        tools: {},
+        resources: {},
+        prompts: {}
+      },
+      serverInfo: { name: "AgentHub MCP Server", version: "0.1.0" }
+    });
+  }
+
   // MCP-compatible aliases
   if (method === "tools/list" || method === "tools.list") {
     const toolDefs = mcpGenericTools();
