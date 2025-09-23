@@ -86,7 +86,7 @@ export default function AgentCard({ project, latest, older = [] }) {
   };
 
   return (
-    <div className="agent-card ai-card" style={{ '--accent': accent }}>
+    <div className={`agent-card ai-card ${openMenu ? "open" : ""}`} style={{ '--accent': accent }}>
       <div className="agent-card-header">
         <div>
           <h3 className="agent-card-title"><a className="agent-card-title-link" href={specPageUrl}>{title}</a></h3>
