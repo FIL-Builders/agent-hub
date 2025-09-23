@@ -21,12 +21,12 @@ exports.handler = async function (event) {
     const { method, params, id } = JSON.parse(event.body);
 
     // MCP-compatible aliases
-    if (method === "tools/list") {
+    if (method === "tools/list" || method === "tools.list") {
       const toolDefs = await mcpListTools();
       return jsonrpc(id, { tools: toolDefs });
     }
 
-    if (method === "tools/call") {
+    if (method === "tools/call" || method === "tools.call") {
       const { name, arguments: args = {} } = params || {};
       if (!name) return jsonrpcError(id, "Missing tool name");
       const version = args.version || "latest";
