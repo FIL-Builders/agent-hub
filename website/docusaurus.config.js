@@ -127,8 +127,7 @@ const config = {
           */
             {
               html:
-                '<a class="button button--primary" href="https://x.com/germinalabs" target="_blank" rel="noopener noreferrer">Follow @GerminaLabs on X</a>' +
-                '<div style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.85;">tag, comment, like</div>',
+                '<a class="button button--primary" href="https://x.com/germinalabs" target="_blank" rel="noopener noreferrer">Tag, Comment, Like @GerminaLabs on X</a>'
             },
           ],
         },
