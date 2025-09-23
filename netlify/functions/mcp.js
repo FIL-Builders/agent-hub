@@ -69,6 +69,13 @@ exports.handler = async function (event) {
 };
 
 async function handleRpc(method, params, id) {
+  // Swallow notifications (no response if no id)
+  if (method && method.startsWith("notifications/")) {
+    if (id === undefined || id === null) {
+      return { statusCode: 204, headers: corsHeaders(), body: "" };
+    }
+    return jsonrpc(id, { ok: true });
+  }
   // MCP initialize handshake
   if (method === "initialize" || method === "server/initialize") {
     const pv = (params && params.protocolVersion) || "2025-03-26";
