@@ -13,86 +13,125 @@ exports.handler = async function (event) {
     };
   }
 
+  // Allow HEAD/GET for liveness and simple query-mode RPC (for picky clients)
+  if (event.httpMethod === "HEAD") {
+    return { statusCode: 204, headers: corsHeaders(), body: "" };
+  }
+  if (event.httpMethod === "GET") {
+    const qs = event.queryStringParameters || {};
+    const method = qs.method;
+    const id = qs.id || null;
+    let params = {};
+    if (qs.params) {
+      try { params = JSON.parse(qs.params); } catch {}
+    }
+    if (!method) {
+      return {
+        statusCode: 200,
+        headers: { ...corsHeaders(), "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: null,
+          result: {
+            ok: true,
+            message: "AgentHub MCP function",
+            endpoints: {
+              sse: "/mcp/sse",
+              rpc: "/.netlify/functions/mcp"
+            },
+            methods: ["tools/list", "tools/call", "listTools", "getToolManifest", "runTool", "ping"]
+          }
+        })
+      };
+    }
+    try {
+      return await handleRpc(method, params, id);
+    } catch (err) {
+      return jsonrpcError(id, err.message || String(err));
+    }
+  }
+  
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, headers: corsHeaders(), body: "Method not allowed" };
   }
 
   try {
     const { method, params, id } = JSON.parse(event.body);
-
-    // MCP-compatible aliases
-    if (method === "tools/list" || method === "tools.list") {
-      const toolDefs = mcpGenericTools();
-      return jsonrpc(id, { tools: toolDefs });
-    }
-
-    if (method === "tools/call" || method === "tools.call") {
-      const { name, arguments: args = {} } = params || {};
-      if (!name) return jsonrpcError(id, "Missing tool name");
-      const tool = String(name);
-
-      if (tool === "agenthub.list") {
-        const { q = "", limit = 20, offset = 0 } = args || {};
-        const page = await agenthubList({ q, limit, offset });
-        return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify(page) }] });
-      }
-
-      if (tool === "agenthub.versions") {
-        const { tool_id } = args || {};
-        if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
-        const versions = await listVersions(tool_id);
-        return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify({ tool_id, versions }) }] });
-      }
-
-      if (tool === "agenthub.fetch") {
-        const { tool_id, version = "latest" } = args || {};
-        if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
-        const yaml = await readAgentByName(tool_id, version);
-        return jsonrpc(id, { content: [{ type: "text", text: yaml }] });
-      }
-
-      // Back-compat: treat unknown tool as direct fetch by tool_id
-      const version = (args && args.version) || "latest";
-      const content = await readAgentByName(tool, version);
-      return jsonrpc(id, { content: [{ type: "text", text: content }] });
-    }
-
-    if (method === "ping") {
-      return jsonrpc(id, { status: "ok", t: Date.now() });
-    }
-
-    if (method === "getToolManifest") {
-      const { tool_id } = params;
-      const manifest = await buildToolManifest(tool_id);
-      return jsonrpc(id, manifest);
-    }
-
-    if (method === "runTool") {
-      const { tool_id, parameters } = params;
-      let version = parameters.version;
-
-      if (version === "latest") {
-        const allVersions = await listVersions(tool_id);
-        if (allVersions.length === 0) throw new Error(`No versions found for tool: ${tool_id}`);
-
-        // Sort descending using semver if your versions are semantic, else lexicographically
-        version = allVersions.sort().reverse()[0];
-      }
-
-      const content = await readAgentFile(tool_id, version);
-      return jsonrpc(id, { content });
-    }
-
-    if (method === "listTools") {
-      const tools = await listAllTools();
-      return jsonrpc(id, tools);
-    }
-
-    return jsonrpcError(id, "Unknown method");
+    return await handleRpc(method, params, id);
   } catch (err) {
     return jsonrpcError(null, err.message);
   }
 };
+
+async function handleRpc(method, params, id) {
+  // MCP-compatible aliases
+  if (method === "tools/list" || method === "tools.list") {
+    const toolDefs = mcpGenericTools();
+    return jsonrpc(id, { tools: toolDefs });
+  }
+
+  if (method === "tools/call" || method === "tools.call") {
+    const { name, arguments: args = {} } = params || {};
+    if (!name) return jsonrpcError(id, "Missing tool name");
+    const tool = String(name);
+
+    if (tool === "agenthub.list") {
+      const { q = "", limit = 20, offset = 0 } = args || {};
+      const page = await agenthubList({ q, limit, offset });
+      return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify(page) }] });
+    }
+
+    if (tool === "agenthub.versions") {
+      const { tool_id } = args || {};
+      if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
+      const versions = await listVersions(tool_id);
+      return jsonrpc(id, { content: [{ type: "text", text: JSON.stringify({ tool_id, versions }) }] });
+    }
+
+    if (tool === "agenthub.fetch") {
+      const { tool_id, version = "latest" } = args || {};
+      if (!tool_id) return jsonrpcError(id, "Missing 'tool_id'");
+      const yaml = await readAgentByName(tool_id, version);
+      return jsonrpc(id, { content: [{ type: "text", text: yaml }] });
+    }
+
+    // Back-compat: treat unknown tool as direct fetch by tool_id
+    const version = (args && args.version) || "latest";
+    const content = await readAgentByName(tool, version);
+    return jsonrpc(id, { content: [{ type: "text", text: content }] });
+  }
+
+  if (method === "ping") {
+    return jsonrpc(id, { status: "ok", t: Date.now() });
+  }
+
+  if (method === "getToolManifest") {
+    const { tool_id } = params || {};
+    const manifest = await buildToolManifest(tool_id);
+    return jsonrpc(id, manifest);
+  }
+
+  if (method === "runTool") {
+    const { tool_id, parameters = {} } = params || {};
+    let version = parameters.version;
+
+    if (version === "latest") {
+      const allVersions = await listVersions(tool_id);
+      if (allVersions.length === 0) throw new Error(`No versions found for tool: ${tool_id}`);
+      version = allVersions.sort().reverse()[0];
+    }
+
+    const content = await readAgentFile(tool_id, version);
+    return jsonrpc(id, { content });
+  }
+
+  if (method === "listTools") {
+    const tools = await listAllTools();
+    return jsonrpc(id, tools);
+  }
+
+  return jsonrpcError(id, "Unknown method");
+}
 
 async function buildToolManifest(tool_id) {
   const dir = path.join(AGENTS_DIR, tool_id);
