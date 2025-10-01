@@ -152,7 +152,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
 
   // Register tools using the config API so inputSchema is honored (raw Zod shape)
   server.registerTool(
-    "agenthub.list",
+    "agenthub_list",
     {
       title: "AgentHub: List Tools",
       description:
@@ -186,7 +186,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   );
 
   server.registerTool(
-    "agenthub.versions",
+    "agenthub_versions",
     {
       title: "AgentHub: List Versions",
       description:
@@ -201,7 +201,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   );
 
   server.registerTool(
-    "agenthub.fetch",
+    "agenthub_fetch",
     {
       title: "AgentHub: Fetch YAML",
       description:
@@ -235,7 +235,7 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
 
   // Optional helper: return same docs available via GET /mcp as an MCP tool
   server.registerTool(
-    "agenthub.docs",
+    "agenthub_docs",
     {
       title: "AgentHub: Docs",
       description: "Return server/tool usage docs as JSON text (same as GET /mcp?format=json).",
@@ -300,10 +300,9 @@ function buildDocsJSON({ baseUrl }) {
     },
     tools: [
       {
-        name: "agenthub.list",
+        name: "agenthub_list",
         description:
           "List available AgentHub tools (paged) with a simple case-insensitive substring filter on tool_id.",
-        aliases: ["agenthub_list"],
         params: {
           q: "optional string; filters by tool_id substring (case-insensitive)",
           limit: "integer 1..100 (default 20)",
@@ -315,14 +314,13 @@ function buildDocsJSON({ baseUrl }) {
             jsonrpc: "2.0",
             id: "1",
             method: "callTool",
-            params: { name: "agenthub.list", arguments: { q: "sdk", limit: 10 } }
+            params: { name: "agenthub_list", arguments: { q: "sdk", limit: 10 } }
           }
         }
       },
       {
-        name: "agenthub.versions",
+        name: "agenthub_versions",
         description: "List available versions for a given tool_id (folder name under agents/)",
-        aliases: ["agenthub_versions"],
         params: { tool_id: "string" },
         response: "JSON text: { tool_id, versions }",
         examples: {
@@ -330,15 +328,14 @@ function buildDocsJSON({ baseUrl }) {
             jsonrpc: "2.0",
             id: "2",
             method: "callTool",
-            params: { name: "agenthub.versions", arguments: { tool_id: "openserv-labs-sdk" } }
+            params: { name: "agenthub_versions", arguments: { tool_id: "openserv-labs-sdk" } }
           }
         }
       },
       {
-        name: "agenthub.fetch",
+        name: "agenthub_fetch",
         description:
           "Fetch the YAML for a tool_id at a version. If version is 'latest', the lexicographically highest version is used.",
-        aliases: ["agenthub_fetch"],
         params: { tool_id: "string", version: "optional string|'latest' (default 'latest')" },
         response: "YAML text",
         examples: {
@@ -346,14 +343,13 @@ function buildDocsJSON({ baseUrl }) {
             jsonrpc: "2.0",
             id: "3",
             method: "callTool",
-            params: { name: "agenthub.fetch", arguments: { tool_id: "openserv-labs-sdk", version: "0.3.0" } }
+            params: { name: "agenthub_fetch", arguments: { tool_id: "openserv-labs-sdk", version: "0.3.0" } }
           }
         }
       },
       {
-        name: "agenthub.docs",
+        name: "agenthub_docs",
         description: "Return these docs as JSON text",
-        aliases: ["agenthub_docs"],
         params: {},
         response: "JSON text"
       }
