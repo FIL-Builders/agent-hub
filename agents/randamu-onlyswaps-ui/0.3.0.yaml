@@ -1,0 +1,491 @@
+meta:
+spec_name: onlyswaps-ui
+spec_version: 0.3.0
+generated: '2025-10-01'
+library_version: ^0.1.0
+language: typescript
+tags:
+
+* react
+* nextjs
+* wagmi
+* rainbowkit
+* zod
+* viem
+* web3
+  purpose: A compact, LLM-ready reference to the public hooks, providers, schemas, and EVM chain helpers exposed by the OnlySwaps UI package, enabling agents to build, validate, and execute cross-chain RUSD swaps via the app's TypeScript API surface.
+  guiding_principles:
+* Prefer hooks (`useOnlySwapsClient`, `useRusd`) to obtain typed clients bound to the active chain from Wagmi.
+* Always read chain-specific addresses from `chainConfigs`; do not hard-code contract addresses.
+* Validate all user inputs with zod schemas (e.g., `SwapFormSchema`) before invoking on-chain actions.
+* Guard on availability: many hooks can return `{}` while wallet/client are loading—gracefully handle `undefined`.
+* Use `supportedChains` and `supportedTransports` to seed Wagmi/RainbowKit configuration for consistent chain handling.
+* Poll swap status on both source and destination chains and debounce polling to avoid rate limits.
+* Use BigInt-friendly helpers (e.g., `rusdFromNumber`) when constructing amounts and fees; never pass floating-point to contracts.
+  design_notes: Derived from project source files in /src (hooks, EVM config, providers, and schemas) in the provided repository snapshot. Exports are grouped by developer-facing concerns (hooks, EVM config, providers, validation, utils). Definitions are extracted verbatim or lightly compressed from TypeScript files with their module paths.
+  groups:
+* name: hooks
+  exports:
+
+  * useOnlySwapsClient
+  * useRusd
+    symbols:
+    useOnlySwapsClient:
+    kind: hook
+    summary: React hook that returns an OnlySwaps client and WalletClient bound to the current (or provided) chain.
+    definition:
+    code: |-
+    export type UseOnlySwapsProps = {
+    chainId?: number
+    }
+
+    ```
+      export type UseOnlySwapsReturn = {
+          walletClient?: WalletClient
+          onlyswaps?: OnlySwaps,
+      }
+
+      export function useOnlySwapsClient(props: UseOnlySwapsProps = {}): UseOnlySwapsReturn
+    lang: typescript
+    source: src/app/hooks/useOnlySwaps.ts
+    ```
+
+    guidance:
+
+    * Call it inside a React component with Wagmi providers mounted. It returns `{ onlyswaps, walletClient }` when the wallet and clients are ready; otherwise fields may be `undefined`.
+    * Pass an explicit `chainId` in `props` to target a specific network (use IDs from `supportedChains`).
+    * Use `chainConfigs[chainId].router` to build swap requests; never hard-code router addresses.
+      example:
+      code: |-
+      import { useAccount } from "wagmi";
+      import { rusdFromNumber } from "onlyswaps-js";
+      import { useOnlySwapsClient } from "@/app/hooks/useOnlySwaps";
+      import { chainConfigs } from "@/app/eth/chains";
+
+      export default function SwapButton() {
+      const { address, chainId } = useAccount();
+      const { onlyswaps } = useOnlySwapsClient({ chainId });
+
+      ```
+      const onClick = async () => {
+        if (!onlyswaps || !address || !chainId) return;
+
+        const srcTokenAddress = chainConfigs[chainId].rusd;
+        const destChainId = chainId; // example only; choose another chain in real flows
+        const destTokenAddress = chainConfigs[destChainId].rusd;
+
+        const { requestId } = await onlyswaps.swap({
+          recipient: address,
+          srcTokenAddress,
+          destTokenAddress,
+          amount: rusdFromNumber(1),
+          fee: rusdFromNumber(0),
+          destinationChainId: BigInt(destChainId),
+        });
+
+        console.log("swap requestId:", requestId);
+      };
+
+      return <button onClick={onClick}>Swap</button>;
+      ```
+
+      }
+      lang: tsx
+      description: Obtains a client and initiates a simple swap once prerequisites are met.
+      since: 0.1.0
+      useRusd:
+      kind: hook
+      summary: React hook that returns an RUSD client bound to a given chain for a wallet address.
+      definition:
+      code: |-
+      type UseRusdProps = {
+      chainId: number
+      address?: `0x${string}`
+      }
+      type UseRusdReturn = {
+      rusd?: RUSD
+      }
+
+      export function useRusd(props: UseRusdProps): UseRusdReturn
+      lang: typescript
+      source: src/app/hooks/useRusd.ts
+      guidance:
+    * Provide both `chainId` and `address`; the hook returns `{}` until `walletClient` and `publicClient` are ready.
+    * Use `chainConfigs[chainId].rusd` to resolve the token address for the network.
+    * Amounts should be handled with the helpers from `onlyswaps-js` to avoid precision loss (e.g., convert numbers to on-chain units).
+      example:
+      code: |-
+      import { useRusd } from "@/app/hooks/useRusd";
+      import { useAccount } from "wagmi";
+
+      export function RusdBalance() {
+      const { address, chainId } = useAccount();
+      const { rusd } = useRusd({ chainId: chainId!, address: address as `0x${string}` });
+
+      ```
+      const [balance, setBalance] = React.useState<bigint | null>(null);
+
+      React.useEffect(() => {
+        (async () => {
+          if (!rusd || !address) return;
+          const b = await rusd.balanceOf(address);
+          setBalance(b);
+        })();
+      }, [rusd, address]);
+
+      return <div>RUSD balance: {balance?.toString() ?? "…"}</div>;
+      ```
+
+      }
+      lang: tsx
+      description: Reads a user's RUSD balance using the viem-backed client.
+      since: 0.1.0
+* name: eth/config
+  exports:
+
+  * chainConfigs
+  * supportedChains
+  * SupportedChainId
+  * supportedTransports
+    symbols:
+    chainConfigs:
+    kind: object
+    summary: Per-chain configuration mapping router and RUSD addresses to Wagmi/Viem Chain objects.
+    definition:
+    code: |-
+    type ChainConfig = {
+    router: `0x${string}`
+    rusd: `0x${string}`
+    chain: Chain
+    }
+    export const chainConfigs: Record<number, ChainConfig> = {
+    [avalanche.id]: {
+    router: "0x4cB630aAEA9e152db83A846f4509d83053F21078",
+    rusd:   "0x1b0F6cF6f3185872a581BD2B5a738EB52CCd4d76",
+    chain: avalanche
+    },
+    [base.id]: {
+    // omitted for brevity in this pack (same addresses as fuji/baseSepolia in snapshot)
+    router: "0x4cB630aAEA9e152db83A846f4509d83053F21078",
+    rusd:   "0x1b0F6cF6f3185872a581BD2B5a738EB52CCd4d76",
+    chain: base
+    },
+    [avalancheFuji.id]: {
+    router: "0x4cB630aAEA9e152db83A846f4509d83053F21078",
+    rusd:   "0x1b0F6cF6f3185872a581BD2B5a738EB52CCd4d76",
+    chain: avalancheFuji
+    },
+    [baseSepolia.id]: {
+    router: "0x4cB630aAEA9e152db83A846f4509d83053F21078",
+    rusd:   "0x1b0F6cF6f3185872a581BD2B5a738EB52CCd4d76",
+    chain: baseSepolia
+    },
+    } as const
+    lang: typescript
+    source: src/app/eth/chains.ts
+    guidance:
+
+    * Reference addresses only via this map to avoid mismatches across chains.
+    * Keep the object `as const` to preserve literal types (useful for enum generation).
+    * When adding a new chain, update `supportedChains` and re-run type checks so `chainIdSchema` stays in sync.
+      example:
+      code: |-
+      import { chainConfigs } from "@/app/eth/chains";
+      const fujiRouter = chainConfigs[43113].router; // Avalanche Fuji
+      console.log(fujiRouter);
+      lang: javascript
+      since: 0.1.0
+      supportedChains:
+      kind: constant
+      summary: Tuple of supported viem `Chain` objects derived from `chainConfigs`.
+      definition:
+      code: |-
+      export const supportedChains = Object.values(chainConfigs)
+      .map(it => it.chain) as unknown as [Chain, ...Chain[]]
+      lang: typescript
+      source: src/app/eth/chains.ts
+      guidance:
+    * Use this when creating Wagmi configs and RainbowKit providers for exact chain coverage.
+    * Treat it as a tuple for stricter typing; order is not significant but being a tuple enables zod enums.
+      example:
+      code: |-
+      import { supportedChains } from "@/app/eth/chains";
+      console.log(supportedChains.map(c => c.id));
+      lang: javascript
+      since: 0.1.0
+      SupportedChainId:
+      kind: type
+      summary: Union type of supported chain IDs inferred from `supportedChains`.
+      definition:
+      code: |-
+      type SupportedChainId = (typeof supportedChains)[number]["id"]
+      lang: typescript
+      source: src/app/eth/chains.ts
+      guidance:
+    * Use this type where an ID must be one of the app’s supported chains.
+    * It narrows generic `number` to a safer literal union.
+      example:
+      code: |-
+      type SupportedChainId = (typeof supportedChains)[number]["id"];
+      const id: SupportedChainId = 43113; // ok
+      // const err: SupportedChainId = 1; // would error if mainnet isn't supported
+      lang: typescript
+      since: 0.1.0
+      supportedTransports:
+      kind: constant
+      summary: Record mapping each supported chain ID to a default HTTP transport.
+      definition:
+      code: |-
+      export const supportedTransports = supportedChains
+      .reduceRight((acc, cur) => ({ ...acc, [cur.id]: http() }), {} as Record<SupportedChainId, Transport>)
+      lang: typescript
+      source: src/app/eth/chains.ts
+      guidance:
+    * Pass this to `wagmi/createConfig({ chains, transports })` to avoid per-chain boilerplate.
+    * Swap `http()` for custom transports if you need WebSocket or authenticated RPC.
+      example:
+      code: |-
+      import { supportedTransports } from "@/app/eth/chains";
+      console.log(Object.keys(supportedTransports));
+      lang: javascript
+      since: 0.1.0
+* name: ui/schemas
+  exports:
+
+  * currencySchema
+  * chainIdSchema
+  * amountSchema
+  * SwapFormSchema
+    symbols:
+    currencySchema:
+    kind: constant
+    summary: Literal currency enum currently limited to 'rusd'.
+    definition:
+    code: |-
+    export const currencySchema = z.enum(["rusd"])
+    lang: typescript
+    source: src/app/ui/schemas.ts
+    guidance:
+
+    * Use to validate currency inputs before passing to clients.
+    * Extend this enum if/when new currencies are supported, and update UI accordingly.
+      example:
+      code: |-
+      import { currencySchema } from "@/app/ui/schemas";
+      currencySchema.parse("rusd"); // ok
+      // currencySchema.parse("usdc"); // throws
+      lang: typescript
+      since: 0.1.0
+      chainIdSchema:
+      kind: constant
+      summary: Zod enum of supported chain IDs as strings.
+      definition:
+      code: |-
+      export const chainIdSchema = z.enum(supportedChains.map(it => it.id + "") as [string, ...string[]])
+      lang: typescript
+      source: src/app/ui/schemas.ts
+      guidance:
+    * Use with form libraries to enforce network selection to supported chains.
+    * It is inferred from `supportedChains` so it stays current as networks are added/removed.
+      example:
+      code: |-
+      import { chainIdSchema } from "@/app/ui/schemas";
+      chainIdSchema.parse("43113"); // ok for Fuji if supported
+      // chainIdSchema.parse("1"); // throws if mainnet not supported
+      lang: typescript
+      since: 0.1.0
+      amountSchema:
+      kind: constant
+      summary: Number coercion with min/max and 2-decimal refinement for UI amounts/fees.
+      definition:
+      code: |-
+      export const amountSchema = z
+      .coerce.number()
+      .max(1_000_000_000, { message: "Must be ≤ 1,000,000,000" })
+      .min(0.01, { message: "Cannot be 0" })
+      .refine(val => Number.isInteger(val * 100), {
+      message: "Must have at most 2 decimal places",
+      })
+      lang: typescript
+      source: src/app/ui/schemas.ts
+      guidance:
+    * Always validate user-entered amounts with this schema to prevent precision and UX issues.
+    * Convert validated numbers to on-chain units (e.g., with `rusdFromNumber`) before transmission.
+      example:
+      code: |-
+      import { amountSchema } from "@/app/ui/schemas";
+      amountSchema.parse(10.25); // ok
+      // amountSchema.parse(0.001); // throws
+      lang: typescript
+      since: 0.1.0
+      SwapFormSchema:
+      kind: constant
+      summary: Composite schema for the swap form including currency, source/destination chains, amount, and fee.
+      definition:
+      code: |-
+      export const SwapFormSchema = z.object({
+      currency: currencySchema,
+      sourceChain: chainIdSchema,
+      destinationChain: chainIdSchema,
+      amount: amountSchema,
+      fee: amountSchema,
+      }).refine(data => data.sourceChain !== data.destinationChain, {
+      path: ["destinationChain"],
+      message: "Destination chain must be different from source chain",
+      })
+      lang: typescript
+      source: src/app/ui/schemas.ts
+      guidance:
+    * Use as the resolver for `react-hook-form` or `zodResolver` to keep UI and types aligned.
+    * Leverage the cross-field refinement to block invalid same-chain swaps early in the UI.
+      example:
+      code: |-
+      import { zodResolver } from "@hookform/resolvers/zod";
+      import { useForm } from "react-hook-form";
+      import { SwapFormSchema } from "@/app/ui/schemas";
+
+      const form = useForm({
+      resolver: zodResolver(SwapFormSchema),
+      });
+      lang: tsx
+      since: 0.1.0
+* name: providers
+  exports:
+
+  * WagmiRainbowKitProviders
+  * Providers
+    symbols:
+    WagmiRainbowKitProviders:
+    kind: function
+    summary: Top-level provider that mounts Wagmi, React Query, and RainbowKit with custom theme/config.
+    definition:
+    code: export default function WagmiRainbowKitProviders({ children }: { children: ReactNode })
+    lang: typescript
+    source: src/app/eth/wagmi-rainbowkit-providers.tsx
+    guidance:
+
+    * Mount this once near the app root to establish wallet connectivity and query caching.
+    * Ensure its Wagmi config chains/transports align with `supportedChains` and `supportedTransports`.
+      example:
+      code: |-
+      // app/providers.tsx
+      import Providers from "@/app/eth/providers";
+
+      // app/layout.tsx
+      export default function RootLayout({ children }: { children: React.ReactNode }) {
+      return ( <html lang="en"> <body><Providers>{children}</Providers></body> </html>
+      );
+      }
+      lang: tsx
+      since: 0.1.0
+      Providers:
+      kind: function
+      summary: App-level wrapper composing ThemeProvider and WagmiRainbowKitProviders.
+      definition:
+      code: export default function Providers({ children }: { children: ReactNode })
+      lang: typescript
+      source: src/app/eth/providers.tsx
+      guidance:
+    * Use this as the single wrapper in Next.js root layout to keep theming and wallet providers in sync.
+    * Avoid nesting multiple Wagmi or RainbowKit providers; it can lead to multiple client instances.
+      example:
+      code: |-
+      import Providers from "@/app/eth/providers";
+      export default function App({ children }: { children: React.ReactNode }) {
+      return <Providers>{children}</Providers>;
+      }
+      lang: tsx
+      since: 0.1.0
+* name: utils
+  exports:
+
+  * cn
+    symbols:
+    cn:
+    kind: function
+    summary: Tailwind className merger combining `clsx` and `tailwind-merge`.
+    definition:
+    code: |-
+    export function cn(...inputs: ClassValue[]) {
+    return twMerge(clsx(inputs))
+    }
+    lang: typescript
+    source: src/lib/utils.ts
+    guidance:
+
+    * Useful for conditionally composing Tailwind classes while deduplicating conflicts.
+    * Prefer `cn` over manual string concatenation to avoid class bloat and override mistakes.
+      example:
+      code: |-
+      import { cn } from "@/lib/utils";
+      function Button({ active }: { active?: boolean }) {
+      return <button className={cn("px-3 py-2", active && "ring")}>Click</button>;
+      }
+      lang: tsx
+      since: 0.1.0
+      common_workflows:
+* title: Wrap Next.js app with providers
+  steps:
+
+  * Import the `Providers` default export from `src/app/eth/providers.tsx`.
+  * Render it once in `app/layout.tsx` around `children`.
+  * Verify wallets can connect via RainbowKit and Wagmi devtools if enabled.
+* title: Validate a swap form
+  steps:
+
+  * Use `SwapFormSchema` with `zodResolver` and `react-hook-form`.
+  * Read `supportedChains` to populate source and destination chain selects.
+  * On submit, convert `amount` and `fee` to on-chain units, then call `onlyswaps.swap`.
+* title: Mint test RUSD on a testnet
+  steps:
+
+  * Use `useRusd({ chainId, address })` after providers mount.
+  * Call `rusd.mint(address, amount)` on supported testnets (e.g., Fuji), then wait for confirmation.
+  * Re-query `rusd.balanceOf(address)` to update the UI.
+* title: Initiate a cross-chain swap
+  steps:
+
+  * Obtain `{ onlyswaps }` via `useOnlySwapsClient({ chainId })`.
+  * Resolve token addresses from `chainConfigs[srcId].rusd` and `chainConfigs[destId].rusd`.
+  * Call `onlyswaps.swap({ recipient, srcTokenAddress, destTokenAddress, amount, fee, destinationChainId })` and capture `requestId`.
+* title: Poll swap status until verification
+  steps:
+
+  * Construct source and destination clients with `useOnlySwapsClient` for each chain.
+  * Use `fetchStatus(requestId)` on the source and `fetchReceipt(requestId)` on the destination to progress states.
+  * Stop polling once status reaches `verified`.
+    troubleshooting_cheatsheet:
+* symptom: Hook returns `{}` (no client).
+  cause: Wallet client or public client not yet available; user not connected.
+  fix: Wait for Wagmi connection state; guard calls until `onlyswaps`/`rusd` are defined.
+* symptom: Swap rejected or fails immediately.
+  cause: Invalid token addresses or destination chain ID.
+  fix: Resolve addresses from `chainConfigs` and ensure `destinationChainId` is a `bigint` matching a supported chain.
+* symptom: Amounts appear incorrect on-chain.
+  cause: Floating-point values passed directly to contract calls.
+  fix: Convert with helpers like `rusdFromNumber` before calling clients.
+* symptom: Form accepts same source and destination chains.
+  cause: Schema refinement missing or not applied.
+  fix: Validate with `SwapFormSchema` via `zodResolver` to enforce cross-field rule.
+* symptom: Multiple wallet modals / unexpected reconnects.
+  cause: Nested Wagmi/RainbowKit providers.
+  fix: Ensure a single provider instance wraps the entire app.
+  faq:
+* q: Which chains are supported?
+  a: The set is defined by `chainConfigs` and surfaced via `supportedChains`. Use those values; do not assume mainnet/testnet coverage.
+* q: Do I need to pass my own RPC URLs?
+  a: `supportedTransports` uses default `http()` transports. You can replace entries with custom providers for rate limits or private RPCs.
+* q: How should I represent amounts?
+  a: Keep UI amounts as numbers validated by `amountSchema`, then convert to on-chain integer units (e.g., via `rusdFromNumber`) when calling clients.
+* q: Can I call these hooks outside React components?
+  a: No. Hooks must run within React render. For non-React contexts, construct clients manually via `onlyswaps-js`.
+  external_resources:
+* label: wagmi
+  url: [https://wagmi.sh](https://wagmi.sh)
+* label: RainbowKit
+  url: [https://www.rainbowkit.com](https://www.rainbowkit.com)
+* label: zod
+  url: [https://zod.dev](https://zod.dev)
+* label: viem
+  url: [https://viem.sh](https://viem.sh)
+
