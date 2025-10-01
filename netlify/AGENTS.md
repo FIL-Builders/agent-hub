@@ -13,9 +13,10 @@ Key files:
 - HTTP `/mcp` — Streamable HTTP transport (SDK)
   - Netlify Function configured via `export const config = { path: "/mcp" }`.
   - `tools` surface (via SDK):
-    - `agenthub.list` — args `{ q?: string, limit?: number, offset?: number }`; returns a JSON page of `{ tool_id, versions }`.
-    - `agenthub.versions` — args `{ tool_id }`; returns `{ tool_id, versions }`.
-    - `agenthub.fetch` — args `{ tool_id, version?: string|'latest' }`; returns YAML text.
+    - `agenthub.list` (aka `agenthub_list`) — args `{ q?: string, limit?: number, offset?: number }`; returns a JSON page of `{ tool_id, versions }`.
+    - `agenthub.versions` (aka `agenthub_versions`) — args `{ tool_id }`; returns `{ tool_id, versions }`.
+    - `agenthub.fetch` (aka `agenthub_fetch`) — args `{ tool_id, version?: string|'latest' }`; returns YAML text.
+    - `agenthub.docs` (aka `agenthub_docs`) — returns server/tool docs as JSON.
 
 
 ## Agents Directory Layout
@@ -67,8 +68,8 @@ curl -sS -X POST http://localhost:8888/mcp \
 
 ## JSON‑RPC Methods (via SDK)
 
-- tools/list → returns 3 generic tools (agenthub.*)
-- tools/call → routes to `agenthub.list`, `agenthub.versions`, `agenthub.fetch`
+- tools/list → returns 4 tools (agenthub.*)
+- tools/call → routes to `agenthub.list` (alias `agenthub_list`), `agenthub.versions` (alias `agenthub_versions`), `agenthub.fetch` (alias `agenthub_fetch`), `agenthub.docs` (alias `agenthub_docs`)
 
 
 SSE is not required in this minimal setup.

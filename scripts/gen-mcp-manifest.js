@@ -13,7 +13,8 @@ const OUTPUT_FILE_ROOT = path.join(OUTPUT_DIR, "ai-plugin.json");
 
 (async () => {
   // Keep manifest tools minimal for client UX; discovery happens via tools/list.
-  const tools = [{ tool_id: "agenthub.fetch" }];
+  // Use underscore to avoid client sanitization inconsistencies (e.g., '.' → '_').
+  const tools = [{ tool_id: "agenthub_fetch" }];
 
   const baseUrl = (process.env.MCP_BASE_URL || process.env.DEPLOY_PRIME_URL || process.env.DEPLOY_URL || process.env.URL || "http://localhost:8888").replace(/\/$/, "");
   const manifest = {
