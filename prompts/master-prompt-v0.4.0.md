@@ -1,7 +1,7 @@
 ==============================================================
 AGENTHUB - MASTER PROMPT (v0.4.0)
-Goal: Draft a Markdown-native AgentHub knowledge pack with no YAML,
-      no frontmatter, and no schema-shaped serialization.
+Goal: Draft a Markdown-native AgentHub knowledge pack as a structured
+      technical document.
 ==============================================================
 
 ### 1 - Role
@@ -17,7 +17,7 @@ The output must be:
 - Markdown-native
 - structured by headings, bullets, and fenced code blocks
 - optimized for LLM retrieval and human readability
-- free of YAML, YAML frontmatter, and schema-key serialization
+- organized as an authored technical reference
 
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>               <- canonical name
@@ -29,12 +29,6 @@ The output must be:
 ### 4 - Target Document
 Write an AgentHub knowledge pack as if Markdown had always been the native
 format for the project.
-
-Do NOT emit:
-- frontmatter
-- top-level keys like `meta:` or `groups:`
-- nested schema objects
-- explanatory prose outside the document
 
 ### 5 - Required Output Structure
 
@@ -55,7 +49,7 @@ how an LLM should use it.
 
 ## Guiding Principles
 - 3 to 10 bullets
-- focus on correct usage, not marketing language
+- focus on correct usage and decision quality
 
 ## Design Notes
 - sources used
@@ -131,12 +125,12 @@ Answer in a short paragraph or 2 to 5 bullets.
 - label + URL
 
 ### 6 - Authoring Rules
-- Use real Markdown sections, not serialized data structures.
+- Use Markdown sections, bullets, short paragraphs, and fenced code blocks.
 - Prefer short sections and dense signal.
 - Keep examples runnable or very close to runnable.
 - Keep definitions close to the source truth.
 - When the docs are ambiguous, say so explicitly.
-- Do not restate the same point in summary, guidance, and FAQ unless each adds value.
+- Give each section a distinct job so summary, guidance, and FAQ each add value.
 - Cross-reference related items using their section names.
 
 ### 7 - Workflow
@@ -147,15 +141,15 @@ Answer in a short paragraph or 2 to 5 bullets.
 4. Identify the public surface area and group it by mental model.
 5. Draft the knowledge pack in the required section order.
 6. Remove repetition and low-signal filler.
-7. Check that the result is Markdown-native and contains no YAML-oriented structure.
+7. Check that the result follows the v0.4.0 document structure cleanly.
 
 ### 8 - Quality Checks
 Before emitting, verify:
 - the output is exactly one Markdown document
-- there is no YAML frontmatter
-- there are no schema keys like `meta:`, `groups:`, `symbols:`, `guidance:`, `example:`
+- the top-level sections appear in the required order
+- `## Snapshot` is expressed as Markdown bullets
 - every important symbol has summary, definition, guidance, and example
-- the document reads like authored documentation, not exported data
+- the document reads like authored documentation
 - the structure is stable enough for a downstream parser to identify sections by headings
 
 ### 9 - Emit

@@ -5,24 +5,18 @@
 Open Agent Spec v0.4.0 defines a Markdown-native format for AgentHub knowledge
 packs.
 
-The goal is to make each pack read like authored technical documentation rather
-than serialized data. A valid v0.4.0 pack should be:
+The goal is to make each pack read like authored technical documentation. A
+valid v0.4.0 pack should be:
 
 - easy for humans to read
 - easy for LLMs to retrieve from by section
 - structurally predictable
-- free of YAML frontmatter and YAML-shaped bodies
+- straightforward to parse from headings and labeled subsections
 
 ## Core Principle
 
-The pack should look like a document that was designed in Markdown from the
-start.
-
-It should not look like:
-
-- a schema object copied into text
-- YAML keys rendered line by line
-- frontmatter plus a serialized payload
+The pack is a document-first format. Its structure comes from headings,
+subheadings, labeled fields, lists, and code fences.
 
 ## Required Document Shape
 
@@ -43,7 +37,7 @@ sections, in this exact order:
 12. `## External Resources`
 
 Additional sections may appear after `## External Resources` only when they add
-clear value and do not break the predictability of the document.
+clear value and preserve the predictability of the document.
 
 ## Section Requirements
 
@@ -53,7 +47,7 @@ The document title is the canonical project or library name.
 
 ### `## Snapshot`
 
-This section replaces YAML metadata.
+This section captures document metadata.
 
 It must include these fields as Markdown bullets:
 
@@ -81,7 +75,7 @@ This section must be a short paragraph explaining:
 
 This section must contain 3 to 10 bullets.
 
-The bullets should be operational guidance, not marketing language. They should
+The bullets should be operational guidance. They should
 help a model choose safe and idiomatic usage patterns.
 
 ### `## Design Notes`
@@ -164,7 +158,7 @@ It may also include:
 **Example**
 - use a fenced code block
 - should be runnable or nearly runnable
-- should show the intended usage pattern, not just syntax
+- should show the intended usage pattern
 
 **Related**
 - list adjacent symbols, concepts, or workflows
@@ -220,13 +214,12 @@ Prioritize official documentation and canonical references.
 
 ## Authoring Rules
 
-- Use real Markdown structure, not serialized keys.
 - Use headings, bullets, short paragraphs, and fenced code blocks.
 - Prefer exact technical definitions over paraphrased summaries when accuracy
   matters.
 - Keep examples minimal but useful.
 - Mark uncertain claims explicitly.
-- Do not invent APIs, fields, or workflows.
+- Keep all APIs, fields, and workflows grounded in source material.
 - Avoid repeating the same idea across multiple sections unless each repetition
   adds distinct value.
 
@@ -235,19 +228,16 @@ Prioritize official documentation and canonical references.
 A v0.4.0 pack is valid when all of the following are true:
 
 1. It is exactly one Markdown document.
-2. It contains no YAML frontmatter.
-3. It does not use top-level schema keys such as `meta:`, `groups:`,
-   `symbols:`, `guidance:`, or `example:`.
-4. The required top-level sections appear in the required order.
-5. `## Guiding Principles` contains 3 to 10 bullets.
-6. Every important symbol documented under `## API Groups` includes `Kind`,
+2. The required top-level sections appear in the required order.
+3. `## Snapshot` is expressed as Markdown bullets.
+4. `## Guiding Principles` contains 3 to 10 bullets.
+5. Every important symbol documented under `## API Groups` includes `Kind`,
    `Summary`, `Definition`, `Guidance`, `Example`, and `Related`.
-7. The document reads like authored documentation, not exported data.
+6. The document reads like authored documentation.
 
 ## Parsing Guidance
 
-Consumers should parse v0.4.0 packs by heading structure, not by indentation or
-schema keys.
+Consumers should parse v0.4.0 packs by heading structure and labeled fields.
 
 Recommended parser strategy:
 

@@ -1,7 +1,7 @@
 ==============================================================
 AGENTHUB - DOCUMENTATION PROMPT (v0.4.0)
 Goal: Produce a complete Markdown-native documentation pack from
-      authoritative source material, with no YAML or frontmatter.
+      authoritative source material.
 ==============================================================
 
 ### 1 - Role
@@ -18,12 +18,6 @@ The document must be:
 - self-contained
 - source-grounded
 - optimized for later transformation into an AgentHub v0.4.0 knowledge pack
-
-Do NOT output:
-- YAML
-- YAML frontmatter
-- JSON objects used as schemas
-- chatty commentary outside the document
 
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>            <- canonical project or library name
@@ -65,7 +59,7 @@ Use these sections in this exact order.
 ## What This Library Is For
 - one short overview paragraph
 - major use cases
-- what it does not do or where its boundaries are
+- scope and boundaries
 
 ## Installation And Setup
 - install commands
@@ -132,22 +126,21 @@ Document high-value end-to-end tasks.
 - release notes
 
 ## Open Questions
-- only include items that could not be resolved from source material
+- unresolved items that need verification
 
 ### 6 - Writing Rules
 - Use headings, bullets, short paragraphs, and fenced code blocks.
 - Keep the structure stable and predictable.
 - Prefer exact definitions when available.
 - Mark uncertain claims as "Needs verification".
-- If something is absent from the sources, say "Not found in source material".
-- Do not invent APIs, fields, or workflows.
+- For gaps in source coverage, mark the point as "Needs verification".
+- Use only APIs, fields, and workflows grounded in the source material.
 
 ### 7 - Quality Checks
 Before you emit the final document, verify:
 - the output is a single Markdown document
-- there is no YAML anywhere in the output unless it appears inside a quoted source example
 - every important public primitive has summary, definition, guidance, and example
-- workflows are task-oriented, not just category dumps
+- workflows are task-oriented end-to-end guides
 - open questions are clearly separated from verified facts
 
 ### 8 - Emit
