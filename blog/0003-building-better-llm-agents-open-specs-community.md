@@ -4,7 +4,7 @@
 
 ## **The Challenge: LLM Agents Are Only as Good as Their Foundations**
 
-The AI world is obsessed with what LLMs *can* do: generate code, automate workflows, interact with APIs, even reason through complex problems. But under the hood, much of today’s “agentic AI” is powered by ad hoc glue: bespoke prompts, untracked YAMLs, wikis, and tribal knowledge lost in Slack threads.
+The AI world is obsessed with what LLMs *can* do: generate code, automate workflows, interact with APIs, even reason through complex problems. But under the hood, much of today’s “agentic AI” is powered by ad hoc glue: bespoke prompts, untracked agent specs, wikis, and tribal knowledge lost in Slack threads.
 
 The result?
 
@@ -65,7 +65,7 @@ It’s how the open-source movement transformed infrastructure—and it’s how 
 AgentHub isn’t just a registry; it’s a conversation.
 Every agent PR is visible.
 Every debate, edge-case, or design “gotcha” is discussed in the open.
-Success is measured not by how many YAMLs are published, but by how many contributors *return*, iterate, and grow together.
+Success is measured not by how many agent specs are published, but by how many contributors *return*, iterate, and grow together.
 
 And with a [Code of Conduct](https://github.com/FIL-Builders/agent-hub/blob/main/CODE_OF_CONDUCT.md) and peer mentorship at its core, we’re building a space where new ideas—and new contributors—are always welcome.
 

@@ -203,11 +203,11 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   server.registerTool(
     "agenthub_fetch",
     {
-      title: "AgentHub: Fetch YAML",
+      title: "AgentHub: Fetch Spec",
       description:
-        "Fetch a specific AgentHub YAML by tool_id and version.\n" +
+        "Fetch a specific AgentHub Markdown spec by tool_id and version.\n" +
         "- version: string or 'latest' (lexicographically highest).\n" +
-        "Returns raw YAML text.",
+        "Returns raw spec text.",
       inputSchema: {
         tool_id: z.string().describe("Tool folder under agents/"),
         version: z.string().optional().default("latest")
@@ -228,8 +228,8 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
           `Unknown version '${version}' for tool '${tool_id}'. Available: [${versions.join(", ")}]`
         );
       }
-      const yaml = await readAgentByName({ fs, path, AGENTS_DIR, name: tool_id, version: selected });
-      return { content: [{ type: "text", text: yaml }] };
+      const specText = await readAgentByName({ fs, path, AGENTS_DIR, name: tool_id, version: selected });
+      return { content: [{ type: "text", text: specText }] };
     }
   );
 
@@ -266,7 +266,9 @@ async function listAllTools({ fs, path, AGENTS_DIR }) {
 async function listVersions({ fs, path, AGENTS_DIR, tool_id }) {
   const dir = path.join(AGENTS_DIR, tool_id);
   const files = await fs.readdir(dir);
-  return files.filter(f => f.endsWith(".yaml")).map(f => f.replace(/\.yaml$/, ""));
+  return [...new Set(files
+    .filter((file) => /^\d+\.\d+\.\d+\.(md|ya?ml)$/i.test(file))
+    .map((file) => file.replace(/\.(md|ya?ml)$/i, "")))];
 }
 
 async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
@@ -276,8 +278,17 @@ async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
     if (!all.length) throw new Error(`No versions found for tool: ${name}`);
     v = all.sort().reverse()[0];
   }
-  const filePath = path.join(AGENTS_DIR, name, `${v}.yaml`);
-  return await fs.readFile(filePath, "utf-8");
+  for (const ext of [".md", ".yaml", ".yml"]) {
+    const filePath = path.join(AGENTS_DIR, name, `${v}${ext}`);
+    try {
+      return await fs.readFile(filePath, "utf-8");
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        throw error;
+      }
+    }
+  }
+  throw new Error(`No spec file found for tool '${name}' version '${v}'.`);
 }
 
 function corsHeaders() {
@@ -335,9 +346,9 @@ function buildDocsJSON({ baseUrl }) {
       {
         name: "agenthub_fetch",
         description:
-          "Fetch the YAML for a tool_id at a version. If version is 'latest', the lexicographically highest version is used.",
+          "Fetch the Markdown spec for a tool_id at a version. If version is 'latest', the lexicographically highest version is used.",
         params: { tool_id: "string", version: "optional string|'latest' (default 'latest')" },
-        response: "YAML text",
+        response: "Raw spec text",
         examples: {
           rpc: {
             jsonrpc: "2.0",
@@ -355,7 +366,7 @@ function buildDocsJSON({ baseUrl }) {
       }
     ],
     notes: [
-      "Agents directory layout: agents/<tool_id>/<version>.yaml",
+      "Agents directory layout: agents/<tool_id>/<version>.md",
       "Filtering is only on tool_id; descriptions/tags are not indexed",
       "Versions are compared lexicographically (not semver-aware)",
       "No authentication; consider adding in production",

@@ -82,10 +82,9 @@ Screenshots, API schemas, OpenAPI/JSON-RPC specs, example configs, etc.
 ---
 
 ## Pre-submission checklist
-- [ ] I confirmed this project is **not already covered** in “All AgentHub YAML Specs”.
+- [ ] I confirmed this project is **not already covered** in “All AgentHub Agent Specs”.
 - [ ] I provided at least one **official repo or docs link**.
 - [ ] I documented **auth requirements** (or stated none).
 - [ ] I listed **minimum endpoints** and **acceptance criteria**.
-
 
 

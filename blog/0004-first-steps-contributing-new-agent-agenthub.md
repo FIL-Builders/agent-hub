@@ -29,20 +29,20 @@ You can open an issue to “claim” your agent idea, but this is optional.
 
 ## **3. Study the Spec and Example Agents**
 
-* **Open Agent Spec:** Read `/spec/open-agent-spec-v0.1.md` (or check [the latest on GitHub](https://github.com/FIL-Builders/agent-hub/blob/main/README.md)) to understand the required fields and structure.
+* **Open Agent Spec:** Read `/spec/open-agent-spec-v0.3.0.yaml` (or check [the latest on GitHub](https://github.com/FIL-Builders/agent-hub/blob/main/README.md)) to understand the required fields and structure.
 * **Review Examples:** Look at existing agents in `/agents/<tool>/`—they set the bar for clarity, depth, and reasoning.
 
 ---
 
-## **4. Write Your Agent YAML**
+## **4. Write Your Agent Markdown File**
 
 * Create a new folder in `/agents/` named after your tool, e.g.,
 
   ```
   agents/my-awesome-api/
   ```
-* Add your YAML file, following the spec (name it after the version or tool, e.g., `v1.yaml`).
-* The YAML should capture:
+* Add your Markdown file, following the spec (name it after the version, e.g., `0.3.0.md`).
+* The Markdown file should use YAML frontmatter for the `meta` block and then capture:
 
   * **Best practices**
   * **Pitfalls and “gotchas”**

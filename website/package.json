@@ -3,6 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "prestart": "node ../scripts/sync-agents-static.js",
+    "prebuild": "node ../scripts/sync-agents-static.js",
     "docusaurus": "docusaurus",
     "start": "docusaurus start",
     "build": "docusaurus build",
@@ -28,9 +30,7 @@
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.8.1",
-    "@docusaurus/types": "3.8.1",
-    "raw-loader": "^4.0.2",
-    "yaml-loader": "^0.8.1"
+    "@docusaurus/types": "3.8.1"
   },
   "browserslist": {
     "production": [

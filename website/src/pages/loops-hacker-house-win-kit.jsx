@@ -4,9 +4,9 @@ import Link from '@docusaurus/Link';
 import { buildPrompt } from '@site/src/utils/prompt';
 
 export default function LoopsHackerHouseWinKit() {
-  // No inline YAML preview; link cards route to the spec viewer
+  // No inline spec preview; link cards route to the spec viewer
 
-  // Organize agent specs into prize-track sections (project → agents/<project>/0.3.0.yaml)
+  // Organize agent specs into prize-track sections (project → agents/<project>/0.3.0.md)
   const sections = [
     {
       id: 'win-kit',
@@ -63,9 +63,9 @@ export default function LoopsHackerHouseWinKit() {
   // Schema card removed per request
 
   const renderAgentCard = ({ title, project, blurb, highlight }) => {
-    const yamlFile = '0.3.0.yaml';
-    const specUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(yamlFile)}`;
-    const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${yamlFile}`;
+    const specFile = '0.3.0.md';
+    const specUrl = `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(specFile)}`;
+    const rawUrl = `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${specFile}`;
     const prompt = buildPrompt(rawUrl);
     return (
       <div key={project} className="ai-card" style={highlight ? { borderColor: 'var(--ifm-color-primary)', boxShadow: '0 8px 24px rgba(249, 115, 22, 0.15)' } : undefined}>
@@ -78,7 +78,7 @@ export default function LoopsHackerHouseWinKit() {
           <a className="button button--secondary button--sm" href={`https://claude.ai/new?q=${encodeURIComponent(prompt)}`} target="_blank" rel="noopener noreferrer">Open in Claude</a>
         </div>
         <div style={{ marginTop: '0.5rem' }}>
-          <code>{`agents/${project}/${yamlFile}`}</code>
+          <code>{`agents/${project}/${specFile}`}</code>
         </div>
       </div>
     );
@@ -91,7 +91,7 @@ export default function LoopsHackerHouseWinKit() {
           <h1 style={{ margin: 0, color: 'var(--ifm-color-primary)' }}>Loops Hacker House – Win Kit</h1>
           <p style={{ marginTop: '0.5rem' }}>
             This page is a curated starting point for teams at the Loops Hacker House. It brings together the
-            exact YAML agent specs and reference flows you need to integrate the five prize‑track protocols quickly—
+            exact Markdown agent specs and reference flows you need to integrate the five prize‑track protocols quickly—
             without yak‑shaving. The intent is to help you ship a small but production‑sane MVP: clear onboarding,
             minimal UI, verifiable on‑chain actions, and telemetry you can show during the demo.
           </p>
@@ -101,8 +101,8 @@ export default function LoopsHackerHouseWinKit() {
             crisp UX, and a believable path to production.
           </p>
           <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
-            <Link className="button button--primary" to="#win-kit">Open the Win Kit</Link>
-            <Link className="button button--secondary" to="#judging">Judging & Prize Tracks</Link>
+            <a className="button button--primary" href="#win-kit">Open the Win Kit</a>
+            <a className="button button--secondary" href="#judging">Judging & Prize Tracks</a>
           </div>
         </header>
 
@@ -115,27 +115,27 @@ export default function LoopsHackerHouseWinKit() {
               <div className="ai-card">
                 <h4 style={{ margin: 0 }}>NEAR ($3,000)</h4>
                 <p>Build on NEAR Intents and NEAR Shade Agents; consumer UX with intent‑based architecture.</p>
-                <Link className="button button--secondary button--sm" to="#near">View NEAR specs</Link>
+                <a className="button button--secondary button--sm" href="#near">View NEAR specs</a>
               </div>
               <div className="ai-card">
                 <h4 style={{ margin: 0 }}>OpenServ AI ($3,000)</h4>
                 <p>Live integration sprint; orchestrate your MVP with OpenServ to ship fast.</p>
-                <Link className="button button--secondary button--sm" to="#openserv">View OpenServ specs</Link>
+                <a className="button button--secondary button--sm" href="#openserv">View OpenServ specs</a>
               </div>
               <div className="ai-card">
                 <h4 style={{ margin: 0 }}>Randamu ($3,000)</h4>
                 <p>Use VRF, Blocklock Encryption, OnlySwaps; provable randomness, secure data, seamless swaps.</p>
-                <Link className="button button--secondary button--sm" to="#randamu">View Randamu specs</Link>
+                <a className="button button--secondary button--sm" href="#randamu">View Randamu specs</a>
               </div>
               <div className="ai-card">
                 <h4 style={{ margin: 0 }}>Golem DB ($3,000)</h4>
                 <p>DB‑Chain L2 for decentralized data; social, gaming infra, analytics, or Web2→Web3 ports.</p>
-                <Link className="button button--secondary button--sm" to="#golem">View Golem specs</Link>
+                <a className="button button--secondary button--sm" href="#golem">View Golem specs</a>
               </div>
               <div className="ai-card">
                 <h4 style={{ margin: 0 }}>Filecoin ($1,000)</h4>
                 <p>Integrate the Filecoin Synapse SDK for decentralized storage/data layers.</p>
-                <Link className="button button--secondary button--sm" to="#filecoin">View Filecoin specs</Link>
+                <a className="button button--secondary button--sm" href="#filecoin">View Filecoin specs</a>
               </div>
             </div>
             <p style={{ marginTop: '0.75rem' }}>

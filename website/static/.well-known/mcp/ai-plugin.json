@@ -1,14 +1,14 @@
 {
   "schema_version": "v1",
   "name": "AgentHub MCP Server",
-  "description": "MCP over Streamable HTTP; serves versioned AgentHub YAML tools.",
+  "description": "MCP over Streamable HTTP; serves versioned AgentHub Markdown specs.",
   "mcp": {
     "transport": "http",
     "rpc_url": "http://localhost:8888/mcp"
   },
   "tools": [
     {
-      "tool_id": "agenthub.fetch"
+      "tool_id": "agenthub_fetch"
     }
   ]
 }

@@ -5,8 +5,9 @@
   "main": "index.js",
   "scripts": {
     "gen-mcp": "node scripts/gen-mcp-manifest.js",
+    "sync-agents": "node scripts/sync-agents-static.js",
     "build:site": "cd website && npm install && npm run build",
-    "build": "npm run gen-mcp && npm run build:site"
+    "build": "npm run gen-mcp && npm run sync-agents && npm run build:site"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.1",

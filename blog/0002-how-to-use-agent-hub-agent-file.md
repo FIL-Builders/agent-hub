@@ -27,14 +27,14 @@ For React, simply go to:
 https://github.com/FIL-Builders/agent-hub/tree/main/agents/react
 ```
 
-You’ll see one or more `.yaml` files.
+You’ll see one or more versioned `.md` files.
 
 ---
 
 ## **Step 2: Copy the Agent File’s Contents**
 
-Click into the `react.yaml` file.
-Copy the entire YAML contents to your clipboard.
+Click into the latest versioned spec file, such as `0.3.0.md`.
+Copy the entire Markdown contents to your clipboard.
 
 > **Tip:** The agent file is readable—skim it for gotchas, expert tips, and important context!
 
@@ -46,21 +46,21 @@ Every LLM interface is different, but the workflow is the same:
 
 * **ChatGPT, Claude, or Web UI:**
 
-  * Paste the agent YAML as a “system prompt” or at the top of your first message.
+  * Paste the agent Markdown spec as a “system prompt” or at the top of your first message.
   * Then, start your coding conversation as usual.
 * **Ollama, LM Studio, or LocalAI:**
 
   * Use the context injection or system prompt feature in your tool (check docs).
-  * Paste the YAML agent before any user instructions.
+  * Paste the Markdown agent spec before any user instructions.
 * **Custom LLM Agents:**
 
-  * If you’re building with frameworks like OpenDevin, Agent-LLM, or Autogen, load the agent YAML into your prompt builder or context window before running code tasks.
+  * If you’re building with frameworks like OpenDevin, Agent-LLM, or Autogen, load the agent Markdown spec into your prompt builder or context window before running code tasks.
 
 **Example:**
 
 ```
 SYSTEM:
-(paste agenthub/agents/react/react.yaml here)
+(paste agenthub/agents/react/0.3.0.md here)
 
 USER:
 Write a React component for a login form with validation and a “forgot password” link.
@@ -85,7 +85,7 @@ You just gave your LLM a senior developer’s guidance—for free.
 Yes!
 
 * **Stack agent files:** You can paste in several (for example, React *and* Redux, or GitHub API and Jest testing).
-* **Edit/extend:** Tailor the YAML to your project quirks—add extra “dos and don’ts” as your team learns.
+* **Edit/extend:** Tailor the Markdown spec to your project quirks—add extra “dos and don’ts” as your team learns.
 * **Contribute back:** If you improve an agent file, [open a Pull Request](https://github.com/FIL-Builders/agent-hub/blob/main/CONTRIBUTING.md) so the community benefits.
 
 ---

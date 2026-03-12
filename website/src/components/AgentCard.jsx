@@ -1,5 +1,6 @@
 import React from 'react';
 import { buildPrompt } from '@site/src/utils/prompt';
+import { stripSpecExtension } from '@site/src/utils/agentSpec';
 
 const accentFromString = (s) => {
   let h = 0;
@@ -7,63 +8,8 @@ const accentFromString = (s) => {
   return `hsl(${h} 82% 52%)`;
 };
 
-const parseMeta = (yaml) => {
-  try {
-    const lines = (yaml || '').split('\n');
-    const idx = lines.findIndex((l) => /^\s*meta:\s*$/.test(l));
-    if (idx === -1) return {};
-    const metaIndent = (lines[idx].match(/^\s*/)?.[0] || '').length;
-    const meta = [];
-    for (let i = idx + 1; i < lines.length; i++) {
-      const line = lines[i];
-      const indent = (line.match(/^\s*/)?.[0] || '').length;
-      if (line.trim() === '') { meta.push(line); continue; }
-      if (indent <= metaIndent) break;
-      meta.push(line);
-    }
-    const scalar = (key) => {
-      const re = new RegExp('^\\s*' + key + '\\s*:\\s*(.*)$');
-      for (const l of meta) {
-        const m = l.match(re);
-        if (m) {
-          let v = (m[1] || '').trim();
-          if (v.startsWith('"') && v.endsWith('"')) v = v.slice(1, -1);
-          if (v.startsWith("'") && v.endsWith("'")) v = v.slice(1, -1);
-          return v;
-        }
-      }
-      return '';
-    };
-    // purpose block handling
-    let purpose = '';
-    for (let i = 0; i < meta.length; i++) {
-      const l = meta[i];
-      const m = l.match(/^\s*purpose\s*:\s*(.*)$/);
-      if (!m) continue;
-      const after = (m[1] || '').trim();
-      const baseIndent = (l.match(/^\s*/)?.[0] || '').length;
-      if (after && after !== '|' && after !== '>') {
-        purpose = after;
-      } else {
-        const block = [];
-        for (let j = i + 1; j < meta.length; j++) {
-          const ln = meta[j];
-          const ind = (ln.match(/^\s*/)?.[0] || '').length;
-          if (ind <= baseIndent) break;
-          block.push(ln.slice(baseIndent + 2));
-        }
-        purpose = (after === '|' ? block.join('\n') : block.join(' ')).trim();
-      }
-      break;
-    }
-    const specName = scalar('spec_name') || scalar('library_name');
-    const language = scalar('language');
-    return { specName, purpose, language };
-  } catch { return {}; }
-};
-
-export default function AgentCard({ project, latest, older = [] }) {
-  const { specName, purpose, language } = React.useMemo(() => parseMeta(latest.raw), [latest.raw]);
+export default function AgentCard({ project, latest, older = [], meta = {} }) {
+  const { specName, purpose, language } = meta;
   const title = specName || project;
   const [openMenu, setOpenMenu] = React.useState(false);
   const [versionsOpen, setVersionsOpen] = React.useState(false);
@@ -92,7 +38,7 @@ export default function AgentCard({ project, latest, older = [] }) {
           <h3 className="agent-card-title"><a className="agent-card-title-link" href={specPageUrl}>{title}</a></h3>
           {language && <span className="agent-lang-pill">{language}</span>}
           <div className="agent-versions-row">
-            <span className="agent-version-latest">Latest: {latest.file.replace(/\.yaml$/, '')}</span>
+            <span className="agent-version-latest">Latest: {stripSpecExtension(latest.file)}</span>
             {older.length > 0 && (
               <button className="agent-older-link" onClick={() => setVersionsOpen(true)}>Older Versions</button>
             )}

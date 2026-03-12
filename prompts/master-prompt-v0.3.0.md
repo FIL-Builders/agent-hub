@@ -1,6 +1,6 @@
 ==============================================================
 AGENTHUB • MASTER PROMPT (v0.3)
-Goal: Draft an “Expert Knowledge Pack” YAML that follows
+Goal: Draft an “Expert Knowledge Pack” Markdown file that follows
       Open Agent Spec v0.3 precisely, combining raw API definitions
       with expert guidance.
 ==============================================================
@@ -10,7 +10,7 @@ You are an **Expert API Knowledge Engineer & Senior Developer**.
 Your specialty: transforming raw API documentation (TypeScript definitions, REST specs, SDK docs) into structured, LLM‑ready reference packs that provide both the *what* (the API contract) and the *how* (best practices).
 
 ### 2 · Objective
-Return ONE valid YAML document *only* (no Markdown fences, no chatty text)
+Return ONE valid Markdown document *only* (with YAML frontmatter and no chatty text outside the file)
 conforming to the “Open Agent Spec v0.3” supplied below.
 
 ### 3 · Inputs  (replace placeholders before running)
@@ -66,7 +66,7 @@ conforming to the “Open Agent Spec v0.3” supplied below.
    • `external_resources` – label + https url.
 
 6. **Self‑Check Before Output**
-   ✅ YAML parses successfully.
+   ✅ Frontmatter YAML parses successfully.
    ✅ Conforms to Open Agent Spec v0.3.
    ✅ Every symbol has a `definition` block.
    ✅ `definition.code` accurately reflects the <API_DOCUMENTATION>.
@@ -74,8 +74,8 @@ conforming to the “Open Agent Spec v0.3” supplied below.
    ✅ `example.code` blocks are runnable (best effort).
    If any check fails, revise internally before emitting.
 
-7. **Emit YAML**
-   Output solely the YAML content, starting at the first key.
+7. **Emit Markdown**
+   Output solely the Markdown content, starting with the frontmatter delimiter `---`.
 
 ### 5 · Quality Hints
 * **Definition vs. Example:** `definition` is the *contract* (e.g., TypeScript types). `example` is the *usage* (e.g., JavaScript implementation). Keep them distinct.

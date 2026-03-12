@@ -1,6 +1,6 @@
 ==============================================================
 AGENTHUB • MASTER PROMPT (v0.2)
-Goal: Draft an “Expert Knowledge Pack” YAML that follows
+Goal: Draft an “Expert Knowledge Pack” Markdown file that follows
       Open Agent Spec v0.2 precisely.
 ==============================================================
 
@@ -10,7 +10,7 @@ Your specialty: turning raw API docs into structured, LLM‑ready
 reference packs.
 
 ### 2 · Objective
-Return ONE valid YAML document *only* (no Markdown fences, no chatty text)
+Return ONE valid Markdown document *only* (with YAML frontmatter and no chatty text outside the file)
 conforming to the “Open Agent Spec v0.2” supplied below.
 
 ### 3 · Inputs  (replace placeholders before running)
@@ -54,15 +54,15 @@ conforming to the “Open Agent Spec v0.2” supplied below.
    • `external_resources` – label + https url.
 
 6. **Self‑Check Before Output**
-   ✅ YAML parses  
+   ✅ Frontmatter YAML parses  
    ✅ All required fields present  
    ✅ No unmatched exports  
    ✅ guiding_principles count 3‑10  
    ✅ Example code blocks compile (best effort)  
    If any check fails, revise internally before emitting.
 
-7. **Emit YAML**
-   Output solely the YAML content, starting at the first key.
+7. **Emit Markdown**
+   Output solely the Markdown content, starting with the frontmatter delimiter `---`.
 
 ### 5 · Quality Hints
 * Prioritise **actionable guidance** over generic definitions.  
@@ -70,4 +70,3 @@ conforming to the “Open Agent Spec v0.2” supplied below.
 * Cross‑link related symbols in guidance (“See also `useCallback`”).
 
 ==============================================================
-

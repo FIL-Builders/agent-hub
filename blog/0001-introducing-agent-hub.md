@@ -22,7 +22,7 @@ AgentHub exists to solve these problems, with a simple idea: **What if every LLM
 
 ## **What *is* an Agent File?**
 
-An **AgentHub agent file** is a lightweight, human-readable YAML file—curated by community experts for each API, SDK, or developer tool. Think of it as a *starter kit* for your LLM:
+An **AgentHub agent file** is a lightweight, human-readable Markdown file with structured frontmatter—curated by community experts for each API, SDK, or developer tool. Think of it as a *starter kit* for your LLM:
 
 * It teaches the LLM best practices, common pitfalls, and the “gotchas” only experts know.
 * It seeds your LLM session so that every code generation, test, or integration is sharper, safer, and more reliable.
@@ -37,7 +37,7 @@ An **AgentHub agent file** is a lightweight, human-readable YAML file—curated 
 Using AgentHub is as simple as:
 
 1. **Browse** the [AgentHub registry](https://github.com/FIL-Builders/agent-hub/tree/main/agents) for the API or SDK you want to use.
-2. **Copy** the relevant agent YAML file.
+2. **Copy** the relevant agent Markdown file.
 3. **Paste** it into your LLM session, or supply it as initial context—however your tool or workflow allows.
 
 Suddenly, your LLM is working from a base of hard-earned expertise, not just guesswork.
@@ -72,7 +72,7 @@ Say you’re building a local LLM tool that generates React code. Normally, your
 
 With AgentHub:
 
-1. Browse the registry and grab the React agent YAML.
+1. Browse the registry and grab the latest React agent Markdown file.
 2. Paste it into your LLM’s initial context—no extra plugins, no special parser.
 3. The LLM now understands expert React practices, edge cases, and anti-patterns—making your generated code cleaner and your iteration loop faster.
 
@@ -94,7 +94,7 @@ AgentHub is in its earliest days, and we want your help shaping it:
 
 ## **Building Together, One Thoughtful File at a Time**
 
-AgentHub is about more than YAML—it’s about making LLM development more robust, transparent, and welcoming for everyone.
+AgentHub is about more than file format—it’s about making LLM development more robust, transparent, and welcoming for everyone.
 We believe the future of agentic AI is open, community-driven, and practical.
 
 Ready to help build it?
