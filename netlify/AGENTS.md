@@ -34,7 +34,6 @@ agents/
 - `listTools` is built from the folders present in `agents/`.
 - `getToolManifest` and `runTool` read versions by filename (without `.md`).
 - `runTool` with `version: "latest"` sorts versions lexicographically descending and returns the first one.
-- The server prefers `.md` and falls back to legacy `.yaml`/`.yml` if present during transition.
 
 
 ## Quick Start (Local Dev)

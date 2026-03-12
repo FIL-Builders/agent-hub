@@ -13,7 +13,7 @@ function stripQuotes(value) {
 }
 
 export function stripSpecExtension(filename = '') {
-  return filename.replace(/\.(md|ya?ml)$/i, '');
+  return filename.replace(/\.md$/i, '');
 }
 
 export function splitFrontmatter(specText = '') {
