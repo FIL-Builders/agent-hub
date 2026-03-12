@@ -22,6 +22,7 @@ The output must be:
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>               <- canonical name
 <LIBRARY_VERSION>            <- current version or supported version range
+<OPEN_AGENT_SPEC_V0_4>       <- Markdown-native Open Agent Spec v0.4.0
 <DOCUMENTATION_PACK_V0_4>    <- Markdown-native documentation pack
 <API_DOCUMENTATION>          <- optional raw source material for verification
 
@@ -141,11 +142,12 @@ Answer in a short paragraph or 2 to 5 bullets.
 ### 7 - Workflow
 
 1. Read <DOCUMENTATION_PACK_V0_4> fully.
-2. Verify critical contracts against <API_DOCUMENTATION> when provided.
-3. Identify the public surface area and group it by mental model.
-4. Draft the knowledge pack in the required section order.
-5. Remove repetition and low-signal filler.
-6. Check that the result is Markdown-native and contains no YAML-oriented structure.
+2. Read <OPEN_AGENT_SPEC_V0_4> and follow its required document structure.
+3. Verify critical contracts against <API_DOCUMENTATION> when provided.
+4. Identify the public surface area and group it by mental model.
+5. Draft the knowledge pack in the required section order.
+6. Remove repetition and low-signal filler.
+7. Check that the result is Markdown-native and contains no YAML-oriented structure.
 
 ### 8 - Quality Checks
 Before emitting, verify:
