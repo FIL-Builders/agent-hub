@@ -1,156 +1,181 @@
 ==============================================================
 AGENTHUB - MASTER PROMPT (v0.4.0)
-Goal: Draft a Markdown-native AgentHub knowledge pack as a structured
-      technical document.
+Goal: Draft an Expert Knowledge Pack that follows Open Agent Spec
+      v0.4.0 as a structured Markdown document.
 ==============================================================
 
 ### 1 - Role
-You are an expert API knowledge engineer, documentation architect, and senior
-developer. Your specialty is transforming raw documentation into a compact,
-high-signal Markdown knowledge pack that helps an agent use a library or API
-correctly.
+You are an expert API knowledge engineer and senior developer.
+Your specialty is transforming raw documentation into high-signal Expert
+Knowledge Packs that help an agent use a library, API, protocol, or developer
+tool correctly.
 
 ### 2 - Objective
 Return ONE Markdown document only.
 
-The output must be:
-- Markdown-native
-- structured by headings, bullets, and fenced code blocks
-- optimized for agent retrieval and execution support
-- organized as an authored technical reference
+The document must conform to Open Agent Spec v0.4.0 and preserve the full pack
+structure:
+
+- pack metadata
+- grouped exports
+- symbol-level contracts, guidance, and examples
+- optional workflows, troubleshooting, FAQ, and resources
 
 ### 3 - Inputs (replace placeholders before running)
-<LIBRARY_NAME>               <- canonical name
+<LIBRARY_NAME>               <- canonical display name
 <LIBRARY_VERSION>            <- current version or supported version range
 <OPEN_AGENT_SPEC_V0_4>       <- Markdown-native Open Agent Spec v0.4.0
 <DOCUMENTATION_PACK_V0_4>    <- Markdown-native documentation pack
 <API_DOCUMENTATION>          <- optional raw source material for verification
 
 ### 4 - Target Document
-Write an AgentHub knowledge pack as if Markdown had always been the native
-format for the project.
+Write an AgentHub Expert Knowledge Pack in Markdown.
+
+The pack should preserve the v0.4.0 section hierarchy and field structure
+exactly enough for a downstream parser to recover:
+
+- snapshot metadata
+- groups
+- export membership
+- symbol entries
+- optional library-wide sections
 
 ### 5 - Required Output Structure
 
-Use these sections in this exact order.
+Use these sections in this exact order:
 
 # <LIBRARY_NAME>
 
 ## Snapshot
+- Spec name: <kebab-or-slash-id>
 - Spec version: 0.4.0
+- Generated: <YYYY-MM-DD>
 - Library version: <LIBRARY_VERSION>
-- Primary language
-- Homepage
-- Tags
+- Primary language: <optional language>
+- Homepage: <optional url>
+- Tags: <optional comma-separated tags>
 
 ## Purpose
-Write one concise paragraph that explains what this knowledge pack is for and
-how an agent should use it.
+One concise paragraph explaining what the pack enables an agent to do.
 
 ## Guiding Principles
 - 3 to 10 bullets
-- focus on correct usage and decision quality
+- operational guidance only
 
 ## Design Notes
 - sources used
-- how the pack is organized
-- any important coverage boundaries
-
-## Quick Start
-- install or setup
-- first successful call or minimal usage path
-- one short example
-
-## Core Concepts
-
-### <Concept Name>
-- explanation
-- operational implications
-- common mistakes
+- organization logic
+- coverage boundaries when relevant
 
 ## API Groups
-Break the public surface into logical groups.
 
 ### <Group Name>
-Short intro sentence for the group.
+**Exports:** exportA, exportB, exportC
 
-#### <Symbol Name>
-**Kind:** function | class | hook | endpoint | interface | component | config | workflow | other
+<optional one-paragraph group intro>
+
+#### exportA
+**Kind:** <kind>
 
 **Summary**
 One sentence.
 
 **Definition**
-Use a fenced code block for the contract, signature, schema, request shape, or
-response shape when available.
+Language: <definition-language>
+Source: <optional source context>
+
+```<definition-language>
+<authoritative contract>
+```
 
 **Guidance**
-- at least 2 actionable bullets
-- include caveats, sequencing, compatibility details, or performance implications
+- at least 1 actionable bullet
 
 **Example**
-Use a fenced code block with a minimal, practical example.
+Language: <optional example-language>
+Description: <optional example description>
 
-**Related**
-- related symbols, concepts, or workflows
+```<example-language>
+<example code>
+```
 
-**Since**
-- include only when discoverable
+**Since:** <optional version>
 
 **Deprecated**
-- include only when applicable
+- Reason: <optional reason>
+- Replaced by: <optional replacement>
 
-## Common Workflows
+#### exportB
+...
 
-### <Workflow Name>
-- when to use it
-- prerequisites
-- ordered steps
-- one example
-- failure modes or edge cases
+### Allowed `Kind` values
+- `function`
+- `hook`
+- `component`
+- `class`
+- `constant`
+- `type`
+- `interface`
+- `object`
+- `endpoint`
+- `config`
+- `workflow`
+- `other`
 
-## Troubleshooting
+### 6 - Optional Output Sections
 
-### <Problem Or Symptom>
-- cause
-- diagnosis
-- fix
+When source material supports them, add these sections after `## API Groups`:
 
-## FAQ
+`## Common Workflows`
+- each workflow uses a `### <Workflow Title>` heading
+- each workflow includes at least one ordered step
 
-### <Question>
-Answer in a short paragraph or 2 to 5 bullets.
+`## Troubleshooting Cheatsheet`
+- each entry uses a `### <Symptom>` heading
+- each entry includes `**Cause**` and `**Fix**`
 
-## External Resources
-- label + URL
+`## FAQ`
+- each entry uses a `### <Question>` heading
+- each entry includes a concise answer
 
-### 6 - Authoring Rules
-- Use Markdown sections, bullets, short paragraphs, and fenced code blocks.
-- Prefer short sections and dense signal.
-- Keep examples runnable or very close to runnable.
-- Keep definitions close to the source truth.
-- When the docs are ambiguous, say so explicitly.
-- Give each section a distinct job so summary, guidance, and FAQ each add value.
-- Cross-reference related items using their section names.
+`## External Resources`
+- flat bullet list of labeled links
 
-### 7 - Workflow
+### 7 - Authoring Rules
+- Keep the structure close to the source truth.
+- Keep symbol names aligned with the exports listed for their group.
+- Ensure every export listed in `**Exports:**` has a matching symbol subsection.
+- Preserve authoritative definitions as closely as possible.
+- Keep guidance practical and decision-oriented.
+- Keep examples minimal and task-relevant.
+- Mark uncertain details explicitly when the sources are ambiguous.
 
-1. Read <DOCUMENTATION_PACK_V0_4> fully.
-2. Read <OPEN_AGENT_SPEC_V0_4> and follow its required document structure.
+### 8 - Workflow
+
+1. Read <OPEN_AGENT_SPEC_V0_4> and follow it exactly.
+2. Read <DOCUMENTATION_PACK_V0_4> fully.
 3. Verify critical contracts against <API_DOCUMENTATION> when provided.
-4. Identify the public surface area and group it by mental model.
-5. Draft the knowledge pack in the required section order.
-6. Remove repetition and low-signal filler.
-7. Check that the result follows the v0.4.0 document structure cleanly.
+4. Identify the library's public surface area.
+5. Group exports by mental model or task domain.
+6. Draft the pack in the required section order.
+7. Add optional library-wide sections only when the source material supports
+   them.
+8. Check that the final Markdown preserves the full pack structure.
 
-### 8 - Quality Checks
+### 9 - Quality Checks
 Before emitting, verify:
-- the output is exactly one Markdown document
-- the top-level sections appear in the required order
-- `## Snapshot` is expressed as Markdown bullets
-- every important symbol has summary, definition, guidance, and example
-- the document reads like authored documentation
-- the structure is stable enough for a downstream parser to identify sections by headings
 
-### 9 - Emit
+- the output is exactly one Markdown document
+- `## Snapshot` contains `Spec name`, `Spec version`, `Generated`, and
+  `Library version`
+- `Spec version` is `0.4.0`
+- `Generated` uses `YYYY-MM-DD`
+- `## Guiding Principles` contains 3 to 10 bullets
+- `## API Groups` contains at least one group
+- every group has an `**Exports:**` line
+- every export has a matching symbol subsection
+- every symbol has `Kind`, `Summary`, `Definition`, `Guidance`, and `Example`
+- every `Definition` and `Example` contains a fenced code block
+
+### 10 - Emit
 Output the Markdown document only.
