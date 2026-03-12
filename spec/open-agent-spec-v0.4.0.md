@@ -63,11 +63,16 @@ Required bullets:
 - `Generated: <date>`
 - `Library version: <version-range-or-release>`
 
-Optional bullets:
+Optional scalar bullets:
 
 - `Primary language: <language>`
 - `Homepage: <url>`
-- `Tags: <comma-separated-tags>`
+
+Optional list fields:
+
+`Tags`
+- `<tag>`
+- `<tag>`
 
 #### Snapshot Field Rules
 
@@ -104,6 +109,8 @@ Optional bullets:
 `Tags`
 - optional
 - compact discovery-oriented list
+- must be expressed as a Markdown list introduced by a `Tags` label
+- tag values should be unique within the list
 
 ### `## Purpose`
 
@@ -154,7 +161,10 @@ Each group must use this structure:
 ```md
 ### <Group Name>
 
-**Exports:** exportA, exportB, exportC
+**Exports**
+- exportA
+- exportB
+- exportC
 
 <optional one-paragraph group intro>
 
@@ -169,13 +179,14 @@ Each group must use this structure:
 
 - at least one group is required
 - every group must have a name
-- every group must declare an `Exports` line
-- the `Exports` line must list one or more export names
+- every group must declare an `Exports` field
+- the `Exports` field must be a Markdown list with one or more export names
 - export names must be unique across the entire pack
 - every export listed in `Exports` must have a matching `#### <Symbol Name>`
   subsection in the same group
 - every symbol subsection under the group must correspond to an entry in that
-  group's `Exports` line
+  group's `Exports` list
+- group names should be unique within the pack
 
 ### Symbol Structure
 
@@ -183,7 +194,8 @@ Each symbol subsection must use this structure and field order:
 
 ````md
 #### <Symbol Name>
-**Kind:** <kind>
+**Kind**
+<kind>
 
 **Summary**
 <one-sentence summary>
@@ -208,7 +220,8 @@ Description: <optional description>
 <example code>
 ```
 
-**Since:** <optional version>
+**Since**
+<optional version>
 
 **Deprecated**
 - Reason: <reason>
@@ -220,10 +233,11 @@ Description: <optional description>
 `<Symbol Name>`
 - required
 - must exactly match the export name declared in the containing group's
-  `Exports` line
+  `Exports` list
 
 `Kind`
 - required
+- must appear as a labeled field on its own line
 - allowed values:
   - `function`
   - `hook`
@@ -240,25 +254,29 @@ Description: <optional description>
 
 `Summary`
 - required
+- must appear immediately after `Kind`
 - one sentence
 - should state the symbol's role plainly
 
 `Definition`
 - required
+- must appear immediately after `Summary`
+- must begin with a `Language: <lang>` scalar line
 - must include a code fence
-- must include `Language: <lang>`
 - may include `Source: <source context>`
-- should preserve the authoritative contract as closely as possible
+- should preserve the authoritative contract of the symbol as closely as possible
 - valid content includes signatures, interfaces, request or response shapes,
   schema fragments, protocol messages, or config contracts
 
 `Guidance`
 - required
+- must appear immediately after `Definition`
 - at least 1 bullet
 - should focus on best practices, sequencing, caveats, and integration behavior
 
 `Example`
 - required
+- must appear immediately after `Guidance`
 - must include a code fence
 - may include `Language: <lang>`
 - may include `Description: <description>`
@@ -266,10 +284,13 @@ Description: <optional description>
 
 `Since`
 - optional
+- when present, it must appear after `Example`
 - the upstream library version in which the symbol became available
 
 `Deprecated`
 - optional
+- when present, it must appear after `Since` if `Since` is present, otherwise
+  directly after `Example`
 - when present, it should explain the reason and replacement path when known
 
 ## Optional Library-Wide Sections
@@ -294,6 +315,7 @@ Workflow rules:
 - each workflow must have a title
 - each workflow must contain at least one ordered step
 - additional explanatory text before or after the steps is allowed
+- if the section is present, it must contain at least one workflow entry
 
 ### `## Troubleshooting Cheatsheet`
 
@@ -317,6 +339,7 @@ Troubleshooting rules:
 - each entry must have a symptom heading
 - each entry must include `Cause`
 - each entry must include `Fix`
+- if the section is present, it must contain at least one troubleshooting entry
 
 ### `## FAQ`
 
@@ -335,6 +358,7 @@ FAQ rules:
 
 - each entry must use the question as the subsection title
 - each entry must contain an answer paragraph or bullet list
+- if the section is present, it must contain at least one FAQ entry
 
 ### `## External Resources`
 
@@ -352,6 +376,7 @@ Resource rules:
 
 - every item must have a human-readable label
 - every item must include a valid URL
+- if the section is present, it must contain at least one resource item
 
 ## Validation Rules
 
@@ -363,16 +388,30 @@ A v0.4.0 pack is valid when all of the following are true:
 4. `Spec name` matches `^[a-z0-9]+([-/][a-z0-9]+)*$`
 5. `Spec version` matches `^0\.4\.[0-9]+$`
 6. `Generated` matches `^\d{4}-\d{2}-\d{2}$`
-7. `## Guiding Principles` contains 3 to 10 bullets
-8. `## API Groups` contains at least one group
-9. every group contains an `Exports` line with at least one export
-10. exports are unique across all groups
-11. every export listed in a group has a matching symbol subsection in that
+7. if `Tags` is present, it is expressed as a Markdown list with unique items
+8. `## Guiding Principles` contains 3 to 10 bullets
+9. `## API Groups` contains at least one group
+10. every group has a unique non-empty name
+11. every group contains an `Exports` field with at least one export item
+12. exports are unique across all groups
+13. every export listed in a group has a matching symbol subsection in that
     group
-12. every symbol subsection contains `Kind`, `Summary`, `Definition`,
-    `Guidance`, and `Example`
-13. every `Definition` block contains a code fence
-14. every `Example` block contains a code fence
+14. every symbol subsection belongs to an export declared in the containing
+    group's `Exports` list
+15. every symbol subsection contains `Kind`, `Summary`, `Definition`,
+    `Guidance`, and `Example` in that order
+16. every `Kind` value is one of the allowed values
+17. every `Definition` block begins with `Language: <lang>` and contains a code
+    fence
+18. every `Definition` block represents the authoritative contract for the
+    symbol
+19. every `Example` block contains a code fence
+20. if `## Common Workflows` is present, every workflow entry has a title and at
+    least one ordered step
+21. if `## Troubleshooting Cheatsheet` is present, every entry has a symptom,
+    `Cause`, and `Fix`
+22. if `## FAQ` is present, every entry has a question heading and answer
+23. if `## External Resources` is present, every item has a label and URL
 
 ## Parser Guidance
 
@@ -382,9 +421,11 @@ Recommended parser strategy:
 
 1. read the title from the first `#` heading
 2. locate required `##` sections by exact heading name
-3. parse `## Snapshot` as a bullet list of labeled fields
+3. parse `## Snapshot` as a bullet list of labeled fields, with `Tags` parsed as
+   a nested Markdown list when present
 4. locate groups under `## API Groups` by `###`
-5. parse `**Exports:**` for the declared export list of each group
+5. parse `**Exports**` as a Markdown list for the declared export set of each
+   group
 6. locate symbols within each group by `####`
 7. parse labeled fields within each symbol subsection in order
 8. parse optional library-wide sections only when present
@@ -401,7 +442,11 @@ Recommended parser strategy:
 - Library version: ^1.2.3
 - Primary language: typescript
 - Homepage: https://example.dev
-- Tags: example, sdk, api
+
+**Tags**
+- example
+- sdk
+- api
 
 ## Purpose
 This pack teaches an agent to use Example Library correctly for common
@@ -419,12 +464,14 @@ integration, extension, and debugging tasks.
 ## API Groups
 
 ### Client Creation
-**Exports:** createClient
+**Exports**
+- createClient
 
 Creates and configures client instances.
 
 #### createClient
-**Kind:** function
+**Kind**
+function
 
 **Summary**
 Creates a configured client instance.
@@ -449,6 +496,9 @@ import { createClient } from "example-library";
 
 const client = createClient({ apiKey: process.env.EXAMPLE_API_KEY! });
 ```
+
+**Since**
+v1.0.0
 
 ## Common Workflows
 

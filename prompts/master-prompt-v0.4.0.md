@@ -53,7 +53,10 @@ Use these sections in this exact order:
 - Library version: <LIBRARY_VERSION>
 - Primary language: <optional language>
 - Homepage: <optional url>
-- Tags: <optional comma-separated tags>
+
+**Tags**
+- <optional tag>
+- <optional tag>
 
 ## Purpose
 One concise paragraph explaining what the pack enables an agent to do.
@@ -70,12 +73,16 @@ One concise paragraph explaining what the pack enables an agent to do.
 ## API Groups
 
 ### <Group Name>
-**Exports:** exportA, exportB, exportC
+**Exports**
+- exportA
+- exportB
+- exportC
 
 <optional one-paragraph group intro>
 
 #### exportA
-**Kind:** <kind>
+**Kind**
+<kind>
 
 **Summary**
 One sentence.
@@ -99,7 +106,8 @@ Description: <optional example description>
 <example code>
 ```
 
-**Since:** <optional version>
+**Since**
+<optional version>
 
 **Deprecated**
 - Reason: <optional reason>
@@ -144,7 +152,11 @@ When source material supports them, add these sections after `## API Groups`:
 ### 7 - Authoring Rules
 - Keep the structure close to the source truth.
 - Keep symbol names aligned with the exports listed for their group.
-- Ensure every export listed in `**Exports:**` has a matching symbol subsection.
+- Express exports as a Markdown list under `**Exports**`.
+- Ensure every export listed in `**Exports**` has a matching symbol subsection.
+- Ensure every symbol subsection belongs to an export declared in that group's
+  `**Exports**` list.
+- Keep symbol fields in strict order.
 - Preserve authoritative definitions as closely as possible.
 - Keep guidance practical and decision-oriented.
 - Keep examples minimal and task-relevant.
@@ -170,11 +182,15 @@ Before emitting, verify:
   `Library version`
 - `Spec version` is `0.4.0`
 - `Generated` uses `YYYY-MM-DD`
+- if `Tags` is present, it is a Markdown list
 - `## Guiding Principles` contains 3 to 10 bullets
 - `## API Groups` contains at least one group
-- every group has an `**Exports:**` line
+- every group has an `**Exports**` field expressed as a Markdown list
 - every export has a matching symbol subsection
+- every symbol belongs to a declared export
 - every symbol has `Kind`, `Summary`, `Definition`, `Guidance`, and `Example`
+- symbol fields appear in the required order
+- every `Kind` value is allowed by the spec
 - every `Definition` and `Example` contains a fenced code block
 
 ### 10 - Emit
