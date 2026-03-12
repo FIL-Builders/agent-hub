@@ -2,21 +2,20 @@
 
 ## Purpose
 
-Open Agent Spec v0.4.0 defines a Markdown-native format for AgentHub knowledge
-packs.
+Specification for AgentHub "Expert Knowledge Packs".
 
-The goal is to make each pack read like authored technical documentation. A
-valid v0.4.0 pack should be:
+A pack teaches any LLM to use a given API, SDK, protocol, or developer tool at
+senior-developer level.
 
-- easy for humans to read
-- easy for LLMs to retrieve from by section
-- structurally predictable
-- straightforward to parse from headings and labeled subsections
+Version 0.4.0 defines Expert Knowledge Packs as structured Markdown documents,
+organized by stable sections, labeled reference entries, workflows, and
+examples.
 
 ## Core Principle
 
 The pack is a document-first format. Its structure comes from headings,
-subheadings, labeled fields, lists, and code fences.
+subheadings, labeled fields, lists, and code fences so that both humans and
+LLMs can read it as technical documentation and retrieve it by section.
 
 ## Required Document Shape
 
