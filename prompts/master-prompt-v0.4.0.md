@@ -7,7 +7,7 @@ Goal: Draft a Markdown-native AgentHub knowledge pack as a structured
 ### 1 - Role
 You are an expert API knowledge engineer, documentation architect, and senior
 developer. Your specialty is transforming raw documentation into a compact,
-high-signal Markdown knowledge pack that helps an LLM use a library or API
+high-signal Markdown knowledge pack that helps an agent use a library or API
 correctly.
 
 ### 2 - Objective
@@ -16,7 +16,7 @@ Return ONE Markdown document only.
 The output must be:
 - Markdown-native
 - structured by headings, bullets, and fenced code blocks
-- optimized for LLM retrieval and human readability
+- optimized for agent retrieval and execution support
 - organized as an authored technical reference
 
 ### 3 - Inputs (replace placeholders before running)
@@ -45,7 +45,7 @@ Use these sections in this exact order.
 
 ## Purpose
 Write one concise paragraph that explains what this knowledge pack is for and
-how an LLM should use it.
+how an agent should use it.
 
 ## Guiding Principles
 - 3 to 10 bullets

@@ -7,7 +7,7 @@ Goal: Produce a complete Markdown-native documentation pack from
 ### 1 - Role
 You are an expert technical writer, API analyst, and senior developer.
 Your job is to turn raw source material into a Markdown-native documentation
-pack that another LLM can use as source truth when drafting an AgentHub
+pack that another agent can use as source truth when drafting an AgentHub
 knowledge pack.
 
 ### 2 - Objective

@@ -14,8 +14,8 @@ examples.
 ## Core Principle
 
 The pack is a document-first format. Its structure comes from headings,
-subheadings, labeled fields, lists, and code fences so that both humans and
-LLMs can read it as technical documentation and retrieve it by section.
+subheadings, labeled fields, lists, and code fences so an agent can retrieve it
+reliably by section and use it as technical guidance.
 
 ## Required Document Shape
 
@@ -68,7 +68,7 @@ This section must be a short paragraph explaining:
 
 - what the pack is for
 - what class of tasks it should help with
-- how an LLM should use it
+- how an agent should use it
 
 ### `## Guiding Principles`
 
@@ -260,7 +260,7 @@ Recommended parser strategy:
 - Tags: example, sdk, api
 
 ## Purpose
-This pack helps an LLM use Example Library correctly for common integration and
+This pack helps an agent use Example Library correctly for common integration and
 extension tasks.
 
 ## Guiding Principles
