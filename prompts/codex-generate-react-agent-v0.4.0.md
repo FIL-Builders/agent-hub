@@ -17,6 +17,7 @@ Use these files as the generation contract:
 - `spec/open-agent-spec-v0.4.0.md`
 - `prompts/master-prompt-v0.4.0.md`
 - `prompts/codex-generate-agent-file-v0.4.0.md`
+- `prompts/codex-agent-pack-runbook-v0.4.0.md`
 
 ### 3 - Required Content Inputs
 
@@ -90,8 +91,9 @@ Examples should:
 
 Before considering the task complete:
 
-1. run `node scripts/validate-agent-pack-v0.4.0.js agents/react/0.4.0.md`
-2. fix any reported structural errors
-3. confirm the pack's `Definition` sources are version-matched React 18.3-era
+1. follow `prompts/codex-agent-pack-runbook-v0.4.0.md`
+2. run `node scripts/validate-agent-pack-v0.4.0.js agents/react/0.4.0.md`
+3. fix any reported structural errors
+4. confirm the pack's `Definition` sources are version-matched React 18.3-era
    sources as closely as possible
-4. stop only when the validator passes
+5. stop only when the validator passes

@@ -25,33 +25,24 @@ Write exactly one Markdown document to the requested output path.
 The output must follow:
 - `spec/open-agent-spec-v0.4.0.md`
 - `prompts/master-prompt-v0.4.0.md`
+- `prompts/codex-agent-pack-runbook-v0.4.0.md`
 
 Do not edit unrelated files.
 
 ### 4 - Required Worker Behavior
 
-1. Treat the spec as the structural source of truth.
-2. Lock the target library version from the provided invariants or task.
-3. Treat the documentation pack and listed raw source files as initial content
-   inputs.
-4. Acquire additional authoritative material as needed, including:
-   - upstream source code
-   - type declarations
-   - tagged docs pages
-   - package contents
-   - official examples or release notes
-5. Prefer version-matched authoritative sources over generic latest pages.
-6. Preserve all invariant fields provided in the task exactly.
-7. Keep the final structure deterministic:
-   - `## Snapshot` with required metadata
-   - `**Exports**` as Markdown lists
-   - strict symbol field order
-8. Preserve authoritative definitions as closely as possible.
-9. Use prior generated packs only for coverage audit, never as the primary
-   contract source for `Definition` blocks.
-10. Keep guidance actionable and examples task-relevant.
-11. If source coverage is incomplete, mark the point as `Needs verification`
-   without inventing structure or APIs.
+Follow `prompts/codex-agent-pack-runbook-v0.4.0.md` exactly.
+
+For agent-pack generation specifically:
+
+1. use the runbook's agent-pack procedure
+2. treat the spec as the structural source of truth
+3. preserve all invariant fields provided in the task exactly
+4. keep the final structure deterministic
+5. preserve authoritative definitions as closely as possible
+6. use prior generated packs only for coverage audit
+7. if source coverage is incomplete, mark the point as `Needs verification`
+   without inventing structure or APIs
 
 ### 5 - Required Self-Check
 

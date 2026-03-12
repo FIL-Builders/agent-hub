@@ -22,28 +22,21 @@ Write exactly one Markdown document to the requested output path.
 
 The document must follow:
 - `prompts/documentation-prompt-v0.4.0.md`
+- `prompts/codex-agent-pack-runbook-v0.4.0.md`
 
 Do not edit unrelated files.
 
 ### 4 - Required Worker Behavior
 
-1. Read all provided local source files completely enough to extract the public
-   surface area, workflows, and source-grounded examples.
-2. Lock the target version before extracting definitions.
-3. Acquire additional authoritative material as needed, including:
-   - upstream source code
-   - type declarations
-   - tagged docs pages
-   - package contents
-   - official examples or release notes
-4. Prefer authoritative version-matched sources over generic latest pages.
-5. Keep source truth and interpretation separate:
-   - definitions stay close to the source
-   - guidance distills expert usage advice
-6. Use prior generated packs only for coverage audit, never as the primary
-   contract source.
-7. If source coverage is incomplete, mark the gap as `Needs verification`.
-8. Write the finished document directly to the requested output path.
+Follow `prompts/codex-agent-pack-runbook-v0.4.0.md` exactly.
+
+For documentation-pack generation specifically:
+
+1. use the runbook's documentation-pack procedure
+2. record the target version and source set clearly
+3. keep definitions close to authoritative sources
+4. use prior generated packs only for coverage audit
+5. write the finished document directly to the requested output path
 
 ### 5 - Output Requirements
 
