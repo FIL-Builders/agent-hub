@@ -70,7 +70,7 @@ Optional scalar bullets:
 
 Optional list fields:
 
-`Tags`
+`**Tags**`
 - `<tag>`
 - `<tag>`
 
@@ -109,7 +109,7 @@ Optional list fields:
 `Tags`
 - optional
 - compact discovery-oriented list
-- must be expressed as a Markdown list introduced by a `Tags` label
+- must be expressed as a Markdown list introduced by an `**Tags**` label
 - tag values should be unique within the list
 
 ### `## Purpose`
