@@ -26,7 +26,7 @@ structure:
 <LIBRARY_VERSION>            <- current version or supported version range
 <OPEN_AGENT_SPEC_V0_4>       <- Markdown-native Open Agent Spec v0.4.0
 <DOCUMENTATION_PACK_V0_4>    <- Markdown-native documentation pack
-<API_DOCUMENTATION>          <- optional raw source material for verification
+<API_DOCUMENTATION>          <- starting set of raw source material for verification
 
 ### 4 - Target Document
 Write an AgentHub Expert Knowledge Pack in Markdown.
@@ -39,6 +39,12 @@ exactly enough for a downstream parser to recover:
 - export membership
 - symbol entries
 - optional library-wide sections
+
+The pack should also preserve provenance well enough to audit:
+
+- target library version
+- upstream source refs when known
+- origin of each authoritative definition
 
 ### 5 - Required Output Structure
 
@@ -53,6 +59,7 @@ Use these sections in this exact order:
 - Library version: <LIBRARY_VERSION>
 - Primary language: <optional language>
 - Homepage: <optional url>
+- Source set: <short description of the authoritative source set>
 
 **Tags**
 - <optional tag>
@@ -89,7 +96,7 @@ One sentence.
 
 **Definition**
 Language: <definition-language>
-Source: <optional source context>
+Source: <upstream file, package, doc page, tag, commit, or other source context>
 
 ```<definition-language>
 <authoritative contract>
@@ -158,21 +165,31 @@ When source material supports them, add these sections after `## API Groups`:
   `**Exports**` list.
 - Keep symbol fields in strict order.
 - Preserve authoritative definitions as closely as possible.
+- Source `Definition` blocks from authoritative version-matched material, not
+  from prior generated packs.
 - Keep guidance practical and decision-oriented.
 - Keep examples minimal and task-relevant.
 - Mark uncertain details explicitly when the sources are ambiguous.
+- Prefer version-pinned upstream refs, tagged docs, package contents, or type
+  declarations over generic latest pages.
+- Use prior packs only for coverage audit, never as the primary contract source.
 
 ### 8 - Workflow
 
 1. Read <OPEN_AGENT_SPEC_V0_4> and follow it exactly.
-2. Read <DOCUMENTATION_PACK_V0_4> fully.
-3. Verify critical contracts against <API_DOCUMENTATION> when provided.
-4. Identify the library's public surface area.
-5. Group exports by mental model or task domain.
-6. Draft the pack in the required section order.
-7. Add optional library-wide sections only when the source material supports
+2. Lock the target version from <LIBRARY_VERSION>.
+3. Read <DOCUMENTATION_PACK_V0_4> fully.
+4. Acquire or inspect authoritative upstream material for the locked version as
+   needed.
+5. Verify critical contracts against <API_DOCUMENTATION> and any fetched
+   authoritative sources.
+6. Identify the library's public surface area.
+7. Group exports by mental model or task domain.
+8. Draft the pack in the required section order.
+9. Add optional library-wide sections only when the source material supports
    them.
-8. Check that the final Markdown preserves the full pack structure.
+10. Check that the final Markdown preserves the full pack structure and records
+    enough provenance to audit later.
 
 ### 9 - Quality Checks
 Before emitting, verify:
@@ -182,6 +199,7 @@ Before emitting, verify:
   `Library version`
 - `Spec version` is `0.4.0`
 - `Generated` uses `YYYY-MM-DD`
+- `## Snapshot` records the source set
 - if `Tags` is present, it is a Markdown list
 - `## Guiding Principles` contains 3 to 10 bullets
 - `## API Groups` contains at least one group
@@ -192,6 +210,8 @@ Before emitting, verify:
 - symbol fields appear in the required order
 - every `Kind` value is allowed by the spec
 - every `Definition` and `Example` contains a fenced code block
+- every `Definition` includes a concrete `Source`
+- the cited sources match the declared target version as closely as possible
 
 ### 10 - Emit
 Output the Markdown document only.

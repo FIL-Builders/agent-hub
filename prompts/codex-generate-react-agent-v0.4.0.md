@@ -1,7 +1,7 @@
 ==============================================================
 AGENTHUB - REACT 0.4.0 GENERATION BRIEF
 Goal: Generate `agents/react/0.4.0.md` using the v0.4.0 spec and
-      local React source material.
+      version-matched React source material.
 ==============================================================
 
 ### 1 - Target Output
@@ -20,7 +20,7 @@ Use these files as the generation contract:
 
 ### 3 - Required Content Inputs
 
-Use these local source files as the primary content basis:
+Use these local files as starting inputs:
 
 - `parse/react.out`
 - `agents/react/0.3.0.md`
@@ -28,6 +28,14 @@ Use these local source files as the primary content basis:
 If available, also use:
 
 - `parse/react-docs-v0.4.0.md`
+
+You are explicitly allowed and expected to acquire additional authoritative
+React 18.3-era sources, including:
+
+- the React source repository at a version-matched tag or commit
+- official React documentation pages for the matching version when available
+- version-matched type declarations or package contents
+- official examples, release notes, or migration notes
 
 ### 4 - Invariants To Preserve
 
@@ -39,8 +47,7 @@ Preserve these values exactly:
 - `Primary language: javascript`
 - `Homepage: https://react.dev`
 
-Preserve the broad coverage shape from `agents/react/0.3.0.md` unless the local
-source material contradicts it.
+Lock the target to React `^18.3.0` before extracting contracts.
 
 ### 5 - Coverage Expectations
 
@@ -54,13 +61,21 @@ already present in `agents/react/0.3.0.md`, including:
 - library-wide workflows
 - troubleshooting and FAQ where source support is strong
 
+Use `agents/react/0.3.0.md` only to audit coverage so you do not regress useful
+surface area. It is not the primary contract source.
+
 ### 6 - Definition Quality
 
 For each documented symbol:
 
-- use `parse/react.out` as the primary source for contracts and signatures
+- prefer version-matched upstream source code or type declarations for contracts
+- use `parse/react.out` only when it matches the locked React `^18.3.0` target
 - preserve definitions as closely as possible
 - compress only when the compression does not change meaning
+- do not copy `Definition` blocks from `agents/react/0.3.0.md` unless the task
+  explicitly authorizes that fallback
+- if version-matched source material cannot support a symbol cleanly, mark the
+  relevant point as `Needs verification`
 
 ### 7 - Example Quality
 
@@ -77,4 +92,6 @@ Before considering the task complete:
 
 1. run `node scripts/validate-agent-pack-v0.4.0.js agents/react/0.4.0.md`
 2. fix any reported structural errors
-3. stop only when the validator passes
+3. confirm the pack's `Definition` sources are version-matched React 18.3-era
+   sources as closely as possible
+4. stop only when the validator passes

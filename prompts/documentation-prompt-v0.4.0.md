@@ -21,15 +21,24 @@ The document must be:
 
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>            <- canonical project or library name
-<DOCUMENTATION_SOURCES>   <- authoritative source docs, README files, API docs,
-                             reference manuals, type definitions, OpenAPI/REST docs,
-                             examples, tests, release notes
+<DOCUMENTATION_SOURCES>   <- starting set of source material, which may include
+                             local files, docs bundles, README files, API docs,
+                             type definitions, examples, tests, and release notes
 <VERSION_CONTEXT>         <- library or API version when known
 
 ### 4 - Workflow
 
-1. Read all authoritative material in <DOCUMENTATION_SOURCES>.
-2. Identify the public surface area:
+1. Lock the target version before extraction.
+   - If <VERSION_CONTEXT> is explicit, use it.
+   - If it is ambiguous, infer the best supported target from the task and mark
+     any uncertainty as `Needs verification`.
+2. Acquire authoritative source material for that target version.
+   Preferred source order:
+   - version-pinned upstream source code or type declarations
+   - official docs for the same version
+   - official examples, release notes, migration notes, or RFCs
+   - local bundles and prior generated packs only as accelerators or coverage audits
+3. Read the authoritative material and identify the public surface area:
    - modules
    - namespaces
    - exported symbols
@@ -37,11 +46,11 @@ The document must be:
    - configuration keys
    - workflows
    - common mistakes
-3. Separate source truth from interpretation:
+4. Separate source truth from interpretation:
    - "Definition" content should stay close to the source
    - "Guidance" should contain expert recommendations, caveats, and usage advice
-4. Organize the output as a Markdown document with predictable headings.
-5. Prefer concise, high-signal writing over raw dumping of docs.
+5. Organize the output as a Markdown document with predictable headings.
+6. Prefer concise, high-signal writing over raw dumping of docs.
 
 ### 5 - Required Output Structure
 
@@ -55,6 +64,7 @@ Use these sections in this exact order.
 - primary language
 - homepage or canonical docs URL
 - short description
+- source set summary
 
 ## What This Library Is For
 - one short overview paragraph
@@ -98,6 +108,7 @@ Use a fenced code block with a runnable or nearly runnable example.
 
 **Source Notes**
 - where this came from
+- exact version or upstream reference when known
 - whether it is exact, condensed, or inferred
 
 ## Common Workflows
@@ -124,6 +135,7 @@ Document high-value end-to-end tasks.
 - source files
 - specs
 - release notes
+- upstream refs, tags, or package versions used
 
 ## Open Questions
 - unresolved items that need verification
@@ -135,6 +147,8 @@ Document high-value end-to-end tasks.
 - Mark uncertain claims as "Needs verification".
 - For gaps in source coverage, mark the point as "Needs verification".
 - Use only APIs, fields, and workflows grounded in the source material.
+- Prefer version-pinned upstream sources over generic latest docs.
+- Use prior generated packs only to audit coverage, not as authoritative contract sources.
 
 ### 7 - Quality Checks
 Before you emit the final document, verify:
@@ -142,6 +156,8 @@ Before you emit the final document, verify:
 - every important public primitive has summary, definition, guidance, and example
 - workflows are task-oriented end-to-end guides
 - open questions are clearly separated from verified facts
+- the target version is stated clearly
+- the references make it possible to audit the source set later
 
 ### 8 - Emit
 Output the Markdown document only.
