@@ -47,12 +47,12 @@ export default function AgentCard({ project, latest, older = [], meta = {} }) {
         <div className="agent-actions" ref={menuRef}>
           <button className="agent-action-btn" onClick={() => setOpenMenu((v) => !v)} title="Actions">Actions ▾</button>
           {openMenu && (
-            <div className="yaml-dropdown-menu" style={{ right: 0, left: 'auto' }}>
-              <a className="yaml-dropdown-item" href={specPageUrl}>🔍 View Spec</a>
-              <a className="yaml-dropdown-item" href={rawUrl} download>⬇️ Download</a>
+            <div className="spec-dropdown-menu" style={{ right: 0, left: 'auto' }}>
+              <a className="spec-dropdown-item" href={specPageUrl}>🔍 View Spec</a>
+              <a className="spec-dropdown-item" href={rawUrl} download>⬇️ Download</a>
               {promptText && (
                 <a
-                  className="yaml-dropdown-item"
+                  className="spec-dropdown-item"
                   href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -63,7 +63,7 @@ export default function AgentCard({ project, latest, older = [], meta = {} }) {
               )}
               {promptText && (
                 <a
-                  className="yaml-dropdown-item"
+                  className="spec-dropdown-item"
                   href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -72,7 +72,7 @@ export default function AgentCard({ project, latest, older = [], meta = {} }) {
                   ✨ Open in Claude
                 </a>
               )}
-              <button className="yaml-dropdown-item" onClick={() => { handleCopyLink(); setOpenMenu(false); }}>🔗 Copy Link</button>
+              <button className="spec-dropdown-item" onClick={() => { handleCopyLink(); setOpenMenu(false); }}>🔗 Copy Link</button>
             </div>
           )}
         </div>

@@ -267,8 +267,8 @@ async function listVersions({ fs, path, AGENTS_DIR, tool_id }) {
   const dir = path.join(AGENTS_DIR, tool_id);
   const files = await fs.readdir(dir);
   return [...new Set(files
-    .filter((file) => /^\d+\.\d+\.\d+\.(md|ya?ml)$/i.test(file))
-    .map((file) => file.replace(/\.(md|ya?ml)$/i, "")))];
+    .filter((file) => /^\d+\.\d+\.\d+\.md$/i.test(file))
+    .map((file) => file.replace(/\.md$/i, "")))];
 }
 
 async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
@@ -278,17 +278,8 @@ async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
     if (!all.length) throw new Error(`No versions found for tool: ${name}`);
     v = all.sort().reverse()[0];
   }
-  for (const ext of [".md", ".yaml", ".yml"]) {
-    const filePath = path.join(AGENTS_DIR, name, `${v}${ext}`);
-    try {
-      return await fs.readFile(filePath, "utf-8");
-    } catch (error) {
-      if (error?.code !== "ENOENT") {
-        throw error;
-      }
-    }
-  }
-  throw new Error(`No spec file found for tool '${name}' version '${v}'.`);
+  const filePath = path.join(AGENTS_DIR, name, `${v}.md`);
+  return await fs.readFile(filePath, "utf-8");
 }
 
 function corsHeaders() {
