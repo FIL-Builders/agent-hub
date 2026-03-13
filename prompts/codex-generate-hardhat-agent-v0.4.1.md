@@ -163,4 +163,8 @@ Before considering the task complete:
 4. confirm the pack does not teach Hardhat 2 compatibility patterns as the
    preferred Hardhat 3 model
 5. confirm core-vs-plugin boundaries are explicit
-6. stop only when the validator passes
+6. compare the regenerated pack against the baseline `agents/hardhat/0.4.0.md`
+   when requested by the parent task
+7. return a structured handoff report that the parent can inspect without
+   needing direct file access to the forked workspace
+8. stop only when the validator passes

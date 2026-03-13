@@ -16,6 +16,7 @@ You will be given:
 - a documentation pack path
 - a starting set of local source files
 - any invariant fields that must be preserved
+- optionally, a baseline file to compare against
 
 Treat the listed local files as starting inputs, not as hard limits.
 
@@ -43,6 +44,8 @@ For agent-pack generation specifically:
 6. use prior generated packs only for coverage audit
 7. if source coverage is incomplete, mark the point as `Needs verification`
    without inventing structure or APIs
+8. if a baseline file is provided, compare your generated output against it and
+   report the meaningful differences
 
 ### 5 - Required Self-Check
 
@@ -56,13 +59,23 @@ Before you stop, verify:
 - `Definition` and `Example` both contain fenced code blocks
 - every `Definition` includes a concrete `Source`
 - the `Source` values reflect the locked target version as closely as possible
+- if a baseline file was provided, you can name the material improvements,
+  regressions, and recommendation clearly
 
 ### 6 - Final Response
 
 In your final response:
 - state the output path
+- state the baseline path when one was provided
 - list the local files you used
 - list the upstream sources you fetched or inspected
 - state the locked target version
 - list any invariant fields you preserved
 - note any `Needs verification` gaps
+- if a baseline file was provided, include:
+  - validation result
+  - section-level diff summary
+  - important groups or symbols added or removed
+  - key improvements
+  - key regressions
+  - recommendation: keep baseline, replace baseline, or selectively patch baseline

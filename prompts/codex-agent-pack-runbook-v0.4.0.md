@@ -293,7 +293,43 @@ The worker must preserve:
 
 Do not vary field order for convenience.
 
-## 14 - Completion Criteria
+## 14 - Forked Workspace Handoff
+
+When the generation run happens in a forked workspace that the parent thread
+cannot inspect directly, the worker must treat the run as both a generation job
+and a comparison or review job.
+
+In that case, the worker must:
+
+1. generate and validate the documentation pack or agent pack in the forked workspace
+2. compare the regenerated output against the baseline file requested by the task
+3. return a structured handoff report in the final response
+
+The structured handoff report must include:
+
+- output path
+- baseline path, when one was provided
+- validation result
+- locked target version
+- local files used
+- upstream sources fetched or inspected
+- section-level diff summary
+- added or removed groups, exports, workflows, troubleshooting entries, FAQ items,
+  or resources when relevant
+- top regressions or improvements relative to the baseline
+- explicit recommendation:
+  - keep baseline
+  - replace baseline
+  - selectively patch baseline
+
+When the parent thread needs an exact final file in the main workspace, do not
+assume the forked workspace output will be available. In that case:
+
+- the worker's output is advisory unless the environment guarantees shared writes
+- the parent thread should apply the final changes locally using the worker's
+  report, or the generation should be re-run locally in the main thread
+
+## 15 - Completion Criteria
 
 A generation run is complete only when:
 
@@ -310,8 +346,10 @@ A generation run is complete only when:
 11. unresolved gaps are marked `Needs verification`
 12. the pack does not teach deprecated or compatibility-only patterns as the
     preferred current approach
+13. if the run happened in a forked workspace, the final response contains the
+    full structured handoff report
 
-## 15 - Stop Conditions
+## 16 - Stop Conditions
 
 Stop and report `Needs verification` when:
 
