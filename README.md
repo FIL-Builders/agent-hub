@@ -33,6 +33,13 @@
 
 ---
 
+## Tutorials
+
+* [Getting Started: Loading Your First Agent File](./tutorials/getting-started-loading-your-first-agent-file.md)
+* [Evaluating AgentHub Pack Outputs](./tutorials/evaluating-agenthub-pack-outputs.md)
+
+---
+
 ## Success Signals ✨
 
 | Community Health Metric | Early‑Stage Target |
@@ -50,4 +57,3 @@ We care less about vanity stars and more about **engaged, returning collaborator
 *AgentHub operates under a [Code of Conduct](./CODE_OF_CONDUCT.md) to ensure a welcoming, harassment‑free environment for everyone.*
 
 Happy agent‑crafting! 🌱
-
