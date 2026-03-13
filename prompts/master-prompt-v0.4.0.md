@@ -21,6 +21,15 @@ structure:
 - symbol-level contracts, guidance, and examples
 - optional workflows, troubleshooting, FAQ, and resources
 
+The pack must also preserve the operational knowledge an agent needs to perform
+real tasks well:
+
+- when to use a symbol
+- when not to use it
+- what it is commonly confused with
+- what preconditions must be satisfied
+- what failure modes matter in practice
+
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>               <- canonical display name
 <LIBRARY_VERSION>            <- current version or supported version range
@@ -103,7 +112,8 @@ Source: <upstream file, package, doc page, tag, commit, or other source context>
 ```
 
 **Guidance**
-- at least 1 actionable bullet
+- at least 2 actionable bullets when the symbol is important
+- include decision rules, anti-patterns, or failure modes when relevant
 
 **Example**
 Language: <optional example-language>
@@ -167,12 +177,20 @@ When source material supports them, add these sections after `## API Groups`:
 - Preserve authoritative definitions as closely as possible.
 - Source `Definition` blocks from authoritative version-matched material, not
   from prior generated packs.
-- Keep guidance practical and decision-oriented.
+- Keep guidance practical, decision-oriented, and task-relevant.
 - Keep examples minimal and task-relevant.
 - Mark uncertain details explicitly when the sources are ambiguous.
 - Prefer version-pinned upstream refs, tagged docs, package contents, or type
   declarations over generic latest pages.
 - Use prior packs only for coverage audit, never as the primary contract source.
+- Preserve strong operational insights from prior packs when they remain valid,
+  but re-ground them in authoritative source material before carrying them
+  forward.
+- For high-value symbols, explain not just what they are but when they should
+  be chosen over nearby alternatives.
+- Prefer guidance that will change implementation behavior over descriptive
+  restatement of docs.
+- Surface common failure modes directly instead of leaving them implicit.
 
 ### 8 - Workflow
 
@@ -184,12 +202,24 @@ When source material supports them, add these sections after `## API Groups`:
 5. Verify critical contracts against <API_DOCUMENTATION> and any fetched
    authoritative sources.
 6. Identify the library's public surface area.
-7. Group exports by mental model or task domain.
-8. Draft the pack in the required section order.
-9. Add optional library-wide sections only when the source material supports
+7. Identify task-critical operational knowledge:
+   - decision rules
+   - preconditions
+   - common confusions
+   - failure modes
+   - workflow steps that commonly go wrong
+8. Group exports by mental model or task domain.
+9. Draft the pack in the required section order.
+10. Add optional library-wide sections only when the source material supports
    them.
-10. Check that the final Markdown preserves the full pack structure and records
-    enough provenance to audit later.
+11. Critique the draft against a small challenge set:
+    - one implementation task
+    - one debugging or troubleshooting task
+    - one design or tradeoff task
+12. Strengthen weak sections before emitting.
+13. Check that the final Markdown preserves the full pack structure, records
+    enough provenance to audit later, and retains the operational knowledge
+    needed for task performance.
 
 ### 9 - Quality Checks
 Before emitting, verify:
@@ -212,6 +242,11 @@ Before emitting, verify:
 - every `Definition` and `Example` contains a fenced code block
 - every `Definition` includes a concrete `Source`
 - the cited sources match the declared target version as closely as possible
+- high-value symbols include decision-oriented guidance, not just descriptions
+- common failure modes and confusions are surfaced where they matter
+- the pack would help an agent answer one implementation task, one
+  troubleshooting task, and one tradeoff task without relying on unstated
+  assumptions
 
 ### 10 - Emit
 Output the Markdown document only.

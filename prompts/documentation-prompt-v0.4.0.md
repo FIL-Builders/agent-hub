@@ -18,6 +18,7 @@ The document must be:
 - self-contained
 - source-grounded
 - optimized for later transformation into an AgentHub v0.4.0 knowledge pack
+- optimized for downstream task performance, not just reference completeness
 
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>            <- canonical project or library name
@@ -48,9 +49,21 @@ The document must be:
    - common mistakes
 4. Separate source truth from interpretation:
    - "Definition" content should stay close to the source
-   - "Guidance" should contain expert recommendations, caveats, and usage advice
-5. Organize the output as a Markdown document with predictable headings.
-6. Prefer concise, high-signal writing over raw dumping of docs.
+   - "Guidance" should contain expert recommendations, caveats, decision rules,
+     failure modes, and usage advice
+5. Extract operational knowledge explicitly:
+   - when to use a primitive
+   - when not to use it
+   - what it is commonly confused with
+   - what must be true before using it
+   - what usually breaks in real implementations
+6. Build a small challenge set mentally while reading:
+   - one implementation task
+   - one debugging or troubleshooting task
+   - one design or tradeoff task
+   Use that challenge set to decide what guidance is important enough to keep.
+7. Organize the output as a Markdown document with predictable headings.
+8. Prefer concise, high-signal writing over raw dumping of docs.
 
 ### 5 - Required Output Structure
 
@@ -84,6 +97,17 @@ For each major concept:
 - why it matters
 - common confusion to avoid
 
+## Decision Rules
+- "Use X when..."
+- "Avoid Y when..."
+- "Choose A over B if..."
+- keep these short and operational
+
+## Preconditions And Invariants
+- what must already be true before important operations
+- sequencing assumptions
+- environment or version requirements
+
 ## Public Surface Area
 Break the library into logical groups.
 
@@ -102,6 +126,8 @@ shape, response shape, or protocol contract.
 **Guidance**
 - at least 2 actionable bullets
 - include constraints, performance notes, sequencing, or interoperability details
+- include at least one decision rule or anti-pattern when relevant
+- include likely failure cases when relevant
 
 **Example**
 Use a fenced code block with a runnable or nearly runnable example.
@@ -119,6 +145,11 @@ Document high-value end-to-end tasks.
 - ordered steps
 - example
 - common failure points
+
+## Common Confusions
+- symbols that are easy to confuse
+- version-specific traps
+- things that look equivalent but are not
 
 ## Pitfalls And Troubleshooting
 
@@ -149,15 +180,23 @@ Document high-value end-to-end tasks.
 - Use only APIs, fields, and workflows grounded in the source material.
 - Prefer version-pinned upstream sources over generic latest docs.
 - Use prior generated packs only to audit coverage, not as authoritative contract sources.
+- Preserve operational knowledge that helps an agent choose correctly under task pressure.
+- Prefer guidance that changes implementation behavior over generic descriptive prose.
+- If two symbols are commonly confused, name the distinction explicitly.
+- If a workflow often fails for a specific reason, document that failure mode directly.
 
 ### 7 - Quality Checks
 Before you emit the final document, verify:
 - the output is a single Markdown document
 - every important public primitive has summary, definition, guidance, and example
 - workflows are task-oriented end-to-end guides
+- decision rules are present for high-value primitives and workflows
+- common confusions and failure modes are surfaced, not implied
 - open questions are clearly separated from verified facts
 - the target version is stated clearly
 - the references make it possible to audit the source set later
+- the document would help an agent answer at least one implementation task, one
+  troubleshooting task, and one tradeoff task
 
 ### 8 - Emit
 Output the Markdown document only.

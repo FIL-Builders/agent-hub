@@ -28,7 +28,9 @@ Follow these steps in order:
 4. Build or refresh the documentation pack.
 5. Generate the v0.4.0 agent pack.
 6. Validate structure and provenance.
-7. Stop only when the completion criteria are satisfied.
+7. Critique the pack against real task archetypes.
+8. Revise weak areas and re-check the pack.
+9. Stop only when the completion criteria are satisfied.
 
 Do not skip version locking.
 
@@ -105,6 +107,7 @@ Prior generated AgentHub packs may be used only for:
 - coverage comparison
 - grouping comparison
 - identifying likely missing symbols or workflows
+- identifying strong operational insights that should not regress
 
 Prior packs must not be the primary source for:
 
@@ -115,6 +118,13 @@ Prior packs must not be the primary source for:
 If a prior pack is the only available source for a useful item, record that
 fact explicitly and mark the item `Needs verification` unless the task says
 otherwise.
+
+When a prior pack contains stronger operational guidance than the current draft:
+
+- treat it as a benchmark insight, not as source truth
+- re-ground the insight in authoritative upstream material before carrying it
+  forward
+- preserve it if it remains valid and improves task performance
 
 ## 8 - Provenance Format
 
@@ -174,8 +184,44 @@ When generating an agent pack:
 7. ensure every symbol has the required fields
 8. ensure every `Definition` has a concrete `Source`
 9. validate the pack
+10. run a critique pass against task archetypes
+11. revise the pack where the critique finds weak operational guidance
 
-## 11 - Structure Rules For Deterministic Parsing
+## 11 - Critique Pass
+
+After the first structurally valid draft, run a critique pass before accepting
+the pack.
+
+Test the draft mentally or explicitly against three task archetypes:
+
+1. implementation task
+2. troubleshooting or debugging task
+3. design or tradeoff task
+
+Ask:
+
+- would the pack help an agent choose the correct primitive?
+- would the pack help an agent avoid the common mistake?
+- would the pack surface the key preconditions and sequencing rules?
+- would the pack distinguish commonly confused alternatives?
+- would the pack support a concise, correct implementation?
+
+If the answer is no for an important area, revise the pack before finishing.
+
+## 12 - Revision Priorities
+
+When the critique pass finds weaknesses, fix them in this order:
+
+1. missing or weak decision rules
+2. missing failure modes or troubleshooting guidance
+3. missing workflow sequencing or preconditions
+4. missing symbol coverage
+5. weak examples
+
+Do not expand the pack with generic prose just to make it longer.
+Prefer targeted revisions that improve task performance.
+
+## 13 - Structure Rules For Deterministic Parsing
 
 The worker must preserve:
 
@@ -186,7 +232,7 @@ The worker must preserve:
 
 Do not vary field order for convenience.
 
-## 12 - Completion Criteria
+## 14 - Completion Criteria
 
 A generation run is complete only when:
 
@@ -195,9 +241,11 @@ A generation run is complete only when:
 3. the source set is recorded clearly
 4. the output follows the required structure
 5. the validator passes when one is provided
-6. unresolved gaps are marked `Needs verification`
+6. a critique pass has been completed
+7. the pack has been revised if the critique exposed important weaknesses
+8. unresolved gaps are marked `Needs verification`
 
-## 13 - Stop Conditions
+## 15 - Stop Conditions
 
 Stop and report `Needs verification` when:
 
@@ -205,10 +253,12 @@ Stop and report `Needs verification` when:
 - the upstream source set is version-mismatched in a material way
 - the contract for a symbol cannot be sourced cleanly
 - sources disagree and the hierarchy does not resolve the conflict
+- the pack remains weak on a critical task archetype and the source material is
+  insufficient to improve it responsibly
 
 Do not invent definitions to fill gaps.
 
-## 14 - Final Worker Report
+## 16 - Final Worker Report
 
 At the end of a run, report:
 
@@ -217,4 +267,6 @@ At the end of a run, report:
 - local files used
 - upstream sources fetched or inspected
 - invariant fields preserved
+- task archetypes used in the critique pass
+- major weaknesses found and what was changed to address them
 - remaining `Needs verification` gaps
