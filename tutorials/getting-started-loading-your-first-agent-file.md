@@ -15,10 +15,10 @@ Go to the [AgentHub agents directory](https://github.com/FIL-Builders/agent-hub/
 
 ---
 
-## **Step 2: Open and Copy the Agent YAML File**
+## **Step 2: Open and Copy the Agent Markdown File**
 
-* Inside each tool’s folder, you’ll find a `.yaml` file (like `react.yaml` or `v1.yaml`).
-* Click on the YAML file to view its contents.
+* Inside each tool’s folder, you’ll find a versioned Markdown file (for example, `0.3.0.md`).
+* Click on the Markdown file to view its contents.
 * **Copy the full contents** to your clipboard.
 
 ---
@@ -30,13 +30,13 @@ How you do this depends on your LLM stack:
 * **ChatGPT, Claude, Perplexity, etc.:**
 
   * Start a new chat.
-  * Paste the agent YAML as your first message or system prompt.
+  * Paste the agent Markdown spec as your first message or system prompt.
   * Continue with your development questions and requests.
 
 * **Ollama, LM Studio, LocalAI, etc.:**
 
   * Use the “system prompt” or “context” field in your interface.
-  * Paste the agent YAML before your instructions.
+  * Paste the agent Markdown spec before your instructions.
 
 * **Custom LLM/agentic tools:**
 
@@ -55,7 +55,7 @@ With the agent file loaded, your LLM will now:
 **Example Prompt:**
 
 ```
-(system prompt): [paste agent YAML here]
+(system prompt): [paste agent Markdown spec here]
 (user prompt): Generate a React component for a signup form with email validation.
 ```
 
@@ -64,7 +64,7 @@ With the agent file loaded, your LLM will now:
 ## **Pro Tips**
 
 * **Stack agents:** You can load multiple agent files if you’re using more than one tool (e.g., React + Redux).
-* **Customize:** Feel free to edit or annotate the YAML for your specific needs.
+* **Customize:** Feel free to edit or annotate the Markdown spec for your specific needs.
 * **Check for updates:** The [AgentHub registry](https://github.com/FIL-Builders/agent-hub/tree/main/agents) is growing—come back for new and improved agent files.
 
 ---
@@ -77,7 +77,7 @@ A: No! If your LLM supports “system prompts” or context injection, you’re 
 **Q: Will this work with proprietary models as well as open-source?**
 A: Yes—any LLM that can accept pasted instructions or context can benefit from AgentHub files.
 
-**Q: How do I know what’s in the YAML?**
+**Q: How do I know what’s in the Markdown file?**
 A: Each file is human-readable and reviewed. Read the comments, rationale, and best practices inside!
 
 **Q: What if I find a mistake or want to improve an agent?**

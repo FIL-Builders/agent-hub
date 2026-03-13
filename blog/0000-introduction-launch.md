@@ -19,7 +19,7 @@ So we re‑plotted our course. Instead of chasing volume and splashy numbers, we
 | **We Are**                                                                                                       | **We Aren’t**                                                                       |
 | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | **An open specification** (`Open Agent Spec v0.1`) that any LLM stack can read.                                  | A closed vendor format or one more proprietary “prompt framework.”                  |
-| **A curated registry** of YAML agent files—each a distilled, peer‑reviewed guide to using a specific API or SDK. | A monolithic CLI or SDK. Developers copy‑paste—or parse—the YAML any way they like. |
+| **A curated registry** of Markdown agent files with structured frontmatter—each a distilled, peer‑reviewed guide to using a specific API or SDK. | A monolithic CLI or SDK. Developers copy‑paste—or parse—the specs any way they like. |
 | **A conversation starter**: every agent PR includes design notes, context, and room for debate.                  | A one‑click magic box. We value understanding over black‑box convenience.           |
 
 *In short:* AgentHub is the **schema + library** layer of the AI toolchain, intentionally lightweight so it can slot into **any** workflow—today or tomorrow.
@@ -39,7 +39,7 @@ So we re‑plotted our course. Instead of chasing volume and splashy numbers, we
   Clear rules (`CODE_OF_CONDUCT`, `CONTRIBUTING`, `MAINTAINERS`, `CODEOWNERS`) so newcomers know the handshake.
 
 * **Founding Agents (10–15)**
-  Hand‑crafted examples for React, Stripe, Postgres, etc., each with `.yaml`, passing CI, and a candid `DESIGN_NOTES.md`.
+  Hand‑crafted examples for React, Stripe, Postgres, etc., each with `.md`, passing CI, and a candid `DESIGN_NOTES.md`.
 
 * **CI / Lint / Smoke Tests**
   A &lt; 90 s GitHub Action that validates spec compliance *and* proves each agent runs inside LangChain, OpenAI Assistants, and LlamaIndex.
@@ -103,7 +103,7 @@ So we re‑plotted our course. Instead of chasing volume and splashy numbers, we
 
 * **Spec hawks** – Help bullet‑proof v0.1; find the edge cases.
 * **Agent artisans** – Pair‑review founding agents or draft one yourself.
-* **Doc whisperers** – Turn terse YAML into crystal‑clear cookbook pages.
+* **Doc whisperers** – Turn terse agent specs into crystal‑clear cookbook pages.
 * **Community champions** – Host office hours, triage issues, keep the tone generous.
 
 If something feels muddy or misaligned with our **collaboration • transparency • quality** ethos—raise it. This manifesto is a living document.

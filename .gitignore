@@ -1,0 +1,8 @@
+# Local Netlify folder
+.netlify
+node_modules
+website/node_modules
+website/build
+website/static/agents
+website/src/generated
+deno.lock

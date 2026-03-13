@@ -32,8 +32,6 @@ const config = {
     locales: ['en'],
   },
 
-  plugins: [require.resolve('./plugins/webpack-yaml-loader.js')],
-
   presets: [
     [
       'classic',

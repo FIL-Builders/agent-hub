@@ -1,14 +1,9 @@
 import React from 'react';
 import Layout from '@theme/Layout';
-import YamlSpecCard from '@site/src/components/YamlSpecCard';
+import SpecCard from '@site/src/components/SpecCard';
 import {useLocation} from '@docusaurus/router';
 import { buildPrompt } from '@site/src/utils/prompt';
-
-const req = require.context(
-  '../../../../agents',
-  true,
-  /\.yaml$/
-);
+import { parseAgentMeta } from '@site/src/utils/agentSpec';
 
 function useQuery() {
   const {search} = useLocation();
@@ -32,53 +27,36 @@ export default function AgentSpecPage() {
     setError('');
     setSpecRaw('');
     setSheetOpen(false);
-    try {
-      if (!project || !file) throw new Error('Missing project or file parameter');
-      const path = `./${project}/${file}`;
-      // Synchronous require, but we defer state update to avoid flashing SSR mismatch
-      const raw = req(path).default;
-      if (!cancelled) {
-        setSpecRaw(raw);
-        setStatus('ready');
-      }
-    } catch (e) {
-      if (!cancelled) {
-        setError(e?.message || String(e));
-        setStatus('error');
-      }
+    if (!project || !file) {
+      setError('Missing project or file parameter');
+      setStatus('error');
+      return () => { cancelled = true; };
     }
+
+    fetch(`/agents/${project}/${file}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Failed to load spec (${response.status})`);
+        }
+        return await response.text();
+      })
+      .then((raw) => {
+        if (!cancelled) {
+          setSpecRaw(raw);
+          setStatus('ready');
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e?.message || String(e));
+          setStatus('error');
+        }
+      });
+
     return () => { cancelled = true; };
   }, [project, file]);
 
-  // Lightweight purpose extraction for subtitle
-  const purpose = React.useMemo(() => {
-    try {
-      const lines = (specRaw || '').split('\n');
-      const iMeta = lines.findIndex((l) => /^\s*meta:\s*$/.test(l));
-      if (iMeta === -1) return '';
-      const metaIndent = (lines[iMeta].match(/^\s*/)?.[0] || '').length;
-      for (let i = iMeta + 1; i < lines.length; i++) {
-        const l = lines[i];
-        const ind = (l.match(/^\s*/)?.[0] || '').length;
-        if (ind <= metaIndent) break;
-        const m = l.match(/^\s*purpose\s*:\s*(.*)$/);
-        if (m) {
-          const after = (m[1] || '').trim();
-          if (after && after !== '|' && after !== '>') return after;
-          const baseIndent = ind;
-          const block = [];
-          for (let j = i + 1; j < lines.length; j++) {
-            const ln = lines[j];
-            const inj = (ln.match(/^\s*/)?.[0] || '').length;
-            if (inj <= baseIndent) break;
-            block.push(ln.slice(baseIndent + 2));
-          }
-          return block.join(after === '|' ? '\n' : ' ').trim();
-        }
-      }
-      return '';
-    } catch { return ''; }
-  }, [specRaw]);
+  const purpose = React.useMemo(() => parseAgentMeta(specRaw).purpose || '', [specRaw]);
 
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
@@ -115,10 +93,9 @@ export default function AgentSpecPage() {
                 {purpose}
               </div>
             )}
-            <YamlSpecCard
+            <SpecCard
               spec={specRaw}
               downloadUrl={`agents/${project}/${file}`}
-              initialVisible={true}
               hideHeader={true}
               disableMobileActions={true}
             />

@@ -13,12 +13,6 @@ export default function Home() {
   const { siteConfig } = useDocusaurusContext();
   const features = [
     {
-      title: 'Loops HH Win Kit',
-      description:
-        'Curated agent specs and strategies to win across NEAR, OpenServ, Randamu, Golem, and Filecoin.',
-      link: '/loops-hacker-house-win-kit',
-    },
-    {
       title: 'Comprehensive Agents',
       description:
         'Browse an extensive catalogue of smart agents ready to integrate into your workflows.',
@@ -37,9 +31,6 @@ export default function Home() {
       link: '/blog',
     },
   ];
-
-  const winKit = features.find((f) => f.link === '/loops-hacker-house-win-kit' || /win kit/i.test(f.title));
-  const otherFeatures = features.filter((f) => f !== winKit);
 
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
@@ -65,28 +56,17 @@ export default function Home() {
           {siteConfig.tagline}
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-          <Link className="button button--primary" to="/tutorials/getting-started-loading-your-first-agent-file">
-            Get Started
-          </Link>
-          <Link className="button button--secondary" to="/agents/">
+          <Link className="button button--primary" to="/agents/">
             View Agents
+          </Link>
+          <Link className="button button--secondary" to="/tutorials/getting-started-loading-your-first-agent-file">
+            Tutorial
           </Link>
         </div>
       </header>
       <main className="container" style={{ padding: '2rem 0' }}>
-        {winKit && (
-          <div className="home-prominent">
-            <div className="ai-card" style={{ borderColor: 'var(--ifm-color-primary)' }}>
-              <h3 style={{ marginBottom: '0.25rem' }}>{winKit.title}</h3>
-              <p style={{ marginTop: 0 }}>{winKit.description}</p>
-              <Link className="button button--primary" style={{ marginTop: '0.5rem' }} to={winKit.link}>
-                Open Win Kit
-              </Link>
-            </div>
-          </div>
-        )}
         <div className="home-features">
-          {otherFeatures.map((feat) => (
+          {features.map((feat) => (
             <div key={feat.title} className="ai-card">
               <h3>{feat.title}</h3>
               <p>{feat.description}</p>

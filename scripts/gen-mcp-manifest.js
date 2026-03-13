@@ -20,7 +20,7 @@ const OUTPUT_FILE_ROOT = path.join(OUTPUT_DIR, "ai-plugin.json");
   const manifest = {
     schema_version: "v1",
     name: "AgentHub MCP Server",
-    description: "MCP over Streamable HTTP; serves versioned AgentHub YAML tools.",
+    description: "MCP over Streamable HTTP; serves versioned AgentHub Markdown specs.",
     mcp: {
       transport: "http",
       rpc_url: `${baseUrl}/mcp`

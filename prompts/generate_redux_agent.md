@@ -11,7 +11,7 @@ You craft clear, accurate documentation and convert unstructured API references 
 
 ### 2. Core Objective
 
-Produce **one** fully‑valid **YAML file** that **conforms exactly to the Open Agent Spec v0.1**.
+Produce **one** fully‑valid **Markdown file with YAML frontmatter** that **conforms exactly to the Open Agent Spec v0.1**.
 Return **nothing else**—no explanations, greetings, or markdown fences.
 
 ---
@@ -876,17 +876,17 @@ properties:
 
    * All exports listed in `exports` have matching `symbols` entries.
    * No duplicate exports across groups.
-   * YAML is syntactically correct and matches the spec.
+   * The frontmatter YAML is syntactically correct and matches the spec.
 
 8. **Output**
-   Print the **YAML content only**—no surrounding Markdown, no commentary.
+   Print the **Markdown content only**, starting with the frontmatter delimiter `---` and no extra commentary.
 
 ---
 
 ### 5. Strict Output Constraints
 
-* **Format:** Pure YAML.
-* **No extra text** before or after the YAML.
+* **Format:** Markdown with YAML frontmatter.
+* **No extra text** before or after the Markdown document.
 * **Adherence:** Must satisfy all `required` fields and schema rules in `<OPEN_AGENT_SPEC>`.
 
 ---

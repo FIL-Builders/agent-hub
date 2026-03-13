@@ -1,7 +1,7 @@
 # Contributor Covenant Code of Conduct
 **Version 2.1 – Adapted for the AgentHub Community**
 
-AgentHub is more than a repository of YAML files; it is a living conversation built on **collaboration, transparency, and quality**. To keep that conversation inclusive and productive for every participant, we adopt—and slightly adapt—the Contributor Covenant v2.1.
+AgentHub is more than a repository of agent files; it is a living conversation built on **collaboration, transparency, and quality**. To keep that conversation inclusive and productive for every participant, we adopt—and slightly adapt—the Contributor Covenant v2.1.
 
 ---
 

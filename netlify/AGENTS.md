@@ -1,6 +1,6 @@
 # MCP Server on Netlify — Minimal HTTP Setup
 
-This repo exposes a minimal, standard MCP server using Netlify Functions and the official MCP SDK’s Streamable HTTP transport. It serves a small, stable tool surface to browse and fetch versioned agent YAML files from `agents/**`.
+This repo exposes a minimal, standard MCP server using Netlify Functions and the official MCP SDK’s Streamable HTTP transport. It serves a small, stable tool surface to browse and fetch versioned agent Markdown files from `agents/**`.
 
 Key files:
 - `netlify/functions/mcp.js:1` — Streamable HTTP MCP server (SDK)
@@ -15,24 +15,24 @@ Key files:
   - `tools` surface (via SDK):
     - `agenthub_list` — args `{ q?: string, limit?: number, offset?: number }`; returns a JSON page of `{ tool_id, versions }`.
     - `agenthub_versions` — args `{ tool_id }`; returns `{ tool_id, versions }`.
-    - `agenthub_fetch` — args `{ tool_id, version?: string|'latest' }`; returns YAML text.
+    - `agenthub_fetch` — args `{ tool_id, version?: string|'latest' }`; returns raw spec text.
     - `agenthub_docs` — returns server/tool docs as JSON.
 
 
 ## Agents Directory Layout
 
-The server treats each subfolder under `agents/` as a tool, and each `*.yaml` file inside as a version:
+The server treats each subfolder under `agents/` as a tool, and each `*.md` file inside as a version:
 
 ```
 agents/
   <tool_id>/
-    0.3.0.yaml
-    0.4.0.yaml
+    0.3.0.md
+    0.4.0.md
     ...
 ```
 
 - `listTools` is built from the folders present in `agents/`.
-- `getToolManifest` and `runTool` read versions by filename (without `.yaml`).
+- `getToolManifest` and `runTool` read versions by filename (without `.md`).
 - `runTool` with `version: "latest"` sorts versions lexicographically descending and returns the first one.
 
 
@@ -78,7 +78,7 @@ SSE is not required in this minimal setup.
 ## Deployment Notes
 
 - `export const config = { path: "/mcp" }` in `netlify/functions/mcp.js:1` exposes `/mcp` directly.
-- `[functions."mcp"].included_files = ["agents/**"]` ensures the YAML agents ship with the function bundle.
+- `[functions."mcp"].included_files = ["agents/**"]` ensures the Markdown agents ship with the function bundle.
 - Push to a Netlify‑connected repo, or build locally with `npm run build` and let Netlify CI run the same.
 
 - GET `/.well-known/mcp/health`
@@ -99,7 +99,7 @@ They include:
 {
   "schema_version": "v1",
   "name": "AgentHub MCP Server",
-  "description": "MCP over Streamable HTTP; serves versioned AgentHub YAML tools.",
+  "description": "MCP over Streamable HTTP; serves versioned AgentHub Markdown specs.",
   "mcp": { "transport": "http", "rpc_url": "<base>/mcp" },
   "tools": [ { "tool_id": "..." } ]
 }

@@ -79,11 +79,6 @@
   max-width: 1000px;
   margin: 0 auto;
 }
-/* Full-width row for a single prominent card */
-.home-prominent {
-  max-width: 1000px;
-  margin: 0 auto 1.25rem;
-}
 @media (min-width: 768px) {
   .home-features { grid-template-columns: repeat(2, minmax(260px, 1fr)); }
 }
@@ -182,38 +177,38 @@
 /* Add breathing room below the sticky filter bar */
 .agents-filter { margin-bottom: 2rem; }
 
-/* YAML specification card styles */
-.yaml-spec-card {
+/* Spec card styles */
+.spec-card {
   /* Inherit base ai-card styles for border, padding and background */
   position: relative;
   margin-top: 1rem;
 }
-.yaml-spec-header {
+.spec-card-header {
   margin-bottom: 0.5rem;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
 }
-.yaml-spec-title {
+.spec-card-title {
   margin: 0 0 0.5rem 0;
   font-size: 1.1rem;
   color: #00BFFF; /* accent */
   border-bottom: 2px solid rgba(0,191,255,0.25);
   display: inline-block;
 }
-.yaml-spec-purpose {
+.spec-card-purpose {
   margin: 0;
   color: var(--ifm-color-content-secondary, #334155);
   font-size: 0.9rem;
 }
-.yaml-spec-headings { max-width: 75%; }
-.yaml-spec-controls {
+.spec-card-headings { max-width: 75%; }
+.spec-card-controls {
   min-height: 0.5rem; /* spacer to preserve layout after moving actions */
 }
-.yaml-spec-toggle,
-.yaml-spec-download,
-.yaml-spec-chatgpt,
-.yaml-spec-claude {
+.spec-card-toggle,
+.spec-card-download,
+.spec-card-chatgpt,
+.spec-card-claude {
   font-size: 0.875rem;
   padding: 0.375rem 0.75rem;
   border-radius: 0.375rem;
@@ -224,20 +219,20 @@
   transition: background-color 0.2s;
   text-decoration: none;
 }
-.yaml-spec-toggle:hover,
-.yaml-spec-download:hover,
-.yaml-spec-chatgpt:hover,
-.yaml-spec-claude:hover {
+.spec-card-toggle:hover,
+.spec-card-download:hover,
+.spec-card-chatgpt:hover,
+.spec-card-claude:hover {
   background-color: var(--ifm-color-emphasis-100, #f3f4f6);
 }
-.yaml-spec-toggle:focus,
-.yaml-spec-download:focus,
-.yaml-spec-chatgpt:focus,
-.yaml-spec-claude:focus {
+.spec-card-toggle:focus,
+.spec-card-download:focus,
+.spec-card-chatgpt:focus,
+.spec-card-claude:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
 }
-.yaml-spec-copy {
+.spec-card-copy {
   font-size: 0.875rem;
   padding: 0.375rem 0.75rem;
   margin-left: 0.5rem;
@@ -248,16 +243,16 @@
   cursor: pointer;
   transition: background-color 0.2s;
 }
-.yaml-spec-copy:hover {
+.spec-card-copy:hover {
   background-color: var(--ifm-color-emphasis-100, #f3f4f6);
 }
-.yaml-spec-copy:focus {
+.spec-card-copy:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5);
 }
 
 /* Dropdown menu styles for Actions ▾ */
-.yaml-dropdown-menu {
+.spec-dropdown-menu {
   position: absolute;
   top: 2.25rem; /* below trigger */
   left: 0;
@@ -269,8 +264,8 @@
   padding: 0.25rem;
   z-index: 2000; /* above elevated cards */
 }
-[data-theme='dark'] .yaml-dropdown-menu { background-color: #0f172a; border-color: #2b2f36; }
-.yaml-dropdown-item {
+[data-theme='dark'] .spec-dropdown-menu { background-color: #0f172a; border-color: #2b2f36; }
+.spec-dropdown-item {
   display: block;
   width: 100%;
   text-align: left;
@@ -283,15 +278,15 @@
   text-decoration: none;
   font-size: 0.9rem;
 }
-.yaml-dropdown-item:hover,
-.yaml-dropdown-item:focus {
+.spec-dropdown-item:hover,
+.spec-dropdown-item:focus {
   background-color: var(--ifm-color-emphasis-100, #f3f4f6);
   outline: none;
 }
 
 /* Ghost icon buttons (actions) */
-.yaml-actions { display: none; gap: 0.5rem; }
-.yaml-action-btn {
+.spec-actions { display: none; gap: 0.5rem; }
+.spec-action-btn {
   border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
   background: var(--ifm-background-surface-color);
   color: var(--ifm-color-content);
@@ -300,29 +295,29 @@
   cursor: pointer;
   text-decoration: none;
 }
-.yaml-action-btn:hover { background-color: var(--ifm-color-emphasis-100, #f3f4f6); }
-.yaml-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5); }
+.spec-action-btn:hover { background-color: var(--ifm-color-emphasis-100, #f3f4f6); }
+.spec-action-btn:focus { outline: none; box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.5); }
 
-[data-theme='dark'] .yaml-action-btn {
+[data-theme='dark'] .spec-action-btn {
   border-color: #2b2f36;
   background: #0f172a;
   color: #e2e8f0;
 }
-[data-theme='dark'] .yaml-action-btn:hover { background-color: rgba(255,255,255,0.08); }
-[data-theme='dark'] .yaml-action-btn:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
+[data-theme='dark'] .spec-action-btn:hover { background-color: rgba(255,255,255,0.08); }
+[data-theme='dark'] .spec-action-btn:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.35); }
 
 /* Show icon bar on >= 640px; mobile shows kebab */
 @media (min-width: 640px) {
-  .yaml-actions { display: inline-flex; }
-  .yaml-actions-mobile { display: none; }
+  .spec-actions { display: inline-flex; }
+  .spec-actions-mobile { display: none; }
 }
 @media (max-width: 639.98px) {
-  .yaml-actions { display: none; }
-  .yaml-actions-mobile { position: relative; }
+  .spec-actions { display: none; }
+  .spec-actions-mobile { position: relative; }
 }
 
-/* YAML content visual polish */
-.yaml-spec-content {
+/* Spec content visual polish */
+.spec-card-content {
   font-family: var(--ifm-font-family-monospace);
   font-size: 15.5px;
   line-height: 1.75;
@@ -335,32 +330,32 @@
   overflow-x: auto;
   box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
-[data-theme='dark'] .yaml-spec-content {
+[data-theme='dark'] .spec-card-content {
   background-color: #1e1e1e; /* lighter dark */
 }
 
-.yaml-spec-line { display: flex; align-items: flex-start; }
-.yaml-line-number {
+.spec-card-line { display: flex; align-items: flex-start; }
+.spec-line-number {
   position: sticky; left: 0; z-index: 1;
   width: 3rem; text-align: right; margin-right: 0.5rem;
   color: var(--ifm-color-muted, #94a3b8);
   user-select: none; cursor: pointer;
   background: inherit; /* for sticky overlap */
 }
-.yaml-line-number:hover { color: #00BFFF; }
-.yaml-line-number:hover::after { content: ' ⎘'; color: #00BFFF; }
-.yaml-line-content { flex: 1; white-space: pre; }
+.spec-line-number:hover { color: #00BFFF; }
+.spec-line-number:hover::after { content: ' ⎘'; color: #00BFFF; }
+.spec-line-content { flex: 1; white-space: pre; }
 
 /* Simple token colors */
-.yaml-key { color: #ffcc66; font-weight: 600; }
-.yaml-string { color: #99e6ff; }
-.yaml-number { color: #f2777a; }
-.yaml-boolean { color: #a9dc76; }
-.yaml-comment { color: #999999; }
-.yaml-colon, .yaml-value, .yaml-plain { color: inherit; }
+.spec-key { color: #ffcc66; font-weight: 600; }
+.spec-string { color: #99e6ff; }
+.spec-number { color: #f2777a; }
+.spec-boolean { color: #a9dc76; }
+.spec-comment { color: #999999; }
+.spec-colon, .spec-value, .spec-plain { color: inherit; }
 
 /* Section divider */
-.yaml-section-divider {
+.spec-section-divider {
   height: 1px;
   background: currentColor;
   opacity: 0.1;
@@ -386,7 +381,7 @@
   .spec-breadcrumb-mobile { display: inline; }
 }
 
-/* Subtitle card above YAML */
+/* Subtitle card above the spec */
 .spec-subtitle-card {
   background: var(--ifm-background-surface-color);
   border: 1px solid var(--ifm-color-emphasis-200, #e2e8f0);
@@ -452,18 +447,18 @@
   .action-sheet-overlay { display: block; }
 }
 
-.yaml-spec-line {
+.spec-card-line {
   display: flex;
   align-items: flex-start;
 }
-.yaml-line-number {
+.spec-line-number {
   width: 2rem;
   text-align: right;
   margin-right: 0.5rem;
   color: var(--ifm-color-muted, #94a3b8);
   user-select: none;
 }
-.yaml-line-content {
+.spec-line-content {
   flex: 1;
   white-space: pre-wrap;
 }
@@ -472,7 +467,7 @@
 footer, footer p, footer a {
   color: var(--ifm-color-content);
 }
-.yaml-spec-content {
+.spec-card-content {
   font-family: var(--ifm-font-family-monospace);
   font-size: 0.85rem;
   color: var(--ifm-color-content);
@@ -654,12 +649,12 @@ footer, footer p, footer a {
 [data-theme='dark'] .agent-action-btn,
 [data-theme='dark'] .mobile-actions-btn{ border-color:#2b2f36; background:#0f172a; color:#e2e8f0; }
 
-.yaml-dropdown-menu{
+.spec-dropdown-menu{
   border-radius:12px;
   border:1px solid color-mix(in srgb, var(--accent), #fff 75%);
   box-shadow:0 20px 40px -12px rgba(2,6,23,.25);
 }
-.yaml-dropdown-item:hover{ background: color-mix(in srgb, var(--accent), #fff 92%); }
+.spec-dropdown-item:hover{ background: color-mix(in srgb, var(--accent), #fff 92%); }
 
 /* Focus rings for accessibility */
 .agent-card a:focus-visible,
@@ -683,7 +678,7 @@ footer, footer p, footer a {
   color: var(--accent);
 }
 
-[data-theme='dark'] .yaml-dropdown-item:hover,
+[data-theme='dark'] .spec-dropdown-item:hover,
 [data-theme='dark'] .action-sheet-item:hover {
   background: color-mix(in srgb, var(--accent), #0f172a 75%);
 }
