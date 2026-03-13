@@ -116,6 +116,14 @@ These files are authoritative for:
 * provenance recording during generation
 * completion criteria for Codex workers
 
+Sub-agent execution note:
+
+* use `worker` for generation or evaluation tasks that need shell access,
+  filesystem writes, or validation commands
+* reserve `helper-*` agents for reasoning-only assistance
+* this is an execution-harness constraint in the current environment, not a
+  change to the v0.4.0 pack contract
+
 These documents are the source of truth for workflow mechanics, not for pack
 structure.
 
@@ -277,6 +285,7 @@ Use this table when you need to resolve a question quickly.
 | What is a valid `v0.4.0` pack? | [spec/open-agent-spec-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/spec/open-agent-spec-v0.4.0.md) |
 | What does the automated checker enforce? | [scripts/validate-agent-pack-v0.4.0.js](/home/mikers/dev/fil-builders/agent-hub/scripts/validate-agent-pack-v0.4.0.js) |
 | How should a Codex worker generate a pack? | [prompts/codex-agent-pack-runbook-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-agent-pack-runbook-v0.4.0.md) |
+| Which sub-agent type should run shell-backed generation and evaluation? | [prompts/codex-agent-pack-runbook-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-agent-pack-runbook-v0.4.0.md) |
 | How should a model draft the final expert pack? | [prompts/master-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/master-prompt-v0.4.0.md) |
 | How should a model draft the documentation pack? | [prompts/documentation-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/documentation-prompt-v0.4.0.md) |
 | What did a specific run produce? | the relevant file in `parse/` or `agents/` |

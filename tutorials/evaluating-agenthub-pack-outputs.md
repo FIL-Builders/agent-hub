@@ -105,6 +105,12 @@ Use one isolated sub-agent per pack. Give both sub-agents:
 
 The only intended difference should be the pack each sub-agent receives.
 
+Execution note:
+
+* use `worker` sub-agents when the evaluation needs shell access, filesystem
+  writes, or validation commands
+* reserve `helper-*` sub-agents for reasoning-only comparisons
+
 Recommended constraints:
 
 * treat the supplied pack as the authoritative context

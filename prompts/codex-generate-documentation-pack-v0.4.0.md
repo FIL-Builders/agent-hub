@@ -8,6 +8,9 @@ Goal: Generate one Markdown documentation pack from explicit local
 You are a Codex worker producing a source-grounded documentation pack for a
 single library or tool.
 
+This prompt is intended to run on a `worker` sub-agent when the task requires
+shell access, local file writes, validation, or upstream source acquisition.
+
 ### 2 - Inputs
 You will be given:
 - a library name
@@ -37,6 +40,9 @@ For documentation-pack generation specifically:
 3. keep definitions close to authoritative sources
 4. use prior generated packs only for coverage audit
 5. write the finished document directly to the requested output path
+
+Do not run this workflow on a reasoning-only helper agent when the task needs
+`exec_command`.
 
 ### 5 - Output Requirements
 

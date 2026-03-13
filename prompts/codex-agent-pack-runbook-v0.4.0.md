@@ -18,7 +18,23 @@ Use this runbook together with:
 - `spec/open-agent-spec-v0.4.0.md`
 - the relevant codex worker prompt for the task
 
-## 2 - Execution Order
+## 2A - Agent Selection
+
+Use the sub-agent type that matches the execution needs of the run.
+
+- use `worker` for any generation, validation, comparison, or review task that
+  needs shell access, filesystem writes, or command execution
+- use `helper-*` only for reasoning-only assistance that does not need
+  `exec_command`
+
+Current execution note:
+
+- in this environment, `helper-*` agents may fail when a task needs shell
+  access
+- treat that as an execution-harness constraint, not as a pack-generation rule
+- when in doubt, run pack generation and evaluation with a `worker`
+
+## 3 - Execution Order
 
 Follow these steps in order:
 
@@ -37,7 +53,7 @@ Follow these steps in order:
 
 Do not skip version locking.
 
-## 3 - Version Locking
+## 4 - Version Locking
 
 Before extracting definitions or examples, lock the target version.
 
@@ -59,7 +75,7 @@ Examples:
 - extracted from: `react@18.3.1`
 - extracted from: `facebook/react@v18.3.1`
 
-## 4 - Source Hierarchy
+## 5 - Source Hierarchy
 
 Use sources in this priority order:
 
@@ -72,7 +88,7 @@ Use sources in this priority order:
 
 The source hierarchy applies per symbol and per definition, not just per task.
 
-## 4A - Version Delta Audit
+## 5A - Version Delta Audit
 
 Before drafting either pack, identify:
 
@@ -93,7 +109,7 @@ Examples:
 - an old config style still parses but is no longer the preferred authoring model
 - an old task flow still exists but is not the recommended path for new code
 
-## 4B - Ecosystem Boundary Audit
+## 5B - Ecosystem Boundary Audit
 
 Before drafting either pack, classify the source surface into:
 
@@ -110,7 +126,7 @@ Then decide:
 Do not silently blend companion surfaces into the core pack when that would
 teach the wrong mental model.
 
-## 5 - Source Selection Rules
+## 6 - Source Selection Rules
 
 When several plausible sources exist:
 
@@ -126,7 +142,7 @@ Examples:
 - `Guidance` may come from docs, examples, and release notes
 - `Workflow` sections may combine docs and examples
 
-## 6 - Conflict Resolution
+## 7 - Conflict Resolution
 
 When sources disagree, resolve them in this order:
 
@@ -141,7 +157,7 @@ If the conflict cannot be resolved confidently:
 - mark the conflicting point as `Needs verification`
 - record the mismatch in `Design Notes`
 
-## 7 - Allowed Use Of Prior Packs
+## 8 - Allowed Use Of Prior Packs
 
 Prior generated AgentHub packs may be used only for:
 
@@ -167,7 +183,7 @@ When a prior pack contains stronger operational guidance than the current draft:
   forward
 - preserve it if it remains valid and improves task performance
 
-## 8 - Provenance Format
+## 9 - Provenance Format
 
 The generated output must make provenance auditable.
 
@@ -199,7 +215,7 @@ Preferred `Source:` forms:
 
 Avoid vague source labels when a concrete upstream ref is available.
 
-## 9 - Documentation Pack Procedure
+## 10 - Documentation Pack Procedure
 
 When generating a documentation pack:
 
@@ -222,7 +238,7 @@ When generating a documentation pack:
 12. record the source set and source notes
 13. mark unresolved points as `Needs verification`
 
-## 10 - Agent Pack Procedure
+## 11 - Agent Pack Procedure
 
 When generating an agent pack:
 
@@ -241,7 +257,7 @@ When generating an agent pack:
 13. run a critique pass against task archetypes
 14. revise the pack where the critique finds weak operational guidance
 
-## 11 - Critique Pass
+## 12 - Critique Pass
 
 After the first structurally valid draft, run a critique pass before accepting
 the pack.
@@ -268,7 +284,7 @@ Ask:
 
 If the answer is no for an important area, revise the pack before finishing.
 
-## 12 - Revision Priorities
+## 13 - Revision Priorities
 
 When the critique pass finds weaknesses, fix them in this order:
 
@@ -282,7 +298,7 @@ When the critique pass finds weaknesses, fix them in this order:
 Do not expand the pack with generic prose just to make it longer.
 Prefer targeted revisions that improve task performance.
 
-## 13 - Structure Rules For Deterministic Parsing
+## 14 - Structure Rules For Deterministic Parsing
 
 The worker must preserve:
 
@@ -293,7 +309,7 @@ The worker must preserve:
 
 Do not vary field order for convenience.
 
-## 14 - Forked Workspace Handoff
+## 15 - Forked Workspace Handoff
 
 When the generation run happens in a forked workspace that the parent thread
 cannot inspect directly, the worker must treat the run as both a generation job
@@ -329,7 +345,7 @@ assume the forked workspace output will be available. In that case:
 - the parent thread should apply the final changes locally using the worker's
   report, or the generation should be re-run locally in the main thread
 
-## 15 - Completion Criteria
+## 16 - Completion Criteria
 
 A generation run is complete only when:
 
@@ -349,7 +365,7 @@ A generation run is complete only when:
 13. if the run happened in a forked workspace, the final response contains the
     full structured handoff report
 
-## 16 - Stop Conditions
+## 17 - Stop Conditions
 
 Stop and report `Needs verification` when:
 
@@ -366,7 +382,7 @@ Stop and report `Needs verification` when:
 
 Do not invent definitions to fill gaps.
 
-## 16 - Final Worker Report
+## 18 - Final Worker Report
 
 At the end of a run, report:
 

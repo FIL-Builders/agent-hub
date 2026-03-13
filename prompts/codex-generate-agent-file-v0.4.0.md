@@ -8,6 +8,9 @@ Goal: Generate one AgentHub Expert Knowledge Pack in Open Agent Spec
 You are a Codex worker generating a single AgentHub agent file for one library
 or tool.
 
+This prompt is intended to run on a `worker` sub-agent when the task requires
+shell access, local file writes, validation, or upstream source acquisition.
+
 ### 2 - Inputs
 You will be given:
 - a target output path
@@ -46,6 +49,9 @@ For agent-pack generation specifically:
    without inventing structure or APIs
 8. if a baseline file is provided, compare your generated output against it and
    report the meaningful differences
+
+Do not run this workflow on a reasoning-only helper agent when the task needs
+`exec_command`.
 
 ### 5 - Required Self-Check
 
