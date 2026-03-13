@@ -56,11 +56,11 @@ export default function Home() {
           {siteConfig.tagline}
         </p>
         <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-          <Link className="button button--primary" to="/tutorials/getting-started-loading-your-first-agent-file">
-            Get Started
-          </Link>
-          <Link className="button button--secondary" to="/agents/">
+          <Link className="button button--primary" to="/agents/">
             View Agents
+          </Link>
+          <Link className="button button--secondary" to="/tutorials/getting-started-loading-your-first-agent-file">
+            Tutorial
           </Link>
         </div>
       </header>
