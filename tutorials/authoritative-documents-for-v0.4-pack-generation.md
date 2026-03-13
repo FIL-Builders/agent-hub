@@ -49,7 +49,7 @@ These are the highest-authority repository documents for pack structure.
 
 ### Primary normative document
 
-* [spec/open-agent-spec-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/spec/open-agent-spec-v0.4.0.md)
+* `spec/open-agent-spec-v0.4.0.md`
 
 This file is the source of truth for:
 
@@ -74,7 +74,7 @@ If you are asking:
 * "Is `**Exports**` a Markdown list?"
 * "What fields must every symbol contain?"
 
-then [spec/open-agent-spec-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/spec/open-agent-spec-v0.4.0.md) is authoritative.
+then `spec/open-agent-spec-v0.4.0.md` is authoritative.
 
 ## 2. Operational Documents
 
@@ -85,8 +85,8 @@ generation procedures.
 
 ### Core prompt documents
 
-* [prompts/documentation-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/documentation-prompt-v0.4.0.md)
-* [prompts/master-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/master-prompt-v0.4.0.md)
+* `prompts/documentation-prompt-v0.4.0.md`
+* `prompts/master-prompt-v0.4.0.md`
 
 These files are authoritative for:
 
@@ -101,10 +101,10 @@ the generation task.
 
 ### Codex execution documents
 
-* [prompts/codex-agent-pack-runbook-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-agent-pack-runbook-v0.4.0.md)
-* [prompts/codex-generate-documentation-pack-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-generate-documentation-pack-v0.4.0.md)
-* [prompts/codex-generate-agent-file-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-generate-agent-file-v0.4.0.md)
-* [prompts/codex-generate-react-agent-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-generate-react-agent-v0.4.0.md)
+* `prompts/codex-agent-pack-runbook-v0.4.0.md`
+* `prompts/codex-generate-documentation-pack-v0.4.0.md`
+* `prompts/codex-generate-agent-file-v0.4.0.md`
+* `prompts/codex-generate-react-agent-v0.4.0.md`
 
 These files are authoritative for:
 
@@ -145,7 +145,7 @@ checks currently implemented in the repo.
 
 ### Primary validation artifact
 
-* [scripts/validate-agent-pack-v0.4.0.js](/home/mikers/dev/fil-builders/agent-hub/scripts/validate-agent-pack-v0.4.0.js)
+* `scripts/validate-agent-pack-v0.4.0.js`
 
 This file is authoritative for:
 
@@ -171,7 +171,7 @@ If you are asking:
 * "Will this pack pass the current checker?"
 * "What can we enforce automatically right now?"
 
-then [scripts/validate-agent-pack-v0.4.0.js](/home/mikers/dev/fil-builders/agent-hub/scripts/validate-agent-pack-v0.4.0.js) is authoritative.
+then `scripts/validate-agent-pack-v0.4.0.js` is authoritative.
 
 ## 4. Generated Artifacts
 
@@ -184,7 +184,7 @@ not define the format.
 
 Example:
 
-* [parse/react-docs-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/parse/react-docs-v0.4.0.md)
+* `parse/react-docs-v0.4.0.md`
 
 These files are authoritative only for:
 
@@ -198,8 +198,8 @@ They are not authoritative for the `v0.4.0` format itself.
 
 Examples:
 
-* [agents/react/0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/agents/react/0.4.0.md)
-* [agents/react/0.3.0.md](/home/mikers/dev/fil-builders/agent-hub/agents/react/0.3.0.md)
+* `agents/react/0.4.0.md`
+* `agents/react/0.3.0.md`
 
 These files are authoritative only for:
 
@@ -231,7 +231,7 @@ Evaluation documents define how to compare candidate outputs.
 
 ### Primary evaluation guide
 
-* [tutorials/evaluating-agenthub-pack-outputs.md](/home/mikers/dev/fil-builders/agent-hub/tutorials/evaluating-agenthub-pack-outputs.md)
+* `tutorials/evaluating-agenthub-pack-outputs.md`
 
 This file is authoritative for:
 
@@ -252,7 +252,7 @@ If you are asking:
 * "How should we score `0.3` versus `0.4`?"
 * "What is a fair sub-agent comparison setup?"
 
-then [tutorials/evaluating-agenthub-pack-outputs.md](/home/mikers/dev/fil-builders/agent-hub/tutorials/evaluating-agenthub-pack-outputs.md) is authoritative.
+then `tutorials/evaluating-agenthub-pack-outputs.md` is authoritative.
 
 ## Precedence Rules
 
@@ -282,14 +282,14 @@ Use this table when you need to resolve a question quickly.
 
 | Question | Authoritative document |
 | --- | --- |
-| What is a valid `v0.4.0` pack? | [spec/open-agent-spec-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/spec/open-agent-spec-v0.4.0.md) |
-| What does the automated checker enforce? | [scripts/validate-agent-pack-v0.4.0.js](/home/mikers/dev/fil-builders/agent-hub/scripts/validate-agent-pack-v0.4.0.js) |
-| How should a Codex worker generate a pack? | [prompts/codex-agent-pack-runbook-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-agent-pack-runbook-v0.4.0.md) |
-| Which sub-agent type should run shell-backed generation and evaluation? | [prompts/codex-agent-pack-runbook-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/codex-agent-pack-runbook-v0.4.0.md) |
-| How should a model draft the final expert pack? | [prompts/master-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/master-prompt-v0.4.0.md) |
-| How should a model draft the documentation pack? | [prompts/documentation-prompt-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/prompts/documentation-prompt-v0.4.0.md) |
+| What is a valid `v0.4.0` pack? | `spec/open-agent-spec-v0.4.0.md` |
+| What does the automated checker enforce? | `scripts/validate-agent-pack-v0.4.0.js` |
+| How should a Codex worker generate a pack? | `prompts/codex-agent-pack-runbook-v0.4.0.md` |
+| Which sub-agent type should run shell-backed generation and evaluation? | `prompts/codex-agent-pack-runbook-v0.4.0.md` |
+| How should a model draft the final expert pack? | `prompts/master-prompt-v0.4.0.md` |
+| How should a model draft the documentation pack? | `prompts/documentation-prompt-v0.4.0.md` |
 | What did a specific run produce? | the relevant file in `parse/` or `agents/` |
-| How should two outputs be compared? | [tutorials/evaluating-agenthub-pack-outputs.md](/home/mikers/dev/fil-builders/agent-hub/tutorials/evaluating-agenthub-pack-outputs.md) |
+| How should two outputs be compared? | `tutorials/evaluating-agenthub-pack-outputs.md` |
 
 ## Change Management Rules
 
@@ -312,7 +312,7 @@ Do not update generated packs first and then retrofit the spec later.
 When reviewing a `v0.4.0` change, ask:
 
 * does the change alter the pack contract?
-* if yes, was [spec/open-agent-spec-v0.4.0.md](/home/mikers/dev/fil-builders/agent-hub/spec/open-agent-spec-v0.4.0.md) updated first?
+* if yes, was `spec/open-agent-spec-v0.4.0.md` updated first?
 * does the validator still match the contract?
 * do the prompts still match the contract?
 * does the runbook still describe the real workflow?
