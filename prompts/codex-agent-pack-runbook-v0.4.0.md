@@ -23,14 +23,17 @@ Use this runbook together with:
 Follow these steps in order:
 
 1. Lock the target library or API version.
-2. Gather the initial local inputs provided by the task.
-3. Acquire authoritative upstream sources for the locked version.
-4. Build or refresh the documentation pack.
-5. Generate the v0.4.0 agent pack.
-6. Validate structure and provenance.
-7. Critique the pack against real task archetypes.
-8. Revise weak areas and re-check the pack.
-9. Stop only when the completion criteria are satisfied.
+2. Identify the prior pack target or prior major-version baseline.
+3. Run a version delta audit.
+4. Gather the initial local inputs provided by the task.
+5. Run an ecosystem boundary audit.
+6. Acquire authoritative upstream sources for the locked version.
+7. Build or refresh the documentation pack.
+8. Generate the v0.4.0 agent pack.
+9. Validate structure and provenance.
+10. Critique the pack against real task archetypes.
+11. Revise weak areas and re-check the pack.
+12. Stop only when the completion criteria are satisfied.
 
 Do not skip version locking.
 
@@ -68,6 +71,44 @@ Use sources in this priority order:
 6. local bundles and prior AgentHub packs for coverage audit only
 
 The source hierarchy applies per symbol and per definition, not just per task.
+
+## 4A - Version Delta Audit
+
+Before drafting either pack, identify:
+
+- the target version of the previous pack, if one exists
+- the currently locked target version
+- whether the version change is major, minor, or primarily documentation-level
+- which assumptions from the previous pack are likely to be stale
+
+Record at least:
+
+- the older mental model that may leak into the new pack
+- the current replacement pattern
+- whether the old pattern is deprecated, compatibility-only, or simply out of scope
+
+Examples:
+
+- a runtime helper that used to be core is now plugin-provided
+- an old config style still parses but is no longer the preferred authoring model
+- an old task flow still exists but is not the recommended path for new code
+
+## 4B - Ecosystem Boundary Audit
+
+Before drafting either pack, classify the source surface into:
+
+1. core package or platform surface
+2. first-party plugin, adapter, or companion-package surface
+3. third-party ecosystem surface
+
+Then decide:
+
+- what belongs in the pack as first-class coverage
+- what should be called out as a boundary
+- what should be excluded from the pack to avoid confusing an agent
+
+Do not silently blend companion surfaces into the core pack when that would
+teach the wrong mental model.
 
 ## 5 - Source Selection Rules
 
@@ -163,29 +204,42 @@ Avoid vague source labels when a concrete upstream ref is available.
 When generating a documentation pack:
 
 1. lock the target version
-2. inspect the provided local inputs
-3. acquire authoritative upstream sources as needed
-4. inventory the public surface area
-5. separate contracts from guidance
-6. draft the documentation pack in the required section order
-7. record the source set and source notes
-8. mark unresolved points as `Needs verification`
+2. identify the prior-pack target or prior major-version baseline
+3. run the version delta audit
+4. inspect the provided local inputs
+5. run the ecosystem boundary audit
+6. acquire authoritative upstream sources as needed
+7. inventory the public surface area
+8. inventory the source set by role:
+   - contract source
+   - guidance source
+   - workflow source
+   - migration source
+   - cross-check-only source
+9. separate contracts from guidance
+10. extract deprecated and compatibility-only surface area
+11. draft the documentation pack in the required section order
+12. record the source set and source notes
+13. mark unresolved points as `Needs verification`
 
 ## 10 - Agent Pack Procedure
 
 When generating an agent pack:
 
 1. lock the target version
-2. read the v0.4.0 spec and master prompt
-3. read the documentation pack
-4. inspect or acquire authoritative upstream sources for symbol contracts
-5. map the public surface into groups and exports
-6. write the pack in strict section order
-7. ensure every symbol has the required fields
-8. ensure every `Definition` has a concrete `Source`
-9. validate the pack
-10. run a critique pass against task archetypes
-11. revise the pack where the critique finds weak operational guidance
+2. identify the prior-pack target or prior major-version baseline
+3. run the version delta audit
+4. read the v0.4.0 spec and master prompt
+5. read the documentation pack
+6. run the ecosystem boundary audit
+7. inspect or acquire authoritative upstream sources for symbol contracts
+8. map the public surface into groups and exports
+9. write the pack in strict section order
+10. ensure every symbol has the required fields
+11. ensure every `Definition` has a concrete `Source`
+12. validate the pack
+13. run a critique pass against task archetypes
+14. revise the pack where the critique finds weak operational guidance
 
 ## 11 - Critique Pass
 
@@ -197,6 +251,8 @@ Test the draft mentally or explicitly against three task archetypes:
 1. implementation task
 2. troubleshooting or debugging task
 3. design or tradeoff task
+4. version-confusion task where an old example or prior-pack pattern could lead
+   to the wrong current answer
 
 Ask:
 
@@ -205,6 +261,10 @@ Ask:
 - would the pack surface the key preconditions and sequencing rules?
 - would the pack distinguish commonly confused alternatives?
 - would the pack support a concise, correct implementation?
+- would the pack keep an agent from using the previous major-version mental
+  model when that model is now wrong?
+- would the pack keep an agent from confusing core APIs with plugin or
+  companion-package APIs?
 
 If the answer is no for an important area, revise the pack before finishing.
 
@@ -214,9 +274,10 @@ When the critique pass finds weaknesses, fix them in this order:
 
 1. missing or weak decision rules
 2. missing failure modes or troubleshooting guidance
-3. missing workflow sequencing or preconditions
-4. missing symbol coverage
-5. weak examples
+3. stale version guidance or compatibility-only patterns presented as current
+4. missing workflow sequencing or preconditions
+5. missing symbol coverage
+6. weak examples
 
 Do not expand the pack with generic prose just to make it longer.
 Prefer targeted revisions that improve task performance.
@@ -238,12 +299,17 @@ A generation run is complete only when:
 
 1. the output file exists at the requested path
 2. the target version is locked and stated clearly
-3. the source set is recorded clearly
-4. the output follows the required structure
-5. the validator passes when one is provided
-6. a critique pass has been completed
-7. the pack has been revised if the critique exposed important weaknesses
-8. unresolved gaps are marked `Needs verification`
+3. the prior-pack target or prior major-version baseline has been identified
+4. the version delta audit has been completed
+5. the ecosystem boundary audit has been completed
+6. the source set is recorded clearly
+7. the output follows the required structure
+8. the validator passes when one is provided
+9. a critique pass has been completed
+10. the pack has been revised if the critique exposed important weaknesses
+11. unresolved gaps are marked `Needs verification`
+12. the pack does not teach deprecated or compatibility-only patterns as the
+    preferred current approach
 
 ## 15 - Stop Conditions
 
@@ -255,6 +321,10 @@ Stop and report `Needs verification` when:
 - sources disagree and the hierarchy does not resolve the conflict
 - the pack remains weak on a critical task archetype and the source material is
   insufficient to improve it responsibly
+- the boundary between core and plugin or companion-package surface cannot be
+  established confidently
+- the prior major-version model conflicts materially with current sources and
+  cannot be resolved safely
 
 Do not invent definitions to fill gaps.
 

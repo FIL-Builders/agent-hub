@@ -39,7 +39,17 @@ The document must be:
    - official docs for the same version
    - official examples, release notes, migration notes, or RFCs
    - local bundles and prior generated packs only as accelerators or coverage audits
-3. Read the authoritative material and identify the public surface area:
+3. Run a version delta audit before drafting:
+   - what version did the prior pack or prior major docs target?
+   - what exact version is this run targeting?
+   - is this a major-version or major-model shift?
+   - which older assumptions are likely to be wrong now?
+4. Run an ecosystem boundary audit:
+   - identify the core package or platform surface
+   - identify first-party plugins, adapters, or companion packages
+   - identify third-party ecosystem surfaces
+   - decide which surfaces belong in this pack and which should be treated as boundaries
+5. Read the authoritative material and identify the public surface area:
    - modules
    - namespaces
    - exported symbols
@@ -47,23 +57,34 @@ The document must be:
    - configuration keys
    - workflows
    - common mistakes
-4. Separate source truth from interpretation:
+6. Inventory the source set by role:
+   - contract source
+   - guidance source
+   - workflow source
+   - migration source
+   - cross-check-only source
+7. Extract deprecated and compatibility-only surface area explicitly:
+   - deprecated exports
+   - compatibility shims
+   - migration traps
+   - still-exported APIs that should not be used for new code
+8. Separate source truth from interpretation:
    - "Definition" content should stay close to the source
    - "Guidance" should contain expert recommendations, caveats, decision rules,
      failure modes, and usage advice
-5. Extract operational knowledge explicitly:
+9. Extract operational knowledge explicitly:
    - when to use a primitive
    - when not to use it
    - what it is commonly confused with
    - what must be true before using it
    - what usually breaks in real implementations
-6. Build a small challenge set mentally while reading:
+10. Build a small challenge set mentally while reading:
    - one implementation task
    - one debugging or troubleshooting task
    - one design or tradeoff task
    Use that challenge set to decide what guidance is important enough to keep.
-7. Organize the output as a Markdown document with predictable headings.
-8. Prefer concise, high-signal writing over raw dumping of docs.
+11. Organize the output as a Markdown document with predictable headings.
+12. Prefer concise, high-signal writing over raw dumping of docs.
 
 ### 5 - Required Output Structure
 
@@ -97,11 +118,23 @@ For each major concept:
 - why it matters
 - common confusion to avoid
 
+## Version Delta Audit
+- prior version or prior pack target
+- current locked version
+- major changes that affect agent behavior
+- outdated assumptions that must not carry forward
+
 ## Decision Rules
 - "Use X when..."
 - "Avoid Y when..."
 - "Choose A over B if..."
 - keep these short and operational
+
+## Ecosystem Boundaries
+- what belongs to the core surface
+- what belongs to first-party plugins, adapters, or companion packages
+- what belongs to third-party ecosystem integrations
+- which adjacent surfaces are intentionally out of scope for this pack
 
 ## Preconditions And Invariants
 - what must already be true before important operations
@@ -151,6 +184,12 @@ Document high-value end-to-end tasks.
 - version-specific traps
 - things that look equivalent but are not
 
+## Deprecated And Compatibility Surface
+- deprecated exports or patterns
+- compatibility-only APIs still present in the source
+- what to use in new code instead
+- migration traps from older versions
+
 ## Pitfalls And Troubleshooting
 
 ### <Problem Or Symptom>
@@ -184,14 +223,22 @@ Document high-value end-to-end tasks.
 - Prefer guidance that changes implementation behavior over generic descriptive prose.
 - If two symbols are commonly confused, name the distinction explicitly.
 - If a workflow often fails for a specific reason, document that failure mode directly.
+- If the target version differs materially from the previous pack or prior major docs,
+  name the outdated assumptions directly.
+- Keep core surfaces and plugin or companion surfaces clearly separated.
+- Record which sources were used for contracts, guidance, workflows, migration notes,
+  and cross-checking.
 
 ### 7 - Quality Checks
 Before you emit the final document, verify:
 - the output is a single Markdown document
 - every important public primitive has summary, definition, guidance, and example
+- the version delta audit identifies older assumptions that should not carry forward
+- the ecosystem boundary section clearly separates core from companion surfaces
 - workflows are task-oriented end-to-end guides
 - decision rules are present for high-value primitives and workflows
 - common confusions and failure modes are surfaced, not implied
+- deprecated and compatibility-only surfaces are called out when they matter
 - open questions are clearly separated from verified facts
 - the target version is stated clearly
 - the references make it possible to audit the source set later

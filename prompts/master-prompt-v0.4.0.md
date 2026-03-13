@@ -29,6 +29,8 @@ real tasks well:
 - what it is commonly confused with
 - what preconditions must be satisfied
 - what failure modes matter in practice
+- which older patterns are now wrong or compatibility-only
+- where the core surface ends and plugin or companion surfaces begin
 
 ### 3 - Inputs (replace placeholders before running)
 <LIBRARY_NAME>               <- canonical display name
@@ -186,38 +188,56 @@ When source material supports them, add these sections after `## API Groups`:
 - Preserve strong operational insights from prior packs when they remain valid,
   but re-ground them in authoritative source material before carrying them
   forward.
+- Identify the prior pack target and avoid carrying forward outdated assumptions
+  from an earlier major version.
+- Distinguish core APIs from plugin, adapter, or companion-package APIs directly
+  in the grouping and guidance.
 - For high-value symbols, explain not just what they are but when they should
   be chosen over nearby alternatives.
 - Prefer guidance that will change implementation behavior over descriptive
   restatement of docs.
 - Surface common failure modes directly instead of leaving them implicit.
+- Surface deprecated or compatibility-only surfaces when they are likely to
+  confuse an agent working from older examples.
 
 ### 8 - Workflow
 
 1. Read <OPEN_AGENT_SPEC_V0_4> and follow it exactly.
 2. Lock the target version from <LIBRARY_VERSION>.
 3. Read <DOCUMENTATION_PACK_V0_4> fully.
-4. Acquire or inspect authoritative upstream material for the locked version as
+4. Identify the prior-pack or prior-major-version target when one exists.
+5. Run a version delta audit:
+   - what changed materially between the prior target and the current target
+   - which old patterns are no longer the preferred way to use the tool
+6. Run an ecosystem boundary audit:
+   - core package or platform surface
+   - first-party plugin or companion surface
+   - third-party ecosystem surface
+   - what this pack should and should not claim as core
+7. Acquire or inspect authoritative upstream material for the locked version as
    needed.
-5. Verify critical contracts against <API_DOCUMENTATION> and any fetched
+8. Verify critical contracts against <API_DOCUMENTATION> and any fetched
    authoritative sources.
-6. Identify the library's public surface area.
-7. Identify task-critical operational knowledge:
+9. Identify the library's public surface area.
+10. Identify task-critical operational knowledge:
    - decision rules
    - preconditions
    - common confusions
    - failure modes
    - workflow steps that commonly go wrong
-8. Group exports by mental model or task domain.
-9. Draft the pack in the required section order.
-10. Add optional library-wide sections only when the source material supports
+   - version-shift traps
+   - deprecated or compatibility-only patterns that should not be used for new code
+11. Group exports by mental model or task domain.
+12. Draft the pack in the required section order.
+13. Add optional library-wide sections only when the source material supports
    them.
-11. Critique the draft against a small challenge set:
+14. Critique the draft against a small challenge set:
     - one implementation task
     - one debugging or troubleshooting task
     - one design or tradeoff task
-12. Strengthen weak sections before emitting.
-13. Check that the final Markdown preserves the full pack structure, records
+    - one version-confusion task where an old pattern could produce the wrong answer
+15. Strengthen weak sections before emitting.
+16. Check that the final Markdown preserves the full pack structure, records
     enough provenance to audit later, and retains the operational knowledge
     needed for task performance.
 
@@ -242,6 +262,10 @@ Before emitting, verify:
 - every `Definition` and `Example` contains a fenced code block
 - every `Definition` includes a concrete `Source`
 - the cited sources match the declared target version as closely as possible
+- the pack does not teach superseded or compatibility-only patterns as the
+  preferred current approach
+- the pack distinguishes core surfaces from plugin or companion surfaces where
+  that boundary matters
 - high-value symbols include decision-oriented guidance, not just descriptions
 - common failure modes and confusions are surfaced where they matter
 - the pack would help an agent answer one implementation task, one
