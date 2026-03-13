@@ -36,6 +36,7 @@
 ## Tutorials
 
 * [Getting Started: Loading Your First Agent File](./tutorials/getting-started-loading-your-first-agent-file.md)
+* [Authoritative Documents For v0.4 Pack Generation](./tutorials/authoritative-documents-for-v0.4-pack-generation.md)
 * [Evaluating AgentHub Pack Outputs](./tutorials/evaluating-agenthub-pack-outputs.md)
 
 ---
