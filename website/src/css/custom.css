@@ -18,7 +18,7 @@
   --ifm-font-family-monospace: 'JetBrains Mono', monospace;
   --ifm-code-font-size: 0.88rem;
   --ifm-heading-font-family: 'Montserrat', sans-serif;
-  --ifm-heading-font-weight: 700;
+  --ifm-heading-font-weight: 800;
   --ifm-navbar-height: 5.5rem;
   --ifm-global-radius: 0;
   --ifm-spacing-horizontal: 1rem;
@@ -26,14 +26,26 @@
 }
 
 html,
-body {
-  min-height: 100%;
+body,
+#__docusaurus {
+  min-height: 100vh;
   background: transparent;
 }
 
 body {
   font-family: var(--ifm-font-family-base);
+  font-weight: 500;
   color: var(--ifm-color-content);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--ifm-heading-font-family);
+  font-weight: var(--ifm-heading-font-weight);
 }
 
 a {
@@ -43,6 +55,9 @@ a {
 .agenthub-site-shell {
   position: relative;
   z-index: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .agenthub-bg {
@@ -101,6 +116,9 @@ a {
   position: relative;
   z-index: 1;
   background: transparent;
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .container {
@@ -138,11 +156,19 @@ a {
   height: 4.25rem;
 }
 
-.navbar__title,
+.navbar__title {
+  color: hsl(var(--foreground));
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
 .navbar__link {
   color: hsl(var(--foreground));
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .navbar__link:hover,
@@ -158,6 +184,7 @@ a {
   background: hsl(var(--card) / 0.78) !important;
   backdrop-filter: blur(14px);
   border-top: 1px solid hsl(var(--primary) / 0.18);
+  margin-top: auto;
 }
 
 .footer__title,
@@ -165,6 +192,19 @@ a {
 .footer a,
 .footer p {
   color: hsl(var(--foreground));
+}
+
+.footer__title {
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.footer__link-item,
+.footer p {
+  font-size: 0.92rem;
 }
 
 .footer a:hover {
@@ -288,6 +328,7 @@ a {
   font-size: clamp(2.9rem, 8vw, 5.4rem);
   line-height: 0.92;
   letter-spacing: -0.05em;
+  font-weight: 800;
   color: hsl(var(--foreground));
 }
 
@@ -296,6 +337,7 @@ a {
   margin: 0 0 1.4rem;
   color: hsl(var(--muted-foreground));
   font-size: 1.05rem;
+  font-weight: 500;
 }
 
 .agenthub-home-actions {
@@ -433,6 +475,7 @@ a {
   margin: 0;
   font-size: 1.08rem;
   line-height: 1.15;
+  font-weight: 700;
 }
 
 .agent-card-title-link {
@@ -677,6 +720,7 @@ a {
   margin: 0 0 0.45rem;
   color: hsl(var(--foreground));
   font-size: 1.25rem;
+  font-weight: 700;
 }
 
 .spec-card-purpose {
