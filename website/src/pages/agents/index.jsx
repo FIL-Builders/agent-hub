@@ -70,13 +70,14 @@ export default function AgentsIndex() {
 
   return (
     <Layout title="All Agent Specs">
-      <main className="container" style={{ padding: '2rem 0' }}>
-        <h1 style={{ color: 'var(--ifm-color-primary)', marginBottom: '0.5rem', fontSize: '1.75rem' }}>
-          All AgentHub Agent Specs
-        </h1>
-        <p style={{ color: 'var(--ifm-color-content-secondary, #6b7280)', marginBottom: '1rem' }}>
+      <main className="container agenthub-page-shell">
+        <div className="agenthub-page-header cg-glass-panel cg-industrial-border">
+          <p className="agenthub-page-header__label">Registry</p>
+          <h1 className="agenthub-page-header__title">All AgentHub Agent Specs</h1>
+          <p className="agenthub-page-header__copy">
           Browse and open agent specifications. Use search and filters to find what you need.
-        </p>
+          </p>
+        </div>
         <div className="agents-filter">
           <input
             className="agents-search"

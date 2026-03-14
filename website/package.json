@@ -20,6 +20,7 @@
     "@docusaurus/plugin-content-docs": "^3.8.1",
     "@docusaurus/preset-classic": "3.8.1",
     "@mdx-js/react": "^3.0.0",
+    "@nil-store/cybergrid-theme": "github:Nil-Store/cybergrid-theme#a251c1f2440c66ba2158feac5874893b4b9d5ce6",
     "clsx": "^2.0.0",
     "docusaurus-plugin-openapi-docs": "^4.5.1",
     "docusaurus-theme-openapi-docs": "^4.5.1",
