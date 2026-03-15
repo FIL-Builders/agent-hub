@@ -48,7 +48,7 @@ export default function Home() {
         <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
           <p className="agenthub-home-panel__label">System Overview</p>
           <p className="agenthub-home-panel__copy">
-            Agent Hub helps AI coding agents fetch the right versioned guidance when a task needs
+            Agent Hub helps AI coding agents fetch the right expert guidance when a task needs
             it, instead of relying on memory or oversized prompts. That means more accurate
             answers, cleaner context, and results that are easier to repeat.
           </p>

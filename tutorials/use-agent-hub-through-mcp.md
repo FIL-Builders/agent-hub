@@ -31,10 +31,23 @@ Instead, copy the prompt below and paste it into your AI agent. It tells the age
 * add Agent Hub MCP if it can do so safely
 * fall back to exact manual steps if it cannot
 * verify the connection by listing tools and fetching `agent-hub`
+* fetch the latest `agent-hub` pack and derive a short routing note from it
+* install that note into persistent agent instructions, or print it for manual paste
 
 <AIAgentOnboardingPrompt />
 
-This is the best starting point when you want one onboarding flow that works across multiple agent environments without hard-coding the instructions to a single tool.
+This is the best starting point when you want one onboarding flow that works across multiple agent environments without hard-coding the instructions to a single tool. It also helps the agent learn when to use Agent Hub after setup, instead of only teaching it how to connect once.
+
+### **Why the Onboarding Prompt Installs a Routing Note**
+
+Connecting MCP is only half of the job. An AI agent also needs to know when Agent Hub is worth checking.
+
+That is why the onboarding prompt now asks the agent to fetch the `agent-hub` pack after setup and turn it into a short persistent routing note. The note should teach the agent to:
+
+* use Agent Hub for versioned library, framework, SDK, protocol, or product questions
+* prefer just-in-time retrieval over loading many packs up front
+* pin versions when reproducibility matters
+* skip Agent Hub when the task does not need versioned technical context
 
 ---
 

@@ -497,7 +497,6 @@ a {
 }
 
 .agenthub-home-tagline {
-  max-width: 42rem;
   margin: 0 0 1.4rem;
   color: hsl(var(--muted-foreground));
   font-size: 1.05rem;
