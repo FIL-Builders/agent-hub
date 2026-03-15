@@ -509,6 +509,126 @@ a {
   gap: 0.9rem;
 }
 
+.agenthub-contribute-page {
+  padding-top: 1.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.agenthub-contribute-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(18rem, 1fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.agenthub-contribute-hero__main,
+.agenthub-contribute-hero__side,
+.agenthub-contribute-card,
+.agenthub-contribute-community {
+  padding: 1.5rem;
+  overflow: visible;
+}
+
+.agenthub-contribute-title {
+  margin: 0 0 0.9rem;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+  color: hsl(var(--foreground));
+}
+
+.agenthub-contribute-lead {
+  margin: 0 0 1.2rem;
+  color: hsl(var(--muted-foreground));
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.agenthub-contribute-definition {
+  margin: 0 0 1.2rem;
+  color: hsl(var(--foreground));
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+.agenthub-contribute-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.agenthub-contribute-steps {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: hsl(var(--foreground));
+}
+
+.agenthub-contribute-steps li + li {
+  margin-top: 0.65rem;
+}
+
+.agenthub-contribute-grid {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.95fr) minmax(0, 1.6fr) minmax(15rem, 0.95fr);
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.agenthub-contribute-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.agenthub-contribute-card h3,
+.agenthub-contribute-community h2,
+.agenthub-contribute-mini h3 {
+  margin-top: 0;
+  color: hsl(var(--foreground));
+}
+
+.agenthub-contribute-card p,
+.agenthub-contribute-community p,
+.agenthub-contribute-mini p,
+.agenthub-contribute-mini li {
+  color: hsl(var(--muted-foreground));
+  line-height: 1.7;
+}
+
+.agenthub-contribute-card__actions {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.agenthub-contribute-community {
+  padding: 1.6rem;
+}
+
+.agenthub-contribute-community__intro {
+  max-width: 54rem;
+}
+
+.agenthub-contribute-community__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 1.1rem;
+  margin: 1.2rem 0 1.1rem;
+}
+
+.agenthub-contribute-mini {
+  padding: 1.15rem;
+}
+
+.agenthub-contribute-mini ul {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.agenthub-contribute-actions--bottom {
+  justify-content: flex-start;
+}
+
 .agenthub-home-panel {
   display: flex;
   flex-direction: column;
@@ -1515,6 +1635,12 @@ footer a {
   .home-features,
   .agents-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .agenthub-contribute-hero,
+  .agenthub-contribute-grid,
+  .agenthub-contribute-community__grid {
+    grid-template-columns: 1fr;
   }
 
   .theme-doc-sidebar-container {

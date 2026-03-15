@@ -84,6 +84,7 @@ const config = {
           label: 'Tutorial',
         },
         { to: '/blog', label: 'Blog', position: 'left' },
+        { to: '/contribute', label: 'Contribute', position: 'right', className: 'navbar-cta' },
       ],
     },
     footer: {
