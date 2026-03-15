@@ -382,12 +382,17 @@ a {
 .button--secondary {
   background: hsl(var(--accent) );
   border-color: hsl(var(--accent) / 0.45);
-  color: hsl(var(--foreground));
+  color: hsl(240 15% 4%);
 }
 
 .button--secondary:hover {
+  color: hsl(240 15% 4%);
   filter: brightness(0.96);
   transform: translate(-2px, -2px);
+}
+
+.button--secondary:focus-visible {
+  color: hsl(240 15% 4%);
 }
 
 .button--sm {
@@ -569,7 +574,7 @@ a {
 
 .agenthub-contribute-grid {
   display: grid;
-  grid-template-columns: minmax(15rem, 0.95fr) minmax(0, 1.6fr) minmax(15rem, 0.95fr);
+  grid-template-columns: minmax(15rem, 0.95fr) minmax(0, 1.85fr);
   gap: 1.25rem;
   margin-bottom: 1.25rem;
 }
