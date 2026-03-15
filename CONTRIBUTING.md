@@ -1,132 +1,174 @@
-# Contributing to **AgentHub**
+# Contributing to Agent Hub
 
-Welcome — whether you’re here to fix a typo or craft the next flagship agent file, we’re thrilled to build AgentHub with you! This guide explains **how to contribute via Pull Requests** and what you can expect from the maintainer team.
+Agent Hub is built in public through GitHub pull requests.
 
----
+Contributions can include:
 
-## Philosophy
+- new Agent Hub packs for tools, libraries, APIs, SDKs, and product surfaces
+- revisions to existing packs
+- improvements to pack-generation prompts and runbooks
+- evaluation, onboarding, tutorial, or website improvements
 
-> **“Collaboration over control, transparency over hype.”**
+The current contribution model is the Markdown-native `v0.4` workflow. If you
+see older `0.1`-`0.3` files in the repo, treat them as historical context
+unless a current tutorial or prompt explicitly tells you to use them.
 
-AgentHub is a community conversation‑space: every design choice, every line of an agent spec, every review comment is out in the open. We prize clear reasoning, shared ownership, and learning together more than big vanity numbers. If that resonates with you, you’re in the right place.
+## What A Good Contribution Looks Like
 
----
+The active Agent Hub surface is built around:
 
-## Our PR‑based Workflow (30 s overview)
+- versioned Markdown packs in `agents/<tool>/`
+- intermediate documentation packs in `parse/`
+- generation prompts in `prompts/`
+- the normative spec in `spec/open-agent-spec-v0.4.0.md`
+- validation and evaluation scripts in `scripts/` and `tutorials/`
 
-1. **Fork the repo** → make your change in a branch.  
-2. **Open a Pull Request** early (Draft PRs welcome!).  
-3. Automated CI will lint, validate the spec, and run a smoke test.  
-4. A maintainer reviews; we aim to respond in **<12 h** during launch week.  
-5. Iterate together until green ✓ — then **merge & celebrate**.  
+The best contributions are:
 
-First PR? Add yourself to the `all-contributors` list and we’ll happily credit you. 🎉
+- version-disciplined
+- grounded in authoritative upstream sources
+- operationally useful for real implementation or debugging work
+- structurally valid under the `v0.4` spec
 
----
+## Before You Start
 
-## How to Contribute an **Agent**
+Read these repo documents first:
 
-1. **Pick a Tool**  
-   Find an API / SDK that doesn’t yet have an agent file in `/agents/`. Open an issue to claim it (optional but helps avoid double work).
+1. `spec/open-agent-spec-v0.4.0.md`
+2. `tutorials/authoritative-documents-for-v0.4-pack-generation.md`
+3. `tutorials/evaluating-agenthub-pack-outputs.md`
 
-2. **Read the Spec**  
-   Follow **Open Agent Spec** in [`/spec/open-agent-spec-v0.3.0.yaml`](./spec/open-agent-spec-v0.3.0.yaml). All required fields must be present and correctly typed.
+If you are generating or revising a pack with a local AI coding agent, also use:
 
-3. **Study the Founding Agents**  
-   Browse `/agents/<tool>/` for examples of structure, tone, and depth. Aim for that quality bar (or higher!).
+- `prompts/codex-agent-pack-runbook-v0.4.0.md`
+- `prompts/codex-generate-agent-file-v0.4.0.md`
 
-4. **Write Your Agent Markdown File**  
-   Create a new folder:  
+If a tool-specific generation brief already exists in `prompts/`, use that too.
+
+## Contributing A New Or Updated Pack
+
+### 1. Pick the target
+
+Choose one of these paths:
+
+- add a new pack under `agents/<tool>/0.4.0.md`
+- improve an existing `0.4.0.md` pack
+- regenerate a pack using the current `v0.4` prompts and review process
+
+If the repo already has an older pack for that tool, use it only as a coverage
+benchmark. Do not treat older generated packs as authoritative sources for API
+definitions.
+
+### 2. Gather authoritative sources
+
+Use upstream documentation, official references, package metadata, and primary
+source material for the target library or product.
+
+Then follow the repository authority chain:
+
+1. `spec/open-agent-spec-v0.4.0.md`
+2. `scripts/validate-agent-pack-v0.4.0.js`
+3. `prompts/codex-agent-pack-runbook-v0.4.0.md`
+4. `prompts/master-prompt-v0.4.0.md`
+5. `prompts/documentation-prompt-v0.4.0.md`
+6. generated artifacts in `parse/` and `agents/`
+
+If repo documents disagree on pack structure, the spec wins.
+
+### 3. Generate or revise the pack
+
+The normal `v0.4` flow is:
+
+1. create or update the intermediate documentation pack in `parse/`
+2. create or update the final expert pack in `agents/<tool>/0.4.0.md`
+3. if needed, add or update a tool-specific generation brief in `prompts/`
+
+Use the checked-in prompts and runbook instead of inventing a new pack shape.
+
+### 4. Validate the result
+
+Run the pack validator on the generated pack:
+
+```bash
+node scripts/validate-agent-pack-v0.4.0.js agents/<tool>/0.4.0.md
 ```
 
-agents/<tool-name>/
-├─ <version>.md
-└─ DESIGN\_NOTES.md
+Fix all structural failures before opening a PR.
 
+If you changed prompts or regenerated a pack that replaces an existing one,
+follow the evaluation process in:
+
+- `tutorials/evaluating-agenthub-pack-outputs.md`
+
+That guide is the standard for deciding whether a new candidate is actually
+better than the prior pack.
+
+### 5. Build the site if your change affects surfaced content
+
+If you changed packs, tutorials, the site UI, or anything that could affect the
+rendered website or MCP-facing static content, run:
+
+```bash
+npm run build
 ```
 
-   Use Markdown with YAML frontmatter containing the full `meta` block, followed by the remaining spec sections in the body. Minimal shape:
+At minimum, pack-only changes should still pass:
 
-```md
----
-meta:
-  spec_name: my-awesome-api
-  spec_version: "0.3.0"
-  library_version: "^1.2.3"
-  generated: "2026-03-12"
-  purpose: >
-    Briefly explain what this pack helps an LLM do.
-  guiding_principles:
-    - Prefer concrete, production-safe patterns.
-    - Call out common failure modes early.
-    - Keep examples runnable and minimal.
-  design_notes: |
-    Summarize key sources and structuring decisions.
----
-groups:
-  - name: core
-    exports: [createClient]
-    symbols:
-      createClient:
-        kind: function
-        summary: Create the primary SDK client.
-        definition:
-          lang: typescript
-          code: |
-            function createClient(config: ClientConfig): Client;
-        guidance:
-          - Initialize once per process when possible.
-        example:
-          lang: javascript
-          code: |
-            import { createClient } from 'my-awesome-api';
-            const client = createClient({ apiKey: process.env.API_KEY });
+```bash
+npm run validate:agent-pack -- agents/<tool>/0.4.0.md
 ```
 
-5. **Fill in `DESIGN_NOTES.md`**  
-Use the template below to explain **why** you chose certain prompts, examples, and guardrails. Transparent rationale helps reviewers and future maintainers.
+## Active Vs Archived Packs
 
-```markdown
-# DESIGN NOTES: <Tool Name> Agent
-* **Goal / Scope:** What problem does this agent solve?
-* **Key Prompts & Reasoning:** Outline major prompt snippets and why they work.
-* **Edge‑case Handling:** How does the agent avoid common pitfalls?
-* **References:** Docs, blog posts, or code samples you consulted.
-```
+The website and MCP surface only expose active packs from `agents/`.
 
-6. **Run CI Locally (optional)**
+Older packs that are no longer meant to appear in the live product are kept in:
 
-   ```bash
-   npm run build   # MCP manifest + site build smoke check
-   ```
+- `archive/agents/`
 
-   Your PR should run the same smoke build locally before submission.
+Do not add new active work to `archive/agents/`.
+Use the archive only for historical preservation or recovery.
 
-7. **Open a Pull Request**
-   In the PR description: link to any open issue, paste a sample “agent in action” snippet, and mention anything you’d like feedback on.
+## Pull Request Expectations
 
-That’s it!
+Open a GitHub pull request with:
 
----
+- a short summary of what changed
+- the target pack or tutorial path
+- validation results
+- evaluation results if you are replacing or regenerating an existing pack
 
-## What to Expect
+Draft PRs are fine.
 
-* **Fast & Friendly Reviews**
-  We target **< 12 hours** turnaround during the first launch week, and <24 hours thereafter. If we slip, please ping us politely.
+We prefer contributions that stay reviewable:
 
-* **Respectful Interaction**
-  Feedback will be constructive and kind. We’ll explain “why,” not just “what.” See our [Code of Conduct](./CODE_OF_CONDUCT.md).
+- focused changes
+- explicit version updates
+- clear source discipline
+- no speculative format changes without updating the spec or prompts that govern them
 
-* **Iteration over Perfection**
-  It’s okay if the first commit isn’t flawless. We’d rather iterate in the open than wait for hidden perfection.
+## UI, Docs, And Website Contributions
 
-* **Shared Ownership**
-  Accepted contributors may be invited to `CODEOWNERS` for their agent—welcome to the maintainer circle!
+Agent Hub is not only a pack registry. It also includes:
 
----
+- MCP onboarding
+- tutorials
+- blog posts
+- the Docusaurus site and cybergrid-based UI
+
+If you change public-facing site content or workflows:
+
+- keep the copy aligned with the current product positioning
+- preserve the existing visual language unless the change is intentionally a redesign
+- run `npm run build`
 
 ## Need Help?
 
-Open a **GitHub Discussion**, drop by our **Discord #contributors** channel, or join the next live office‑hours stream. No question is too small.
+If you are unsure how to contribute, start here:
 
-Happy agent‑crafting! ✨
+- `tutorials/authoritative-documents-for-v0.4-pack-generation.md`
+- `tutorials/evaluating-agenthub-pack-outputs.md`
+- `agents/agent-hub/0.4.0.md`
+
+If something in the repo is ambiguous or stale, a pull request that fixes the
+documentation is a valid contribution too.

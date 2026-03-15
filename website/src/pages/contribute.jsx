@@ -27,16 +27,15 @@ export default function ContributePage() {
             <p className="agenthub-home-kicker">Community Contribution Workflow</p>
             <h1 className="agenthub-contribute-title">Contribute to Agent Hub</h1>
             <p className="agenthub-contribute-lead">
-              Create or improve Agent Hub packs with your local AI coding agent, then send the
-              result through GitHub PRs so it can be reviewed and merged in the open.
+              Create or improve Agent Hub packs for the tools you care about using your local AI
+              coding agent, then contribute the result through GitHub in the open.
             </p>
             <p className="agenthub-contribute-definition">
-              Agent Hub packs are versioned Markdown guides that help AI coding agents use a tool,
-              library, API, or product surface correctly.
+              Agent Hub packs are Markdown guides that help AI coding agents use libraries, APIs,
+              SDKs, and product surfaces more accurately.
             </p>
             <div className="agenthub-contribute-actions">
-              <ActionLink href={GITHUB_REPO} primary>Open GitHub Repo</ActionLink>
-              <ActionLink to={PACK_TUTORIAL}>Read Pack Tutorial</ActionLink>
+              <ActionLink href={CONTRIBUTING_GUIDE} primary>Read Contribution Guide</ActionLink>
             </div>
           </div>
 
@@ -68,14 +67,13 @@ export default function ContributePage() {
             <p className="agenthub-feature-card__label">Local AI Workflow</p>
             <h3>Use Your Local AI Coding Agent</h3>
             <p>
-              Use your local AI coding agent to generate a new pack or improve an existing one
-              with the prompts and runbooks in this repo. Then validate the result locally and
-              send it through GitHub as a normal pull request.
+              Use the prompts and runbooks in this repo to draft a new pack or improve an
+              existing one with your local AI coding agent. Then validate the result locally and
+              open a pull request.
             </p>
             <p>
-              This tutorial shows how to generate or revise a pack locally, which repo
-              documents to trust, and how contributions move from draft to a reviewable pull
-              request in the open.
+              The pack tutorial shows which repo documents to trust and how to move from draft to
+              a review-ready contribution.
             </p>
             <div className="agenthub-contribute-card__actions">
               <ActionLink to={PACK_TUTORIAL} small>Read Tutorial</ActionLink>
