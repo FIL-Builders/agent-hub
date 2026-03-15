@@ -4,6 +4,7 @@ import Link from '@docusaurus/Link';
 
 const GITHUB_REPO = 'https://github.com/FIL-Builders/agent-hub';
 const CONTRIBUTING_GUIDE = 'https://github.com/FIL-Builders/agent-hub/blob/main/CONTRIBUTING.md';
+const PACK_TUTORIAL = '/tutorials/authoritative-documents-for-v0.4-pack-generation';
 
 function ActionLink({to, href, children, primary = false, small = false}) {
   const className = `button ${primary ? 'button--primary' : 'button--secondary'}${small ? ' button--sm' : ''}`;
@@ -35,7 +36,7 @@ export default function ContributePage() {
             </p>
             <div className="agenthub-contribute-actions">
               <ActionLink href={GITHUB_REPO} primary>Open GitHub Repo</ActionLink>
-              <ActionLink to="/tutorials/use-agent-hub-through-mcp">Read MCP Tutorial</ActionLink>
+              <ActionLink to={PACK_TUTORIAL}>Read Pack Tutorial</ActionLink>
             </div>
           </div>
 
@@ -79,20 +80,20 @@ export default function ContributePage() {
             </p>
             <div className="agenthub-contribute-card__actions">
               <ActionLink href={CONTRIBUTING_GUIDE} small>Read Contribution Guide</ActionLink>
-              <ActionLink to="/tutorials/use-agent-hub-through-mcp" small>See Tutorial</ActionLink>
+              <ActionLink to={PACK_TUTORIAL} small>See Tutorial</ActionLink>
             </div>
           </div>
 
           <div className="agenthub-contribute-card agenthub-contribute-card--narrow cg-glass-panel cg-industrial-border cg-industrial-border-accent">
             <p className="agenthub-feature-card__label">Tutorial Summary</p>
-            <h3>Start With the MCP Tutorial</h3>
+            <h3>Start With the Pack Generation Tutorial</h3>
             <p>
-              The tutorial shows how to connect Agent Hub, verify the server, fetch packs from the
-              deployed endpoint, and install a short routing note so your AI agent knows when Agent
-              Hub is worth checking.
+              The authoritative v0.4 tutorial explains which documents govern pack generation,
+              how the prompts and runbook fit together, and which files should be treated as the
+              source of truth when you generate or revise a pack locally.
             </p>
             <div className="agenthub-contribute-card__actions">
-              <ActionLink to="/tutorials/use-agent-hub-through-mcp" small>Read Tutorial</ActionLink>
+              <ActionLink to={PACK_TUTORIAL} small>Read Tutorial</ActionLink>
             </div>
           </div>
         </section>
