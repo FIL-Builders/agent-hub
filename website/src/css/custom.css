@@ -145,13 +145,14 @@ a {
 }
 
 .agenthub-navbar-inner {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 1rem;
 }
 
 .agenthub-navbar-left,
+.agenthub-navbar-center,
 .agenthub-navbar-right,
 .agenthub-navbar-links,
 .agenthub-navbar-controls {
@@ -161,6 +162,11 @@ a {
 
 .agenthub-navbar-left {
   gap: 0.9rem;
+  min-width: 0;
+}
+
+.agenthub-navbar-center {
+  justify-content: center;
   min-width: 0;
 }
 

@@ -51,7 +51,7 @@ export default function Home() {
       <main className="container agenthub-home-main">
         <div className="home-features">
           {features.map((feature) => (
-            <div key={feature.title} className="ai-card agenthub-feature-card cg-glass-panel cg-industrial-border">
+            <div key={feature.title} className="ai-card agenthub-feature-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
               <p className="agenthub-feature-card__label">Surface</p>
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>

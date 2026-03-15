@@ -58,6 +58,9 @@ export default function NavbarContent() {
         <div className="agenthub-navbar-brand-slot">
           <NavbarLogo />
         </div>
+      </div>
+
+      <div className="agenthub-navbar-center">
         <div className="agenthub-navbar-links">
           <NavbarItems items={leftItems} />
         </div>
