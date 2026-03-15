@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { buildPrompt } from '@site/src/utils/prompt';
 import { parseAgentMeta } from '@site/src/utils/agentSpec';
 
@@ -33,12 +35,6 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
     } catch {}
   };
 
-  const handleCopyLine = async (line) => {
-    try {
-      await navigator.clipboard.writeText(line);
-    } catch {}
-  };
-
   const repoPath = (downloadUrl || '').replace(/^\//, '');
   const rawUrl = repoPath ? `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/${repoPath}` : '';
   const promptText = buildPrompt(rawUrl);
@@ -50,8 +46,6 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
     : '';
 
   const { specName, purpose } = parseAgentMeta(spec);
-  const lines = (spec || '').trimEnd().split('\n');
-
   return (
     <div className="spec-card ai-card">
       <div className="spec-card-header">
@@ -92,14 +86,11 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
         )}
       </div>
       <div className="spec-card-controls" />
-      <pre className="spec-card-content">
-        {lines.map((line, idx) => (
-          <div key={idx} className="spec-card-line">
-            <span className="spec-line-number" title="Copy line" onClick={() => handleCopyLine(line)}>{idx + 1}</span>
-            <span className="spec-line-content">{line}</span>
-          </div>
-        ))}
-      </pre>
+      <div className="spec-card-content markdown">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {spec}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 };

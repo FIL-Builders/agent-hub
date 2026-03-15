@@ -30,7 +30,7 @@ Instead, copy the prompt below and paste it into your AI agent. It tells the age
 * detect the right MCP config location
 * add Agent Hub MCP if it can do so safely
 * fall back to exact manual steps if it cannot
-* verify the connection by listing tools and fetching `react`
+* verify the connection by listing tools and fetching `agent-hub`
 
 <AIAgentOnboardingPrompt />
 
@@ -119,7 +119,7 @@ At a high level:
 * use `agenthub_fetch` when you want the actual pack text
 * use `agenthub_docs` when you want the server’s own reference docs
 
-For example, a model can discover that `react` has multiple versions available, then fetch `latest` before answering a React question.
+For example, a model can discover that `agent-hub` has multiple versions available, then fetch `latest` to verify the server and inspect the product pack itself.
 
 ---
 
@@ -159,7 +159,7 @@ curl -sS https://agent-hub-1.netlify.app/mcp \
   }'
 ```
 
-Check React versions:
+Check Agent Hub versions:
 
 ```bash
 curl -sS https://agent-hub-1.netlify.app/mcp \
@@ -171,12 +171,12 @@ curl -sS https://agent-hub-1.netlify.app/mcp \
     "method": "tools/call",
     "params": {
       "name": "agenthub_versions",
-      "arguments": { "tool_id": "react" }
+      "arguments": { "tool_id": "agent-hub" }
     }
   }'
 ```
 
-Fetch the latest React pack:
+Fetch the latest Agent Hub pack:
 
 ```bash
 curl -sS https://agent-hub-1.netlify.app/mcp \
@@ -188,7 +188,7 @@ curl -sS https://agent-hub-1.netlify.app/mcp \
     "method": "tools/call",
     "params": {
       "name": "agenthub_fetch",
-      "arguments": { "tool_id": "react", "version": "latest" }
+      "arguments": { "tool_id": "agent-hub", "version": "latest" }
     }
   }'
 ```
@@ -230,7 +230,7 @@ That keeps prompts smaller, retrieval cleaner, and context more intentional.
 
 In practice, this means your agent can:
 
-* pull `react` before answering a React performance question
+* pull `agent-hub` first when you want to verify the server or explain Agent Hub itself
 * fetch `ethers` before writing a wallet or contract integration
 * grab `typescript` before untangling generics or module-resolution issues
 * switch between packs without rewriting your whole system prompt every time
@@ -258,7 +258,7 @@ If you are building coding agents, internal copilots, or AI-native tooling, MCP 
 ## **Next Steps**
 
 * Connect the deployed MCP endpoint to your client
-* Fetch `react`, `typescript`, or another pack you use every day
+* Fetch `agent-hub`, `typescript`, or another pack you use every day
 * Read the React comparison post to see why MCP delivery won in practice: [Better Context, Better Fixes: Why AgentHub MCP Won a Real React Test](/blog/0005-why-agenthub-mcp-won-react-context-test)
 * Browse the full pack catalog at [Agent Specs](/agents/)
 
