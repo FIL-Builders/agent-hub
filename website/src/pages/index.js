@@ -10,20 +10,23 @@ export default function Home() {
     {
       label: 'Onboarding',
       title: 'AI Agent Onboarding',
-      description: 'Copy one setup prompt that tells your AI agent what Agent Hub MCP is, connects it if possible, and falls back to exact manual steps when it cannot edit the config itself.',
+      description: 'Start here if you want the fastest way to use Agent Hub inside your AI coding workflow. Copy one prompt and your agent will either connect Agent Hub for you or give you the exact setup steps to finish it manually.',
       onboarding: true,
     },
     {
-      label: 'Tutorial',
+      label: 'Tutorial/MCP',
       title: 'Use The MCP Tutorial',
-      description: 'Connect Agent Hub to any MCP-aware client with direct HTTP or mcp-remote, then verify the setup by listing tools, checking React versions, and fetching a live pack from the deployed server.',
+      description: 'Use this guide to connect Agent Hub to your AI tool so it can fetch the right guidance when a task needs it, instead of relying on memory or oversized prompts. It walks through setup, verification, and live retrieval from the deployed server.',
       link: '/tutorials/use-agent-hub-through-mcp',
       cta: 'Read Tutorial',
     },
     {
-      label: 'Proof',
-      title: 'See MCP Results',
-      description: 'Agent Hub MCP produced the top React result in our four-way test, beating direct file access, no pack, and an inline prompt. The comparison matters because it isolates delivery mode, not just model quality.',
+      label: 'BLOG/PROOF',
+      title: 'Agent Hub Example: Improved React Debugging Results',
+      description: [
+        'We gave AI coding agents the same hard React debugging task and compared runs with Agent Hub against runs without it.',
+        'The Agent Hub run produced the strongest overall result, showing that better context can improve both code quality and reasoning on the same problem.',
+      ],
       link: '/blog/0005-why-agenthub-mcp-won-react-context-test',
       cta: 'Read Results',
     },
@@ -33,20 +36,21 @@ export default function Home() {
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
       <header className="agenthub-home-hero">
         <div className="agenthub-home-hero__inner cg-glass-panel cg-industrial-border">
-          <p className="agenthub-home-kicker">Agent-Native Context Delivery</p>
+          <p className="agenthub-home-kicker">Versioned Context for AI Coding Agents</p>
           <h1 className="agenthub-home-title">{siteConfig.title}</h1>
           <p className="agenthub-home-tagline">{siteConfig.tagline}</p>
           <div className="agenthub-home-actions">
             <Link className="button button--primary" to="/agents/">
-              View Agents
+              Browse Agent Packs
             </Link>
           </div>
         </div>
         <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
           <p className="agenthub-home-panel__label">System Overview</p>
           <p className="agenthub-home-panel__copy">
-            Agent Hub gives agents versioned specs, MCP delivery, tutorials, and measured
-            evaluations so they can pull the right context when the task actually needs it.
+            Agent Hub helps AI coding agents fetch the right versioned guidance when a task needs
+            it, instead of relying on memory or oversized prompts. That means more accurate
+            answers, cleaner context, and results that are easier to repeat.
           </p>
         </div>
       </header>
@@ -56,7 +60,11 @@ export default function Home() {
             <div key={feature.title} className="ai-card agenthub-feature-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
               <p className="agenthub-feature-card__label">{feature.label}</p>
               <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
+              {Array.isArray(feature.description) ? (
+                feature.description.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+              ) : (
+                <p>{feature.description}</p>
+              )}
               {feature.onboarding && <AIAgentOnboardingPrompt compact buttonLabel="Copy Prompt" />}
               {feature.link && (
                 <Link className="button button--secondary button--sm agenthub-feature-card__cta" to={feature.link}>
@@ -72,8 +80,9 @@ export default function Home() {
               <p className="agenthub-feature-card__label">MCP Server</p>
               <h3 className="agenthub-mcp-endpoint-panel__title">Agent Hub MCP Endpoint</h3>
               <p className="agenthub-mcp-endpoint-panel__copy">
-                Prefer direct setup? Use the deployed MCP server URL below for manual
-                configuration, debugging, or quick client verification.
+                Use the deployed MCP endpoint if you want to connect Agent Hub directly in your
+                client or test the server yourself. It is the fastest path for manual setup,
+                debugging, and quick verification.
               </p>
             </div>
             <pre className="agenthub-mcp-endpoint-panel__endpoint">

@@ -11,7 +11,7 @@ import {themes as prismThemes} from 'prism-react-renderer';
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Agent Hub',
-  tagline: 'LLMs are cool, smart LLMs are even cooler!',
+  tagline: 'Give AI coding agents the right versioned technical guidance when they need it.',
   favicon: 'img/favicon-agent-hub.png',
 
   future: {

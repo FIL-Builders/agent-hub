@@ -20,6 +20,10 @@ We asked agents to diagnose the root causes, propose a production-sane fix, incl
 
 Then we compared **four different context delivery modes**.
 
+## **The Interview Question**
+
+Every agent received the same practical React 18 task: explain why a page with 5,000 searchable rows felt laggy, why rows rerendered too often, and why selection appeared to reset after filtering. Then each agent had to provide a minimal but production-sane fix with complete code and explicitly explain when to use `useDeferredValue`, `useTransition`, `memo`, and stable props.
+
 ---
 
 ## **The Four-Way Comparison**
@@ -60,6 +64,8 @@ The reviewer’s scoring rubric covered:
 * code quality
 * completeness
 * senior-level practicality
+
+In other words, we ranked the responses based on whether they would actually help a real engineer solve the problem well. We kept the task and answer constraints fixed, changed only the context delivery method, scored each answer across those six dimensions, then totaled the results out of 60 and normalized them to 10.
 
 And the top line is straightforward:
 
