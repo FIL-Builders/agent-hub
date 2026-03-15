@@ -40,6 +40,18 @@ export default function Root({children}) {
 
   return (
     <>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function () {
+              try {
+                var root = document.documentElement;
+                root.classList.toggle('dark', root.getAttribute('data-theme') === 'dark');
+              } catch (e) {}
+            })();
+          `,
+        }}
+      />
       <div className="agenthub-bg" aria-hidden="true">
         <div className="agenthub-bg__grid cyber-grid-layer" />
         <div className="agenthub-bg__living">
