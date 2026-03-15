@@ -7,19 +7,23 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   const features = [
     {
-      title: 'Connect AgentHub Through MCP',
-      description: 'Learn how to list packs, fetch exact versions, and give agents runtime access to the right spec instead of pasting prompt blobs.',
+      title: 'Connect Agent Hub MCP',
+      description: 'Use the deployed Agent Hub MCP server to list packs, inspect versions, and fetch the exact spec your agent needs at runtime.',
+      endpoint: 'https://agent-hub-1.netlify.app/mcp',
       link: '/tutorials/use-agent-hub-through-mcp',
+      cta: 'Use MCP',
     },
     {
       title: 'Explore Agent Specs',
-      description: 'Browse the versioned AgentHub catalogue and find the exact framework or API pack your agent needs.',
+      description: 'Browse the Agent Hub catalog and find versioned packs for the frameworks, APIs, and tools your agents work with.',
       link: '/agents/',
+      cta: 'Browse Specs',
     },
     {
       title: 'See MCP Results',
-      description: 'Read the React comparison showing how AgentHub MCP beat direct-file, no-pack, and inline-pack delivery.',
+      description: 'See how Agent Hub MCP performed in a real React comparison against direct-file, no-pack, and inline-pack context delivery.',
       link: '/blog/0005-why-agenthub-mcp-won-react-context-test',
+      cta: 'Read Results',
     },
   ];
 
@@ -39,8 +43,8 @@ export default function Home() {
         <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
           <p className="agenthub-home-panel__label">System Overview</p>
           <p className="agenthub-home-panel__copy">
-            Agent Hub packages versioned agent specs, MCP delivery, tutorials, and proof-backed
-            evaluations so models can fetch the right context at the moment they need it.
+            Agent Hub gives agents versioned specs, MCP delivery, tutorials, and measured
+            evaluations so they can pull the right context when the task actually needs it.
           </p>
         </div>
       </header>
@@ -51,8 +55,9 @@ export default function Home() {
               <p className="agenthub-feature-card__label">Surface</p>
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
-              <Link className="button button--primary button--sm" to={feature.link}>
-                Learn more
+              {feature.endpoint && <pre className="agenthub-feature-card__endpoint">{feature.endpoint}</pre>}
+              <Link className="button button--secondary button--sm" to={feature.link}>
+                {feature.cta}
               </Link>
             </div>
           ))}
