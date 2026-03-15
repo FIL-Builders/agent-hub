@@ -534,6 +534,48 @@ a {
   gap: 1.25rem;
 }
 
+.agenthub-mcp-endpoint-panel {
+  margin-top: 1.25rem;
+  padding: 1.3rem 1.5rem;
+  overflow: visible;
+}
+
+.agenthub-mcp-endpoint-panel__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(20rem, 0.8fr);
+  gap: 1rem;
+  align-items: center;
+}
+
+.agenthub-mcp-endpoint-panel__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.agenthub-mcp-endpoint-panel__title {
+  margin: 0;
+}
+
+.agenthub-mcp-endpoint-panel__copy {
+  margin: 0;
+}
+
+.agenthub-mcp-endpoint-panel__endpoint {
+  margin: 0;
+  padding: 1rem 1.15rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / 0.18);
+  color: hsl(var(--foreground));
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.08);
+  justify-self: stretch;
+}
+
 .agenthub-feature-card {
   display: flex;
   flex-direction: column;
@@ -542,22 +584,40 @@ a {
   overflow: visible;
 }
 
-.agenthub-feature-card__endpoint {
+.agenthub-onboarding-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.agenthub-onboarding-prompt__code {
   margin: 0;
-  padding: 0.7rem 0.8rem;
+  padding: 0.75rem 0.85rem;
   border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / 0.18);
   color: hsl(var(--foreground));
   font-family: var(--ifm-font-family-monospace);
-  font-size: 0.72rem;
-  line-height: 1.5;
+  font-size: 0.68rem;
+  line-height: 1.45;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   box-shadow: inset 0 0 0 1px hsl(var(--primary) / 0.08);
 }
 
-.agenthub-feature-card .button {
+.agenthub-onboarding-prompt .button {
+  margin-top: 0;
+  align-self: flex-start;
+}
+
+.agenthub-feature-card__cta {
   margin-top: auto;
   align-self: flex-start;
+}
+
+@media (max-width: 996px) {
+  .agenthub-mcp-endpoint-panel__body {
+    grid-template-columns: 1fr;
+  }
 }
 
 .agents-grid {

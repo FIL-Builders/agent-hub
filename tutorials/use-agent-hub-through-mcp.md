@@ -2,6 +2,8 @@
 hide_table_of_contents: true
 ---
 
+import AIAgentOnboardingPrompt from '@site/src/components/AIAgentOnboardingPrompt';
+
 # Get Better Agent Answers with Agent Hub MCP
 
 Stop pasting giant agent specs into prompts.
@@ -16,6 +18,23 @@ With MCP, your coding agent can:
 * retrieve context deliberately instead of carrying oversized prompt material up front
 
 If you want the proof that delivery shape matters, read [Better Context, Better Fixes: Why AgentHub MCP Won a Real React Test](/blog/0005-why-agenthub-mcp-won-react-context-test). In our latest four-way React comparison, Agent Hub MCP outperformed direct-file, no-pack, and inline-pack delivery, finishing first at **59/60**, **9.8/10**, and **rank #1**.
+
+---
+
+## **Fastest Path: AI Agent Onboarding**
+
+If you are already working inside a CLI AI agent environment, the fastest path is usually not manual config editing.
+
+Instead, copy the prompt below and paste it into your AI agent. It tells the agent to:
+
+* detect the right MCP config location
+* add Agent Hub MCP if it can do so safely
+* fall back to exact manual steps if it cannot
+* verify the connection by listing tools and fetching `react`
+
+<AIAgentOnboardingPrompt />
+
+This is the best starting point when you want one onboarding flow that works across multiple agent environments without hard-coding the instructions to a single tool.
 
 ---
 

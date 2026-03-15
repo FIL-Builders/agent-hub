@@ -2,26 +2,28 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
+import AIAgentOnboardingPrompt from '@site/src/components/AIAgentOnboardingPrompt';
 
 export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   const features = [
     {
-      title: 'Connect Agent Hub MCP',
-      description: 'Use the deployed Agent Hub MCP server to list packs, inspect versions, and fetch the exact spec your agent needs at runtime.',
-      endpoint: 'https://agent-hub-1.netlify.app/mcp',
+      label: 'Onboarding',
+      title: 'AI Agent Onboarding',
+      description: 'Copy one setup prompt that tells your AI agent what Agent Hub MCP is, connects it if possible, and falls back to exact manual steps when it cannot edit the config itself.',
+      onboarding: true,
+    },
+    {
+      label: 'Tutorial',
+      title: 'Use The MCP Tutorial',
+      description: 'Connect Agent Hub to any MCP-aware client with direct HTTP or mcp-remote, then verify the setup by listing tools, checking React versions, and fetching a live pack from the deployed server.',
       link: '/tutorials/use-agent-hub-through-mcp',
-      cta: 'Use MCP',
+      cta: 'Read Tutorial',
     },
     {
-      title: 'Explore Agent Specs',
-      description: 'Browse the Agent Hub catalog and find versioned packs for the frameworks, APIs, and tools your agents work with.',
-      link: '/agents/',
-      cta: 'Browse Specs',
-    },
-    {
+      label: 'Proof',
       title: 'See MCP Results',
-      description: 'See how Agent Hub MCP performed in a real React comparison against direct-file, no-pack, and inline-pack context delivery.',
+      description: 'Agent Hub MCP produced the top React result in our four-way test, beating direct file access, no pack, and an inline prompt. The comparison matters because it isolates delivery mode, not just model quality.',
       link: '/blog/0005-why-agenthub-mcp-won-react-context-test',
       cta: 'Read Results',
     },
@@ -52,15 +54,32 @@ export default function Home() {
         <div className="home-features">
           {features.map((feature) => (
             <div key={feature.title} className="ai-card agenthub-feature-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
-              <p className="agenthub-feature-card__label">Surface</p>
+              <p className="agenthub-feature-card__label">{feature.label}</p>
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
-              {feature.endpoint && <pre className="agenthub-feature-card__endpoint">{feature.endpoint}</pre>}
-              <Link className="button button--secondary button--sm" to={feature.link}>
-                {feature.cta}
-              </Link>
+              {feature.onboarding && <AIAgentOnboardingPrompt compact buttonLabel="Copy Prompt" />}
+              {feature.link && (
+                <Link className="button button--secondary button--sm agenthub-feature-card__cta" to={feature.link}>
+                  {feature.cta}
+                </Link>
+              )}
             </div>
           ))}
+        </div>
+        <div className="agenthub-mcp-endpoint-panel cg-glass-panel cg-industrial-border">
+          <div className="agenthub-mcp-endpoint-panel__body">
+            <div className="agenthub-mcp-endpoint-panel__content">
+              <p className="agenthub-feature-card__label">MCP Server</p>
+              <h3 className="agenthub-mcp-endpoint-panel__title">Agent Hub MCP Endpoint</h3>
+              <p className="agenthub-mcp-endpoint-panel__copy">
+                Prefer direct setup? Use the deployed MCP server URL below for manual
+                configuration, debugging, or quick client verification.
+              </p>
+            </div>
+            <pre className="agenthub-mcp-endpoint-panel__endpoint">
+              https://agent-hub-1.netlify.app/mcp
+            </pre>
+          </div>
         </div>
       </main>
     </Layout>
