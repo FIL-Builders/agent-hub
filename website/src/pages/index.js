@@ -3,79 +3,61 @@ import Layout from '@theme/Layout';
 import Link from '@docusaurus/Link';
 import useDocusaurusContext from '@docusaurus/useDocusaurusContext';
 
-/**
- * Custom home page for the Agent Hub site.  It replaces the default
- * template with a hero banner and a set of feature cards styled with
- * the AI Templates design system.  Buttons link users to tutorials,
- * the agent catalogue and the blog.
- */
 export default function Home() {
-  const { siteConfig } = useDocusaurusContext();
+  const {siteConfig} = useDocusaurusContext();
   const features = [
     {
-      title: 'Comprehensive Agents',
-      description:
-        'Browse an extensive catalogue of smart agents ready to integrate into your workflows.',
+      title: 'Connect Agent Hub MCP',
+      description: 'Use the deployed Agent Hub MCP server to list packs, inspect versions, and fetch the exact spec your agent needs at runtime.',
+      endpoint: 'https://agent-hub-1.netlify.app/mcp',
+      link: '/tutorials/use-agent-hub-through-mcp',
+      cta: 'Use MCP',
+    },
+    {
+      title: 'Explore Agent Specs',
+      description: 'Browse the Agent Hub catalog and find versioned packs for the frameworks, APIs, and tools your agents work with.',
       link: '/agents/',
+      cta: 'Browse Specs',
     },
     {
-      title: 'Step‑By‑Step Tutorials',
-      description:
-        'Follow concise tutorials that guide you through agent setup and usage.',
-      link: '/tutorials/getting-started-loading-your-first-agent-file',
-    },
-    {
-      title: 'Insights & Updates',
-      description:
-        'Read our blog for news, updates and behind‑the‑scenes on agent development.',
-      link: '/blog',
+      title: 'See MCP Results',
+      description: 'See how Agent Hub MCP performed in a real React comparison against direct-file, no-pack, and inline-pack context delivery.',
+      link: '/blog/0005-why-agenthub-mcp-won-react-context-test',
+      cta: 'Read Results',
     },
   ];
 
   return (
     <Layout title={siteConfig.title} description={siteConfig.tagline}>
-      <header className="heroBanner" style={{ padding: '4rem 0', textAlign: 'center' }}>
-        <h1
-          style={{
-            fontFamily: 'Courier New, monospace',
-            color: 'var(--ifm-color-primary)',
-            marginBottom: '0.5rem',
-          }}
-        >
-          {siteConfig.title}
-        </h1>
-        <p
-          style={{
-            color: 'var(--ifm-color-content-secondary, #475569)',
-            marginBottom: '2rem',
-            maxWidth: '600px',
-            marginLeft: 'auto',
-            marginRight: 'auto',
-          }}
-        >
-          {siteConfig.tagline}
-        </p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
-          <Link className="button button--primary" to="/agents/">
-            View Agents
-          </Link>
-          <Link className="button button--secondary" to="/tutorials/getting-started-loading-your-first-agent-file">
-            Tutorial
-          </Link>
+      <header className="agenthub-home-hero">
+        <div className="agenthub-home-hero__inner cg-glass-panel cg-industrial-border">
+          <p className="agenthub-home-kicker">Agent-Native Context Delivery</p>
+          <h1 className="agenthub-home-title">{siteConfig.title}</h1>
+          <p className="agenthub-home-tagline">{siteConfig.tagline}</p>
+          <div className="agenthub-home-actions">
+            <Link className="button button--primary" to="/agents/">
+              View Agents
+            </Link>
+          </div>
+        </div>
+        <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
+          <p className="agenthub-home-panel__label">System Overview</p>
+          <p className="agenthub-home-panel__copy">
+            Agent Hub gives agents versioned specs, MCP delivery, tutorials, and measured
+            evaluations so they can pull the right context when the task actually needs it.
+          </p>
         </div>
       </header>
-      <main className="container" style={{ padding: '2rem 0' }}>
+      <main className="container agenthub-home-main">
         <div className="home-features">
-          {features.map((feat) => (
-            <div key={feat.title} className="ai-card">
-              <h3>{feat.title}</h3>
-              <p>{feat.description}</p>
-              <Link
-                className="button button--primary button--sm"
-                style={{ marginTop: '0.5rem' }}
-                to={feat.link}
-              >
-                Learn more
+          {features.map((feature) => (
+            <div key={feature.title} className="ai-card agenthub-feature-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
+              <p className="agenthub-feature-card__label">Surface</p>
+              <h3>{feature.title}</h3>
+              <p>{feature.description}</p>
+              {feature.endpoint && <pre className="agenthub-feature-card__endpoint">{feature.endpoint}</pre>}
+              <Link className="button button--secondary button--sm" to={feature.link}>
+                {feature.cta}
               </Link>
             </div>
           ))}

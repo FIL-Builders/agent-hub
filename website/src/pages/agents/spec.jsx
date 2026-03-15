@@ -60,13 +60,13 @@ export default function AgentSpecPage() {
 
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
-      <main className="container spec-page" style={{ padding: '3rem 2rem' }}>
-        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <main className="container spec-page agenthub-page-shell">
+        <div className="spec-page-nav">
           <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Specs</a>
           <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
         {status === 'loading' && (
-          <div className="ai-card" aria-busy="true">
+          <div className="ai-card cg-glass-panel cg-industrial-border" aria-busy="true">
             <div className="spec-skeleton">
               <div className="skeleton skeleton-title" />
               <div className="skeleton skeleton-subtitle" />
@@ -81,7 +81,10 @@ export default function AgentSpecPage() {
         )}
         {status === 'ready' ? (
           <>
-            <h1 className="spec-page-title">{project} / {file}</h1>
+            <div className="agenthub-page-header cg-glass-panel cg-industrial-border">
+              <p className="agenthub-page-header__label">Specification</p>
+              <h1 className="spec-page-title">{project} / {file}</h1>
+            </div>
             {/* Mobile actions button under title */}
             <div className="mobile-actions-container">
               <button className="mobile-actions-btn" onClick={() => setSheetOpen(true)}>
@@ -89,7 +92,7 @@ export default function AgentSpecPage() {
               </button>
             </div>
             {purpose && (
-              <div className="spec-subtitle-card">
+              <div className="spec-subtitle-card cg-glass-panel cg-industrial-border-accent">
                 {purpose}
               </div>
             )}
@@ -109,7 +112,7 @@ export default function AgentSpecPage() {
           </>
         ) : null}
         {status === 'error' && (
-          <div className="ai-card">
+          <div className="ai-card cg-glass-panel cg-industrial-border">
             <h3>Specification Not Found</h3>
             <p>
               Unable to load spec for project <code>{project || '(missing)'}</code> and

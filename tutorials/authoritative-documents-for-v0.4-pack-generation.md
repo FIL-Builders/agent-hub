@@ -1,3 +1,7 @@
+---
+hide_table_of_contents: true
+---
+
 # Authoritative Documents For v0.4 Pack Generation
 
 This guide defines the authority chain for AgentHub `v0.4.0` pack generation.
@@ -331,3 +335,6 @@ For `v0.4.0`, treat the documents this way:
 * the evaluation guide tells you how to compare outputs
 
 That separation is what keeps the system understandable as the repository grows.
+---
+hide_table_of_contents: true
+---
