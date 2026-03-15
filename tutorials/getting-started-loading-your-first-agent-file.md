@@ -1,3 +1,7 @@
+---
+hide_table_of_contents: true
+---
+
 # Getting Started: Loading Your First Agent File
 
 ---

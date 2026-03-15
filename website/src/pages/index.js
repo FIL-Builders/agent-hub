@@ -7,19 +7,19 @@ export default function Home() {
   const {siteConfig} = useDocusaurusContext();
   const features = [
     {
-      title: 'Comprehensive Agents',
-      description: 'Browse an extensive catalogue of smart agents ready to integrate into your workflows.',
+      title: 'Connect AgentHub Through MCP',
+      description: 'Learn how to list packs, fetch exact versions, and give agents runtime access to the right spec instead of pasting prompt blobs.',
+      link: '/tutorials/use-agent-hub-through-mcp',
+    },
+    {
+      title: 'Explore Agent Specs',
+      description: 'Browse the versioned AgentHub catalogue and find the exact framework or API pack your agent needs.',
       link: '/agents/',
     },
     {
-      title: 'Step-By-Step Tutorials',
-      description: 'Follow concise tutorials that guide you through agent setup and usage.',
-      link: '/tutorials/getting-started-loading-your-first-agent-file',
-    },
-    {
-      title: 'Insights & Updates',
-      description: 'Read the blog for evaluations, release notes, and context-delivery experiments.',
-      link: '/blog',
+      title: 'See MCP Results',
+      description: 'Read the React comparison showing how AgentHub MCP beat direct-file, no-pack, and inline-pack delivery.',
+      link: '/blog/0005-why-agenthub-mcp-won-react-context-test',
     },
   ];
 
@@ -34,16 +34,13 @@ export default function Home() {
             <Link className="button button--primary" to="/agents/">
               View Agents
             </Link>
-            <Link className="button button--secondary" to="/tutorials/getting-started-loading-your-first-agent-file">
-              Tutorial
-            </Link>
           </div>
         </div>
-        <div className="agenthub-home-panel cg-glass-panel cg-industrial-border-accent">
+        <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
           <p className="agenthub-home-panel__label">System Overview</p>
           <p className="agenthub-home-panel__copy">
-            Agent Hub packages versioned agent specs, MCP delivery, tutorials, and evaluation flows
-            into one place so models can pull the right context at the right time.
+            Agent Hub packages versioned agent specs, MCP delivery, tutorials, and proof-backed
+            evaluations so models can fetch the right context at the moment they need it.
           </p>
         </div>
       </header>

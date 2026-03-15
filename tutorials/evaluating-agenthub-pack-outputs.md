@@ -1,3 +1,7 @@
+---
+hide_table_of_contents: true
+---
+
 # Evaluating AgentHub Pack Outputs
 
 This guide defines a repeatable process for comparing two AgentHub pack outputs.
@@ -296,3 +300,6 @@ The best evaluations are specific and repeatable. Avoid loose statements like
 show the outputs, score them, and explain the tradeoff.
 
 That makes the decision auditable and gives the next iteration a clear target.
+---
+hide_table_of_contents: true
+---

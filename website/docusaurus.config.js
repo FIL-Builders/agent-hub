@@ -75,13 +75,6 @@ const config = {
     image: 'img/agent-hub-logo.png',
     navbar: {
       title: 'Agent Hub',
-      logo: {
-        alt: 'Agent Hub Logo',
-        src: 'img/agent-hub-logo.png',
-        // Explicitly set width/height to make the logo much larger in the navbar
-        width: 80,
-        height: 80,
-      },
       items: [
         { to: '/agents/', label: 'Agent Specs', position: 'left' },
         {
@@ -91,11 +84,6 @@ const config = {
           label: 'Tutorial',
         },
         { to: '/blog', label: 'Blog', position: 'left' },
-        {
-          href: 'https://github.com/FIL-Builders/agent-hub/issues/new?template=request-new-agent.md',
-          label: 'Suggest Agent',
-          position: 'right',
-        },
       ],
     },
     footer: {
@@ -106,7 +94,7 @@ const config = {
           items: [
             {
               label: 'Tutorial',
-              to: '/tutorials/getting-started-loading-your-first-agent-file',
+              to: '/tutorials/use-agent-hub-through-mcp',
             },
           ],
         },
