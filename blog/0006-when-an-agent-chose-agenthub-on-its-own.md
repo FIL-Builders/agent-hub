@@ -219,6 +219,23 @@ If AgentHub is useful, agents should start learning the same habit. This Scaffol
 
 ---
 
+## **Try This In Your Own Agent**
+
+If you want to test this behavior yourself, the easiest path is to install AgentHub through the prompt-based onboarding flow.
+
+Start with the [AgentHub MCP tutorial](/tutorials/use-agent-hub-through-mcp). It gives you a ready-to-paste onboarding prompt that tells your AI coding agent to:
+
+1. connect the AgentHub MCP server
+2. verify the installation
+3. fetch the `agent-hub` pack
+4. install a short persistent note about when to check AgentHub
+
+That last step matters. The goal is not just to make AgentHub available. The goal is to help your agent learn when framework-specific or tool-specific context is worth retrieving.
+
+Once that is installed, give your agent a real task for a framework or tool you care about and watch what happens. The best outcome is not that the agent mentions AgentHub. It is that the agent quietly uses the right pack at the right moment and produces a better plan because of it.
+
+---
+
 ## **The Takeaway**
 
 The most encouraging result was not that the agent wrote a decent plan.
@@ -236,3 +253,5 @@ If AgentHub can help agents become more accurate on framework-specific work beca
 It means the system is starting to work the way good tooling should:
 
 **quietly, at the right moment, for the right task.**
+
+If you want to put that to work in your own setup, install AgentHub with the [prompt-based MCP onboarding flow](/tutorials/use-agent-hub-through-mcp) and see whether your agent starts reaching for the right context on its own.
