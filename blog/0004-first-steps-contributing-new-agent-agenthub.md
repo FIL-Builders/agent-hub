@@ -51,24 +51,7 @@ You can open an issue to “claim” your agent idea, but this is optional.
 
 ---
 
-## **5. Add DESIGN\_NOTES.md**
-
-Every agent comes with a short `DESIGN_NOTES.md`.
-Here’s a template to get you started:
-
-```markdown
-# DESIGN NOTES: <Tool Name> Agent
-* **Goal / Scope:** What problem does this agent solve?
-* **Key Prompts & Reasoning:** Outline major prompt snippets and why they work.
-* **Edge‑case Handling:** How does the agent avoid common pitfalls?
-* **References:** Docs, blog posts, or code samples you consulted.
-```
-
-This is where you explain *why* you made certain choices and how future maintainers or contributors should think about evolving the agent.
-
----
-
-## **6. Open a Pull Request (PR)**
+## **5. Open a Pull Request (PR)**
 
 * Commit your changes and push to your fork.
 * Go to the main AgentHub repo and open a Pull Request from your branch.
@@ -82,7 +65,7 @@ You can open a **draft PR** if you’re still working—early feedback is encour
 
 ---
 
-## **7. Collaborate and Iterate**
+## **6. Collaborate and Iterate**
 
 * The AgentHub team aims for a review turnaround of **≤12 hours** during launch week, and &lt;24 hours after that.
 * Feedback is friendly, specific, and transparent.
@@ -90,7 +73,7 @@ You can open a **draft PR** if you’re still working—early feedback is encour
 
 ---
 
-## **8. Celebrate Your Contribution!**
+## **7. Celebrate Your Contribution!**
 
 * Once your PR is merged, add yourself to the `all-contributors` list—you’re part of AgentHub history.
 * You may be invited as a code owner for your agent or tool area as you continue to contribute.
@@ -101,7 +84,7 @@ You can open a **draft PR** if you’re still working—early feedback is encour
 ## **Quick Tips for First-Time Contributors**
 
 * **Iterate openly:** Your first draft doesn’t have to be perfect—collaboration is the heart of AgentHub.
-* **Be transparent:** Document your reasoning and references in `DESIGN_NOTES.md`.
+* **Be transparent:** Document your reasoning and references.
 * **Ask questions:** Open a GitHub Discussion, join Discord, or comment in your PR. The community is here to help.
 * **Be respectful:** See the [Code of Conduct](https://github.com/FIL-Builders/agent-hub/blob/main/CODE_OF_CONDUCT.md) for our commitment to a welcoming environment.
 
