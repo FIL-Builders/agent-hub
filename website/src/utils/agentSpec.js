@@ -111,16 +111,57 @@ function readBlockScalar(metaLines, key) {
 export function parseAgentMeta(specText = '') {
   try {
     const metaLines = extractMetaLines(specText);
-    if (!metaLines.length) {
-      return {};
+    if (metaLines.length) {
+      const specName = readScalar(metaLines, 'spec_name') || readScalar(metaLines, 'library_name');
+      const language = readScalar(metaLines, 'language').toLowerCase();
+      const purpose = readBlockScalar(metaLines, 'purpose');
+
+      return { specName, language, purpose };
     }
 
-    const specName = readScalar(metaLines, 'spec_name') || readScalar(metaLines, 'library_name');
-    const language = readScalar(metaLines, 'language').toLowerCase();
-    const purpose = readBlockScalar(metaLines, 'purpose');
+    const lines = specText.split('\n');
+    const title = lines[0]?.match(/^#\s+(.+)$/)?.[1]?.trim() || '';
+    const snapshotLines = getH2SectionLines(lines, 'Snapshot');
+    const purposeLines = getH2SectionLines(lines, 'Purpose');
+    const snapshotMap = new Map();
+
+    snapshotLines.forEach((line) => {
+      const match = line.match(/^-\s+([^:]+):\s+(.+)$/);
+      if (match) {
+        snapshotMap.set(match[1].trim(), match[2].trim());
+      }
+    });
+
+    const specName = snapshotMap.get('Spec name') || title;
+    const language = (snapshotMap.get('Primary language') || '').toLowerCase();
+    const purpose = purposeLines.join(' ').replace(/\s+/g, ' ').trim();
 
     return { specName, language, purpose };
   } catch {
     return {};
   }
+}
+
+function getH2SectionLines(lines, sectionTitle) {
+  const start = lines.findIndex((line) => line.trim() === `## ${sectionTitle}`);
+  if (start === -1) {
+    return [];
+  }
+
+  const collected = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    if (/^##\s+/.test(lines[i])) {
+      break;
+    }
+    collected.push(lines[i]);
+  }
+
+  while (collected.length && !collected[0].trim()) {
+    collected.shift();
+  }
+  while (collected.length && !collected[collected.length - 1].trim()) {
+    collected.pop();
+  }
+
+  return collected;
 }

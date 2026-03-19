@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import AgentCard from '@site/src/components/AgentCard';
 import agentSpecs from '@site/src/generated/agent-index.json';
+import distributionIndex from '@site/src/generated/distribution-index.json';
 import { parseAgentMeta, stripSpecExtension } from '@site/src/utils/agentSpec';
 
 export default function AgentsIndex() {
@@ -29,6 +30,13 @@ export default function AgentsIndex() {
   const [query, setQuery] = React.useState('');
   const [language, setLanguage] = React.useState('');
   const [metaByProject, setMetaByProject] = React.useState({});
+  const skillByProjectVersion = React.useMemo(() => {
+    const next = new Map();
+    distributionIndex.forEach((entry) => {
+      next.set(`${entry.project}:${entry.version}`, entry);
+    });
+    return next;
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -69,13 +77,15 @@ export default function AgentsIndex() {
   }, [metaByProject]);
 
   return (
-    <Layout title="All Agent Specs">
+    <Layout title="All Agent Packs">
       <main className="container agenthub-page-shell">
         <div className="agenthub-page-header cg-glass-panel cg-industrial-border">
           <p className="agenthub-page-header__label">Registry</p>
-          <h1 className="agenthub-page-header__title">All AgentHub Agent Specs</h1>
+          <h1 className="agenthub-page-header__title">All AgentHub Packs</h1>
           <p className="agenthub-page-header__copy">
-          Browse and open agent specifications. Use search and filters to find what you need.
+          Browse canonical Markdown packs and generated Claude-compatible skills.
+          Use search and filters to find the pack you need, then inspect whichever
+          distribution fits your workflow.
           </p>
         </div>
         <div className="agents-filter">
@@ -117,6 +127,7 @@ export default function AgentsIndex() {
                 latest={latestSpec}
                 older={sorted.slice(1)}
                 meta={meta}
+                latestSkill={skillByProjectVersion.get(`${project}:${stripSpecExtension(latestSpec.file)}`) || null}
               />
             );
           })}
