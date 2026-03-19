@@ -9,7 +9,7 @@ Use this skill when the task depends on TypeScript-specific typing or compiler b
 
 ## Purpose
 
-This pack teaches an agent to use TypeScript 5.9 effectively for generic API design, narrowing, inference, utility types, module-resolution debugging, and `tsconfig` decisions while keeping language semantics, compiler behavior, and runtime behavior clearly separated.
+This skill teaches an agent to use TypeScript 5.9 effectively for generic API design, narrowing, inference, utility types, module-resolution debugging, and `tsconfig` decisions while keeping language semantics, compiler behavior, and runtime behavior clearly separated.
 
 ## When to use this skill
 

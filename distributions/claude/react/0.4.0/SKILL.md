@@ -9,7 +9,7 @@ Use this skill when the task depends on React-specific component, hooks, renderi
 
 ## Purpose
 
-This pack teaches an agent to use React's core public API for component composition, state, effects, concurrency, and performance-sensitive rendering tasks in a React 18.3-era codebase.
+This skill teaches an agent to use React's core public API for component composition, state, effects, concurrency, and performance-sensitive rendering tasks in a React 18.3-era codebase.
 
 ## When to use this skill
 

@@ -358,6 +358,9 @@ function buildSkillMarkdown({ toolId, displayName, description, purpose, guiding
       `${displayName}-specific debugging and maintenance`,
       "version-sensitive framework or tool guidance"
     ];
+  const skillPurpose = purpose
+    .replace(/^This pack teaches an agent to\s*/i, "This skill teaches an agent to ")
+    .replace(/^This pack teaches\s*/i, "This skill teaches ");
 
   const parts = [
     "---",
@@ -371,7 +374,7 @@ function buildSkillMarkdown({ toolId, displayName, description, purpose, guiding
     "",
     "## Purpose",
     "",
-    purpose,
+    skillPurpose,
     "",
     "## When to use this skill",
     "",

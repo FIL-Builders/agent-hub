@@ -9,7 +9,7 @@ Use this skill when the task depends on Next.js framework behavior, especially A
 
 ## Purpose
 
-This pack teaches an agent to use Next.js 16 effectively across App Router, Pages Router compatibility, rendering boundaries, request helpers, caching and revalidation, and framework-specific routing behavior without collapsing those concerns into generic React advice.
+This skill teaches an agent to use Next.js 16 effectively across App Router, Pages Router compatibility, rendering boundaries, request helpers, caching and revalidation, and framework-specific routing behavior without collapsing those concerns into generic React advice.
 
 ## When to use this skill
 

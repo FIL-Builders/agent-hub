@@ -9,7 +9,7 @@ Use this skill when the task depends on Scaffold-ETH 2 project structure, the co
 
 ## Purpose
 
-This pack teaches an agent to use Scaffold-ETH 2 as a current, AI-ready dApp starter kit: run the normal three-terminal local loop, modify contracts and deploy scripts in the Hardhat workspace, rely on generated contract metadata instead of hand-editing addresses and ABIs, use the scaffold-specific frontend hooks and config surface rather than raw library snippets, and follow the repo’s built-in agent guidance and Context7 retrieval setup when working inside the repository.
+This skill teaches an agent to use Scaffold-ETH 2 as a current, AI-ready dApp starter kit: run the normal three-terminal local loop, modify contracts and deploy scripts in the Hardhat workspace, rely on generated contract metadata instead of hand-editing addresses and ABIs, use the scaffold-specific frontend hooks and config surface rather than raw library snippets, and follow the repo’s built-in agent guidance and Context7 retrieval setup when working inside the repository.
 
 ## When to use this skill
 
