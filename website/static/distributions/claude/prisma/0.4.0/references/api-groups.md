@@ -1,0 +1,857 @@
+# Prisma ORM API Groups
+
+### Schema Modeling
+
+**Exports**
+- datasource
+- generator
+- model
+- @id
+- @relation
+
+Core schema primitives that shape database mapping and generated client output.
+
+#### datasource
+**Kind**
+other
+
+**Summary**
+Declares the database provider and connection URL used by the Prisma schema.
+
+**Definition**
+Language: prisma
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+**Guidance**
+- Keep the provider aligned with the actual database you deploy against.
+- Treat the connection URL as environment-sensitive operational configuration.
+- Provider choice affects supported features, migration semantics, and runtime behavior.
+
+**Example**
+Language: prisma
+Description: Minimal PostgreSQL datasource configuration.
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+#### generator
+**Kind**
+other
+
+**Summary**
+Declares generated artifacts, typically the Prisma Client.
+
+**Definition**
+Language: prisma
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+```
+
+**Guidance**
+- Keep the generator output aligned with the runtime package your app imports.
+- Regenerate when schema changes affect client shape.
+- Treat generated artifacts as build outputs, not hand-edited source files.
+
+**Example**
+Language: prisma
+Description: Generate the standard Prisma Client.
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+```
+
+#### model
+**Kind**
+other
+
+**Summary**
+Defines a Prisma data model that maps to a database table-like entity and shapes the generated client API.
+
+**Definition**
+Language: prisma
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```prisma
+model User {
+  id    Int    @id @default(autoincrement())
+  email String @unique
+}
+```
+
+**Guidance**
+- Model names and field names shape generated delegate names and relation fields.
+- Treat field attributes as data-contract decisions, not just code-generation hints.
+- Keep relation and uniqueness design explicit because it affects both schema and query behavior.
+
+**Example**
+Language: prisma
+Description: Define a relational Post model linked to a User.
+
+```prisma
+model Post {
+  id       Int    @id @default(autoincrement())
+  title    String
+  authorId Int
+  author   User   @relation(fields: [authorId], references: [id])
+}
+```
+
+#### @id
+**Kind**
+other
+
+**Summary**
+Marks the primary identifier field for a model.
+
+**Definition**
+Language: prisma
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```prisma
+id Int @id @default(autoincrement())
+```
+
+**Guidance**
+- Use it for stable record identity that the generated client and relations can rely on.
+- Choose the id strategy deliberately because changing it later is costly.
+- Keep the field type aligned with how identifiers are created and used operationally.
+
+**Example**
+Language: prisma
+Description: UUID primary key for globally distributed identity.
+
+```prisma
+id String @id @default(uuid())
+```
+
+#### @relation
+**Kind**
+other
+
+**Summary**
+Declares relation metadata between models, including referenced fields and owning foreign-key fields.
+
+**Definition**
+Language: prisma
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```prisma
+author User @relation(fields: [authorId], references: [id])
+```
+
+**Guidance**
+- Use it when the relation needs explicit ownership or foreign-key field mapping.
+- Keep relation field names and scalar foreign-key fields readable together.
+- Remember that relation shape changes affect generated nested query behavior.
+
+**Example**
+Language: prisma
+Description: Explicit one-to-many relation from Post to User.
+
+```prisma
+model Post {
+  id       Int    @id @default(autoincrement())
+  authorId Int
+  author   User   @relation(fields: [authorId], references: [id])
+}
+```
+
+### Generated Client Lifecycle
+
+**Exports**
+- PrismaClient
+- $connect
+- $disconnect
+- select
+- include
+
+Core generated-client primitives for lifecycle and result shape control.
+
+#### PrismaClient
+**Kind**
+class
+
+**Summary**
+Generated client entrypoint used to connect to the database and run model queries.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+```
+
+**Guidance**
+- Create the client intentionally and manage its lifecycle for the runtime environment.
+- Reuse a long-lived client in ordinary server processes instead of instantiating one per query.
+- Keep the generated client in sync with the schema and generation step.
+
+**Example**
+Language: typescript
+Description: Create one Prisma client and connect explicitly.
+
+```ts
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
+await prisma.$connect();
+```
+
+#### $connect
+**Kind**
+function
+
+**Summary**
+Establishes the Prisma Client connection to the configured database.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration
+
+```ts
+await prisma.$connect();
+```
+
+**Guidance**
+- Use it when explicit connection control matters for startup, testing, or scripts.
+- Keep lifecycle predictable in short-lived scripts and long-lived services.
+- Do not over-call it in hot paths where a reused client already manages connectivity.
+
+**Example**
+Language: typescript
+Description: Connect during service startup.
+
+```ts
+const prisma = new PrismaClient();
+await prisma.$connect();
+```
+
+#### $disconnect
+**Kind**
+function
+
+**Summary**
+Closes Prisma Client connections and releases associated resources.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/setup-and-configuration
+
+```ts
+await prisma.$disconnect();
+```
+
+**Guidance**
+- Use it in scripts, tests, and controlled shutdown paths.
+- Keep shutdown explicit for short-lived jobs so the process can exit cleanly.
+- Do not sprinkle disconnect calls across request handlers.
+
+**Example**
+Language: typescript
+Description: Clean up the client in a script.
+
+```ts
+const prisma = new PrismaClient();
+try {
+  await prisma.user.findMany();
+} finally {
+  await prisma.$disconnect();
+}
+```
+
+#### select
+**Kind**
+other
+
+**Summary**
+Shapes query results by selecting only specific fields from the model result.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+const user = await prisma.user.findUnique({
+  where: { id: 1 },
+  select: { id: true, email: true },
+});
+```
+
+**Guidance**
+- Use `select` to keep result shape and transfer cost explicit.
+- Prefer it when the caller needs only a narrow subset of fields.
+- Do not mix broad default fetching with downstream field-picking by habit.
+
+**Example**
+Language: typescript
+Description: Fetch a minimal public user shape.
+
+```ts
+const user = await prisma.user.findUnique({
+  where: { id: 1 },
+  select: { id: true, email: true, name: true },
+});
+```
+
+#### include
+**Kind**
+other
+
+**Summary**
+Extends a query result with related records or relation counts.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+const post = await prisma.post.findUnique({
+  where: { id: 1 },
+  include: { author: true },
+});
+```
+
+**Guidance**
+- Use `include` when the caller truly needs related records in the same query shape.
+- Keep relation loading explicit to avoid accidental over-fetching.
+- Treat nested relation loading as query-shape design, not a free convenience.
+
+**Example**
+Language: typescript
+Description: Load a post together with its author and comments.
+
+```ts
+const post = await prisma.post.findUnique({
+  where: { id: 1 },
+  include: { author: true, comments: true },
+});
+```
+
+### CRUD And Relation Queries
+
+**Exports**
+- findMany
+- create
+- update
+- delete
+- upsert
+
+Core generated-client query patterns for reading and mutating data.
+
+#### findMany
+**Kind**
+function
+
+**Summary**
+Queries multiple records for a model with filtering, ordering, pagination, and projection options.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+const users = await prisma.user.findMany({
+  where: { email: { contains: "@example.com" } },
+});
+```
+
+**Guidance**
+- Combine filtering, ordering, and pagination intentionally.
+- Pair it with `select` or `include` so result shape stays explicit.
+- Remember that model delegates are generated from the schema, not hard-coded global APIs.
+
+**Example**
+Language: typescript
+Description: Fetch the newest published posts in pages.
+
+```ts
+const posts = await prisma.post.findMany({
+  where: { published: true },
+  orderBy: { id: "desc" },
+  take: 20,
+});
+```
+
+#### create
+**Kind**
+function
+
+**Summary**
+Creates a new record through the generated client for a specific model.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+const user = await prisma.user.create({
+  data: { email: "ada@example.com", name: "Ada" },
+});
+```
+
+**Guidance**
+- Keep `data` aligned with schema constraints and relation requirements.
+- Use nested writes deliberately when multiple related records belong in one mutation.
+- Validation and constraint failures still depend on real database state.
+
+**Example**
+Language: typescript
+Description: Create a user and a related profile in one mutation.
+
+```ts
+const user = await prisma.user.create({
+  data: {
+    email: "ada@example.com",
+    profile: { create: { bio: "Mathematician" } },
+  },
+});
+```
+
+#### update
+**Kind**
+function
+
+**Summary**
+Updates one existing record, usually identified by a unique selector.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+const user = await prisma.user.update({
+  where: { id: 1 },
+  data: { name: "Grace" },
+});
+```
+
+**Guidance**
+- Use unique selectors in `where` and keep partial updates intentional.
+- Treat multi-step update workflows as transaction candidates when correctness depends on atomicity.
+- Distinguish `update` from `updateMany` and relation nested updates.
+
+**Example**
+Language: typescript
+Description: Mark an order as paid.
+
+```ts
+const order = await prisma.order.update({
+  where: { id: 42 },
+  data: { status: "PAID" },
+});
+```
+
+#### delete
+**Kind**
+function
+
+**Summary**
+Deletes one record identified by a unique selector.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+await prisma.user.delete({
+  where: { id: 1 },
+});
+```
+
+**Guidance**
+- Use it only when the schema and application workflow really allow destructive deletion.
+- Consider referential and business consequences before using it in bulk workflows.
+- Keep transaction boundaries explicit when deletion is coupled to other operations.
+
+**Example**
+Language: typescript
+Description: Delete an expired session by unique id.
+
+```ts
+await prisma.session.delete({
+  where: { id: "sess_123" },
+});
+```
+
+#### upsert
+**Kind**
+function
+
+**Summary**
+Creates a record if it does not exist or updates it if it does.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/crud
+
+```ts
+await prisma.user.upsert({
+  where: { email: "ada@example.com" },
+  create: { email: "ada@example.com" },
+  update: { name: "Ada" },
+});
+```
+
+**Guidance**
+- Use it when the workflow truly centers on a unique identity and dual create-or-update behavior.
+- Keep `where`, `create`, and `update` aligned around the same invariants.
+- Remember that upsert is not a substitute for broader transactional reasoning.
+
+**Example**
+Language: typescript
+Description: Ensure a feature flag record exists for a tenant.
+
+```ts
+await prisma.featureFlag.upsert({
+  where: { tenantId_key: { tenantId: "t1", key: "beta-ui" } },
+  create: { tenantId: "t1", key: "beta-ui", enabled: true },
+  update: { enabled: true },
+});
+```
+
+### Transactions And Raw SQL
+
+**Exports**
+- $transaction
+- $queryRaw
+- $executeRaw
+- interactive transactions
+- TypedSQL
+
+Transaction and escape-hatch primitives for cases that need stronger control.
+
+#### $transaction
+**Kind**
+function
+
+**Summary**
+Runs multiple Prisma operations inside one transaction boundary.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/transactions
+
+```ts
+await prisma.$transaction([
+  prisma.user.create({ data: { email: "a@example.com" } }),
+  prisma.profile.create({ data: { bio: "hello" } }),
+]);
+```
+
+**Guidance**
+- Use it when operations must succeed or fail together.
+- Distinguish batched array form from interactive callback form.
+- Keep database contention and lock duration in mind for interactive transactions.
+
+**Example**
+Language: typescript
+Description: Create a user and audit record atomically.
+
+```ts
+await prisma.$transaction(async (tx) => {
+  const user = await tx.user.create({ data: { email: "a@example.com" } });
+  await tx.auditLog.create({ data: { userId: user.id, action: "CREATE" } });
+});
+```
+
+#### $queryRaw
+**Kind**
+function
+
+**Summary**
+Executes a raw query and returns rows when Prisma Client cannot express the needed behavior directly.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries
+
+```ts
+const rows = await prisma.$queryRaw`SELECT id, email FROM "User"`;
+```
+
+**Guidance**
+- Use it as an explicit escape hatch, not a default query style.
+- Keep parameterization safe and deliberate.
+- Raw SQL changes portability, typing, and abstraction guarantees.
+
+**Example**
+Language: typescript
+Description: Run an aggregate query Prisma Client cannot express cleanly.
+
+```ts
+const totals = await prisma.$queryRaw`
+  SELECT status, COUNT(*)::int AS count
+  FROM "Order"
+  GROUP BY status
+`;
+```
+
+#### $executeRaw
+**Kind**
+function
+
+**Summary**
+Executes a raw command and returns the affected-row count or command result metadata.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries
+
+```ts
+const count = await prisma.$executeRaw`UPDATE "User" SET active = false`;
+```
+
+**Guidance**
+- Use it for raw write operations when Prisma Client cannot express the needed command.
+- Keep it separate from row-returning query expectations.
+- Review operational and SQL-injection implications carefully.
+
+**Example**
+Language: typescript
+Description: Archive old records with a raw update.
+
+```ts
+const archived = await prisma.$executeRaw`
+  UPDATE "Session"
+  SET archived = true
+  WHERE expires_at < now()
+`;
+```
+
+#### interactive transactions
+**Kind**
+other
+
+**Summary**
+Transaction callback form that provides a transactional client for ordered multi-step logic.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/queries/transactions
+
+```ts
+await prisma.$transaction(async (tx) => {
+  // transactional work here
+});
+```
+
+**Guidance**
+- Use it when later operations depend on earlier results inside one transaction.
+- Keep the callback focused and short-lived to reduce contention.
+- Avoid long external calls inside the transaction callback.
+
+**Example**
+Language: typescript
+Description: Reserve inventory and create an order in one interactive transaction.
+
+```ts
+await prisma.$transaction(async (tx) => {
+  const item = await tx.inventory.update({
+    where: { sku: "sku_1" },
+    data: { available: { decrement: 1 } },
+  });
+
+  await tx.order.create({
+    data: { sku: item.sku, quantity: 1 },
+  });
+});
+```
+
+#### TypedSQL
+**Kind**
+other
+
+**Summary**
+Prisma's typed SQL workflow for selected raw-query use cases.
+
+**Definition**
+Language: typescript
+Source: https://www.prisma.io/docs/orm/prisma-client/using-raw-sql/raw-queries
+
+```ts
+// TypedSQL is part of Prisma's raw SQL guidance in the Prisma 7 docs.
+```
+
+**Guidance**
+- Use it when the workflow explicitly benefits from Prisma's typed raw SQL support.
+- Keep it as an advanced boundary, not a default replacement for normal client queries.
+- Explain the difference between typed raw SQL and standard generated-client queries.
+
+**Example**
+Language: typescript
+Description: Keep raw SQL explicit and isolated behind one module boundary.
+
+```ts
+// Use TypedSQL only in modules where plain Prisma Client queries are not enough.
+```
+
+### Migration And Deployment Workflows
+
+**Exports**
+- prisma migrate dev
+- prisma migrate deploy
+- prisma db push
+- prisma generate
+- prisma db seed
+
+Core Prisma workflows for schema evolution and generated artifacts.
+
+#### prisma migrate dev
+**Kind**
+other
+
+**Summary**
+Development-time workflow that creates and applies a migration and updates generated artifacts.
+
+**Definition**
+Language: bash
+Source: https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production
+
+```bash
+npx prisma migrate dev
+```
+
+**Guidance**
+- Use this in development when iterating on schema changes.
+- Keep created migrations under version control.
+- Do not substitute it for production migration application.
+
+**Example**
+Language: bash
+Description: Create a named migration while iterating on a schema change.
+
+```bash
+npx prisma migrate dev --name add-order-status
+```
+
+#### prisma migrate deploy
+**Kind**
+other
+
+**Summary**
+Applies existing migration files in deployment environments.
+
+**Definition**
+Language: bash
+Source: https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production
+
+```bash
+npx prisma migrate deploy
+```
+
+**Guidance**
+- Use this in production or CI/CD deployment steps.
+- Expect it to apply committed migrations, not generate new ones.
+- Sequence deployment so app code and schema changes stay compatible.
+
+**Example**
+Language: bash
+Description: Apply pending migrations during deployment.
+
+```bash
+npx prisma migrate deploy
+```
+
+#### prisma db push
+**Kind**
+other
+
+**Summary**
+Synchronizes the database schema without creating managed migration files.
+
+**Definition**
+Language: bash
+Source: https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production
+
+```bash
+npx prisma db push
+```
+
+**Guidance**
+- Use this only when the workflow truly fits direct schema synchronization.
+- Do not treat it as equivalent to migration history management.
+- Explain the tradeoff explicitly before using it in production-like workflows.
+
+**Example**
+Language: bash
+Description: Prototype a schema quickly in a local environment.
+
+```bash
+npx prisma db push
+```
+
+#### prisma generate
+**Kind**
+other
+
+**Summary**
+Generates Prisma Client and related artifacts from the current schema.
+
+**Definition**
+Language: bash
+Source: https://www.prisma.io/docs/orm/prisma-schema/overview
+
+```bash
+npx prisma generate
+```
+
+**Guidance**
+- Run it after schema changes when the generated client must be refreshed.
+- Keep generated-client drift in mind when debugging type mismatches.
+- Treat generated code as build output derived from the schema.
+
+**Example**
+Language: bash
+Description: Refresh Prisma Client after changing model fields.
+
+```bash
+npx prisma generate
+```
+
+#### prisma db seed
+**Kind**
+other
+
+**Summary**
+Runs the configured seed workflow to populate development or test data.
+
+**Definition**
+Language: bash
+Source: https://www.prisma.io/docs/orm/prisma-migrate/workflows/seeding
+
+```bash
+npx prisma db seed
+```
+
+**Guidance**
+- Use it for controlled bootstrap data, not ad hoc production repair work.
+- Keep seeds idempotent enough for the target workflow when possible.
+- Distinguish seeding from migrations; they solve different problems.
+
+**Example**
+Language: bash
+Description: Populate local development data after migrations.
+
+```bash
+npx prisma db seed
+```

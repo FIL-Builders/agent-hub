@@ -1,0 +1,17 @@
+{
+  "tool_id": "fil-frame",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/fil-frame/0.4.0.md",
+  "display_name": "FIL-Frame",
+  "description": "Use for FIL-Frame tasks. Helps with fIL-Frame at a senior-developer level: deploy and verify the Filecoin deal contracts, prepare upload metadata and CommP-derived deal parameters correctly, bridge Next.js form state into the onchain `DealRequest` shape, and keep storage-onramp behavior separate from actual Filecoin deal publication.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

@@ -1,0 +1,1084 @@
+# Pyth API Groups
+
+### Hermes Price Delivery
+
+**Exports**
+- HermesClient
+- HermesClient.getPriceFeeds
+- HermesClient.getLatestPriceUpdates
+- HermesClient.getPriceUpdatesAtTimestamp
+- HermesClient.getPriceUpdatesStream
+
+Hermes is the ordinary off-chain entry point for discovering Pyth feeds and fetching serialized update payloads before downstream verification or consumption.
+
+#### HermesClient
+**Kind**
+class
+
+**Summary**
+Client for Hermes HTTP and SSE endpoints that fetches feed metadata and serialized price updates.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/hermes-client@3.1.0:dist/cjs/hermes-client.d.ts
+
+```ts
+export declare class HermesClient {
+    constructor(endpoint: string, config?: HermesClientConfig);
+    getPriceFeeds({ fetchOptions, ...options }?: {
+        query?: string;
+        assetType?: AssetType;
+        fetchOptions?: RequestInit;
+    }): Promise<PriceFeedMetadata[]>;
+    getLatestPriceUpdates(ids: HexString[], options?: {
+        encoding?: EncodingType;
+        parsed?: boolean;
+        ignoreInvalidPriceIds?: boolean;
+    }, fetchOptions?: RequestInit): Promise<PriceUpdate>;
+    getPriceUpdatesAtTimestamp(publishTime: UnixTimestamp, ids: HexString[], options?: {
+        encoding?: EncodingType;
+        parsed?: boolean;
+        ignoreInvalidPriceIds?: boolean;
+    }, fetchOptions?: RequestInit): Promise<PriceUpdate>;
+    getPriceUpdatesStream(ids: HexString[], options?: {
+        encoding?: EncodingType;
+        parsed?: boolean;
+        allowUnordered?: boolean;
+        benchmarksOnly?: boolean;
+        ignoreInvalidPriceIds?: boolean;
+    }): Promise<EventSource>;
+}
+```
+
+**Guidance**
+- Use `HermesClient` as the default off-chain Pyth integration surface for price feeds.
+- Prefer private or provider-backed Hermes endpoints for reliability-sensitive systems; the package README explicitly recommends this over the free public endpoint.
+- Keep the returned update payloads separate from any later on-chain verification step.
+- Decide whether you need metadata discovery, latest updates, time-bounded updates, or streaming updates before choosing a specific method.
+
+**Example**
+Language: typescript
+Description: Create a Hermes client and fetch the latest hex-encoded updates for one feed.
+
+```ts
+import { HermesClient } from "@pythnetwork/hermes-client";
+
+const hermes = new HermesClient("https://hermes.pyth.network", {
+  timeout: 10_000,
+});
+
+const updates = await hermes.getLatestPriceUpdates(
+  ["0xff61491a931112ddf1bd8147cd1b641375f79f5825126d665480874634fd0ace"],
+  { encoding: "hex" },
+);
+
+console.log(updates);
+```
+
+#### HermesClient.getPriceFeeds
+**Kind**
+function
+
+**Summary**
+Fetches available feed metadata with optional text and asset-type filters.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/hermes-client@3.1.0:dist/cjs/hermes-client.d.ts
+
+```ts
+getPriceFeeds({ fetchOptions, ...options }?: {
+    query?: string;
+    assetType?: AssetType;
+    fetchOptions?: RequestInit;
+}): Promise<PriceFeedMetadata[]>;
+```
+
+**Guidance**
+- Use this for feed discovery, symbol search, and UI selection flows before requesting updates by feed ID.
+- Do not confuse metadata discovery with update delivery; this method returns descriptive feed metadata, not verified price values.
+- Keep feed IDs stable once selected; downstream retrieval flows generally operate on IDs rather than text search.
+
+**Example**
+Language: typescript
+Description: Discover crypto feeds matching a search term.
+
+```ts
+const feeds = await hermes.getPriceFeeds({
+  query: "btc",
+  assetType: "crypto",
+});
+
+console.log(feeds.map((feed) => feed.id));
+```
+
+#### HermesClient.getLatestPriceUpdates
+**Kind**
+function
+
+**Summary**
+Fetches the latest update payloads for a set of price feed IDs.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/hermes-client@3.1.0:dist/cjs/hermes-client.d.ts
+
+```ts
+getLatestPriceUpdates(ids: HexString[], options?: {
+    encoding?: EncodingType;
+    parsed?: boolean;
+    ignoreInvalidPriceIds?: boolean;
+}, fetchOptions?: RequestInit): Promise<PriceUpdate>;
+```
+
+**Guidance**
+- This is the ordinary transport path for applications that later submit updates to `IPyth` on-chain.
+- Choose encoding deliberately because downstream consumers may expect `hex` or `base64`.
+- `parsed: true` is useful for inspection or debugging, but it does not replace on-chain verification where verification is required.
+- Keep invalid feed handling explicit rather than silently dropping bad IDs unless that behavior is intentionally desired.
+
+**Example**
+Language: typescript
+Description: Fetch latest updates for two feeds and keep the raw update payloads.
+
+```ts
+const latest = await hermes.getLatestPriceUpdates(
+  [btcPriceId, ethPriceId],
+  { encoding: "hex", parsed: false },
+);
+
+console.log(latest.binary.data.length);
+```
+
+#### HermesClient.getPriceUpdatesAtTimestamp
+**Kind**
+function
+
+**Summary**
+Fetches update payloads for a given set of feed IDs at a specific publish timestamp.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/hermes-client@3.1.0:dist/cjs/hermes-client.d.ts
+
+```ts
+getPriceUpdatesAtTimestamp(publishTime: UnixTimestamp, ids: HexString[], options?: {
+    encoding?: EncodingType;
+    parsed?: boolean;
+    ignoreInvalidPriceIds?: boolean;
+}, fetchOptions?: RequestInit): Promise<PriceUpdate>;
+```
+
+**Guidance**
+- Use this when a workflow needs updates around a specific publish time instead of "latest."
+- Pair this with on-chain parsing methods such as `parsePriceFeedUpdates` when the contract logic is time-windowed rather than simply latest-price oriented.
+- Keep the meaning of `publishTime` explicit in seconds and avoid mixing it with milliseconds.
+
+**Example**
+Language: typescript
+Description: Fetch timestamp-scoped updates for backtesting or fixed-time verification.
+
+```ts
+const atTime = await hermes.getPriceUpdatesAtTimestamp(
+  1_741_000_000,
+  [btcPriceId],
+  { encoding: "hex", parsed: true },
+);
+
+console.log(atTime.parsed);
+```
+
+#### HermesClient.getPriceUpdatesStream
+**Kind**
+function
+
+**Summary**
+Opens an SSE stream for ongoing price updates for the selected feed IDs.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/hermes-client@3.1.0:dist/cjs/hermes-client.d.ts
+
+```ts
+getPriceUpdatesStream(ids: HexString[], options?: {
+    encoding?: EncodingType;
+    parsed?: boolean;
+    allowUnordered?: boolean;
+    benchmarksOnly?: boolean;
+    ignoreInvalidPriceIds?: boolean;
+}): Promise<EventSource>;
+```
+
+**Guidance**
+- Use the stream when the application needs ongoing updates rather than polling.
+- Treat stream lifecycle management as part of the application design: handle `onerror`, close streams, and reconnect intentionally.
+- `allowUnordered` and `benchmarksOnly` change semantics; do not enable them casually in correctness-sensitive systems.
+
+**Example**
+Language: typescript
+Description: Subscribe to live updates for one feed with explicit cleanup.
+
+```ts
+const stream = await hermes.getPriceUpdatesStream([btcPriceId], {
+  encoding: "hex",
+  parsed: true,
+});
+
+stream.onmessage = (event) => {
+  console.log(event.data);
+};
+
+stream.onerror = () => {
+  stream.close();
+};
+```
+
+### EVM Price Verification and Consumption
+
+**Exports**
+- IPyth.getUpdateFee
+- IPyth.updatePriceFeeds
+- IPyth.updatePriceFeedsIfNecessary
+- IPyth.getPriceNoOlderThan
+- IPyth.parsePriceFeedUpdates
+
+These methods cover the ordinary EVM path: obtain update payloads off-chain, pay the required fee on-chain, then read or parse prices with explicit freshness assumptions.
+
+#### IPyth.getUpdateFee
+**Kind**
+function
+
+**Summary**
+Returns the required wei fee for submitting a specific batch of price update payloads.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/pyth-sdk-solidity@4.3.1:IPyth.sol
+
+```solidity
+function getUpdateFee(
+    bytes[] calldata updateData
+) external view returns (uint feeAmount);
+```
+
+**Guidance**
+- Call this with the exact `updateData` batch you plan to submit, not a different or earlier payload set.
+- Treat the fee as part of the update-submission transaction construction, not as static configuration.
+- Recompute when batching, splitting, or replacing updates.
+
+**Example**
+Language: solidity
+Description: Quote the fee before submitting a batch of Hermes-delivered updates.
+
+```solidity
+uint fee = pyth.getUpdateFee(priceUpdateData);
+```
+
+#### IPyth.updatePriceFeeds
+**Kind**
+function
+
+**Summary**
+Verifies and stores newer updates from submitted Pyth update payloads.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/pyth-sdk-solidity@4.3.1:IPyth.sol
+
+```solidity
+function updatePriceFeeds(bytes[] calldata updateData) external payable;
+```
+
+**Guidance**
+- Submit the exact fee from `getUpdateFee(updateData)` as `msg.value`.
+- This stores fresher data on-chain but does not by itself prove that a later read is fresh enough for your application; the read path must still enforce freshness.
+- Keep transport retrieval and on-chain update submission separated in code so fee calculation and payload provenance stay explicit.
+
+**Example**
+Language: solidity
+Description: Pay the required update fee and store newer prices on-chain.
+
+```solidity
+uint fee = pyth.getUpdateFee(priceUpdateData);
+pyth.updatePriceFeeds{ value: fee }(priceUpdateData);
+```
+
+#### IPyth.updatePriceFeedsIfNecessary
+**Kind**
+function
+
+**Summary**
+Rejects fast when the target feeds are already up to date enough relative to the caller's known publish times.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/pyth-sdk-solidity@4.3.1:IPyth.sol
+
+```solidity
+function updatePriceFeedsIfNecessary(
+    bytes[] calldata updateData,
+    bytes32[] calldata priceIds,
+    uint64[] calldata publishTimes
+) external payable;
+```
+
+**Guidance**
+- Use this when the caller already knows the relevant publish times and wants to avoid unnecessary storage updates.
+- The correctness of the early-reject behavior depends on the caller supplying aligned `priceIds` and `publishTimes`.
+- Do not use it as a replacement for understanding the actual freshness requirements of the downstream business logic.
+
+**Example**
+Language: solidity
+Description: Skip unnecessary update storage when the target feeds are already current enough.
+
+```solidity
+uint fee = pyth.getUpdateFee(priceUpdateData);
+pyth.updatePriceFeedsIfNecessary{ value: fee }(
+  priceUpdateData,
+  priceIds,
+  publishTimes
+);
+```
+
+#### IPyth.getPriceNoOlderThan
+**Kind**
+function
+
+**Summary**
+Returns a price only if it is no older than the supplied age threshold.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/pyth-sdk-solidity@4.3.1:IPyth.sol
+
+```solidity
+function getPriceNoOlderThan(
+    bytes32 id,
+    uint age
+) external view returns (PythStructs.Price memory price);
+```
+
+**Guidance**
+- Prefer this over `getPriceUnsafe` for ordinary application logic because it makes the freshness contract explicit.
+- The right `age` value is application-specific; choose it from business logic rather than copying a random constant.
+- Keep price exponent and confidence handling explicit in downstream math.
+
+**Example**
+Language: solidity
+Description: Read a recent BTC price after updates have been submitted.
+
+```solidity
+PythStructs.Price memory price = pyth.getPriceNoOlderThan(btcPriceId, 30);
+```
+
+#### IPyth.parsePriceFeedUpdates
+**Kind**
+function
+
+**Summary**
+Parses submitted update payloads for fixed publish-time windows without requiring them to become the latest stored prices.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/pyth-sdk-solidity@4.3.1:IPyth.sol
+
+```solidity
+function parsePriceFeedUpdates(
+    bytes[] calldata updateData,
+    bytes32[] calldata priceIds,
+    uint64 minPublishTime,
+    uint64 maxPublishTime
+) external payable returns (PythStructs.PriceFeed[] memory priceFeeds);
+```
+
+**Guidance**
+- Use this for time-windowed or fixed-time logic instead of "latest value" logic.
+- It still requires the update fee, so fee handling remains part of the call path.
+- Keep the publish-time window explicit and aligned with the business event you are proving or settling against.
+
+**Example**
+Language: solidity
+Description: Parse a price feed update bounded to a time window.
+
+```solidity
+uint fee = pyth.getUpdateFee(priceUpdateData);
+PythStructs.PriceFeed[] memory feeds = pyth.parsePriceFeedUpdates{ value: fee }(
+  priceUpdateData,
+  priceIds,
+  minPublishTime,
+  maxPublishTime
+);
+```
+
+### Pythnet Low-Level JavaScript Client
+
+**Exports**
+- PythConnection
+- PythHttpClient
+- getPythProgramKeyForCluster
+
+This lower-level package reads Pythnet accounts directly through Solana web3 connections. Keep it separate from the Hermes-first ordinary integration path.
+
+#### PythConnection
+**Kind**
+class
+
+**Summary**
+Callback-driven streaming reader for Pythnet price-account changes over a Solana web3 connection.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/client@2.22.1:lib/PythConnection.d.ts
+
+```ts
+export declare class PythConnection {
+    constructor(connection: Connection, pythProgramKey: PublicKey, commitment?: Commitment, feedIds?: PublicKey[]);
+    start(): Promise<void>;
+    onPriceChange(callback: PythPriceCallback): void;
+    onPriceChangeVerbose(callback: PythVerbosePriceCallback): void;
+    stop(): Promise<void>;
+}
+```
+
+**Guidance**
+- Use this only when direct Pythnet or Solana account access is genuinely required.
+- The package README explicitly recommends Hermes for most use cases, so treat `PythConnection` as a lower-level surface.
+- Register callbacks before `start()` and clean up intentionally with `stop()`.
+
+**Example**
+Language: typescript
+Description: Stream price-account changes from Pythnet directly.
+
+```ts
+import { Connection } from "@solana/web3.js";
+import { PythConnection, getPythProgramKeyForCluster } from "@pythnetwork/client";
+
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+const pyth = new PythConnection(connection, getPythProgramKeyForCluster("pythnet"));
+
+pyth.onPriceChange((product, price) => {
+  console.log(product.symbol, price.price);
+});
+
+await pyth.start();
+```
+
+#### PythHttpClient
+**Kind**
+class
+
+**Summary**
+Fetches current Pythnet data through a Solana connection in one-shot request flows.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/client@2.22.1:lib/PythHttpClient.d.ts
+
+```ts
+export declare class PythHttpClient {
+    constructor(connection: Connection, pythProgramKey: PublicKey, commitment?: Commitment);
+    getData(): Promise<PythHttpClientResult>;
+    getAssetPricesFromAccounts(priceAccounts: PublicKey[]): Promise<PriceData[]>;
+}
+```
+
+**Guidance**
+- Use `getData()` sparingly because it fetches broad product and price-account data.
+- Prefer targeted account reads or Hermes when the application does not need full Pythnet account traversal.
+- Keep cluster and program-key alignment explicit; mismatches here produce confusing failures.
+
+**Example**
+Language: typescript
+Description: Fetch the current set of symbols and prices from Pythnet.
+
+```ts
+import { Connection } from "@solana/web3.js";
+import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
+
+const connection = new Connection("https://api.mainnet-beta.solana.com");
+const client = new PythHttpClient(connection, getPythProgramKeyForCluster("pythnet"));
+const data = await client.getData();
+
+console.log(data.symbols.length);
+```
+
+#### getPythProgramKeyForCluster
+**Kind**
+function
+
+**Summary**
+Returns the Pyth program public key for a named cluster.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/client@2.22.1:lib/cluster.d.ts
+
+```ts
+export declare function getPythProgramKeyForCluster(cluster: PythCluster): PublicKey;
+```
+
+**Guidance**
+- Use this instead of hardcoding the Pyth program key when you are already working within the supported cluster names.
+- Keep the chosen cluster explicit in application configuration; the resulting program key changes with it.
+- Pair it with the matching RPC endpoint rather than mixing clusters and URLs casually.
+
+**Example**
+Language: typescript
+Description: Resolve the program key before constructing a lower-level Pyth client.
+
+```ts
+import { getPythProgramKeyForCluster } from "@pythnetwork/client";
+
+const programKey = getPythProgramKeyForCluster("pythnet");
+console.log(programKey.toBase58());
+```
+
+### Entropy Randomness
+
+**Exports**
+- IEntropyV2.requestV2
+- IEntropyV2.getFeeV2
+- IEntropyV2.getProviderInfoV2
+- IEntropyConsumer.entropyCallback
+
+Entropy is a separate randomness surface. Do not flatten it into ordinary price-feed logic.
+
+#### IEntropyV2.requestV2
+**Kind**
+function
+
+**Summary**
+Requests randomness through one of the v2 request variants and returns a sequence number for later correlation.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/entropy-sdk-solidity@2.2.1:IEntropyV2.sol
+
+```solidity
+function requestV2() external payable returns (uint64 assignedSequenceNumber);
+function requestV2(uint32 gasLimit) external payable returns (uint64 assignedSequenceNumber);
+function requestV2(address provider, uint32 gasLimit) external payable returns (uint64 assignedSequenceNumber);
+function requestV2(address provider, bytes32 userRandomNumber, uint32 gasLimit) external payable returns (uint64 assignedSequenceNumber);
+```
+
+**Guidance**
+- Choose the overload deliberately based on whether you need explicit provider selection, explicit callback gas, or explicit user-provided randomness.
+- Always compute the fee for the exact request shape before calling the method.
+- Persist the returned sequence number; it is the primary join key for callbacks and request inspection.
+- When using the overload with `userRandomNumber`, generate strong randomness off-chain and never reuse it across requests.
+
+**Example**
+Language: solidity
+Description: Request randomness with an explicit provider, explicit user randomness, and explicit callback gas.
+
+```solidity
+bytes32 userRandomNumber = keccak256(
+  abi.encodePacked(msg.sender, block.prevrandao, nonce)
+);
+uint32 gasLimit = 120_000;
+uint128 fee = entropy.getFeeV2(provider, gasLimit);
+uint64 sequence = entropy.requestV2{ value: fee }(
+  provider,
+  userRandomNumber,
+  gasLimit
+);
+```
+
+#### IEntropyV2.getFeeV2
+**Kind**
+function
+
+**Summary**
+Quotes the wei fee required for a randomness request under the chosen provider and gas configuration.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/entropy-sdk-solidity@2.2.1:IEntropyV2.sol
+
+```solidity
+function getFeeV2() external view returns (uint128 feeAmount);
+function getFeeV2(uint32 gasLimit) external view returns (uint128 feeAmount);
+function getFeeV2(address provider, uint32 gasLimit) external view returns (uint128 feeAmount);
+```
+
+**Guidance**
+- Match the overload to the request variant you will actually call.
+- Recompute the fee before each request instead of caching it as a constant.
+- If you change gas limit or provider, recompute the fee instead of reusing a previous quote.
+
+**Example**
+Language: solidity
+Description: Quote the exact fee for a custom-gas request.
+
+```solidity
+uint32 gasLimit = 120_000;
+uint128 fee = entropy.getFeeV2(gasLimit);
+```
+
+#### IEntropyV2.getProviderInfoV2
+**Kind**
+function
+
+**Summary**
+Returns provider configuration and operational information for a specific Entropy provider.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/entropy-sdk-solidity@2.2.1:IEntropyV2.sol
+
+```solidity
+function getProviderInfoV2(
+    address provider
+) external view returns (EntropyStructsV2.ProviderInfo memory info);
+```
+
+**Guidance**
+- Use this when provider-specific fee or gas behavior matters to the application.
+- Keep provider choice chain-specific; a provider address that exists on one deployment is not automatically valid on another.
+- Treat provider metadata as part of the request-construction path, not just as documentation.
+
+**Example**
+Language: solidity
+Description: Inspect provider information before constructing a request.
+
+```solidity
+EntropyStructsV2.ProviderInfo memory info = entropy.getProviderInfoV2(provider);
+```
+
+#### IEntropyConsumer.entropyCallback
+**Kind**
+hook
+
+**Summary**
+Internal consumer hook that receives the final random number after the Entropy contract validates the external callback entrypoint.
+
+**Definition**
+Language: solidity
+Source: npm:@pythnetwork/entropy-sdk-solidity@2.2.1:IEntropyConsumer.sol
+
+```solidity
+function entropyCallback(
+    uint64 sequence,
+    address provider,
+    bytes32 randomNumber
+) internal virtual;
+```
+
+**Guidance**
+- Keep callback logic small and deterministic so your chosen gas limit remains realistic.
+- Use the sequence number to clear or settle only the request state associated with this callback.
+- Follow checks-effects-interactions discipline around any subsequent external effects.
+
+**Example**
+Language: solidity
+Description: Clear request state before using the returned randomness.
+
+```solidity
+function entropyCallback(
+  uint64 sequence,
+  address,
+  bytes32 randomNumber
+) internal override {
+  delete pending[sequence];
+  _settle(randomNumber);
+}
+```
+
+### Express Relay Searcher Flows
+
+**Exports**
+- Client
+- Client.subscribeChains
+- Client.getQuote
+- Client.submitQuote
+- Client.submitBid
+
+Express Relay is an opportunity, quote, and bidding surface. Keep it separated from price-feed delivery and verification.
+
+#### Client
+**Kind**
+class
+
+**Summary**
+Primary JavaScript client for subscribing to opportunities and statuses and for issuing quote or bid requests.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/express-relay-js@0.29.0:lib/index.d.ts
+
+```ts
+export declare class Client {
+    constructor(
+      clientOptions: ClientOptions,
+      wsOptions?: WsOptions,
+      opportunityCallback?: (opportunity: Opportunity) => Promise<void>,
+      bidStatusCallback?: (statusUpdate: BidStatusUpdate) => Promise<void>,
+      svmChainUpdateCallback?: (update: SvmChainUpdate) => Promise<void>,
+      removeOpportunitiesCallback?: (opportunityDelete: OpportunityDelete) => Promise<void>,
+      websocketCloseCallback?: () => Promise<void>
+    );
+    subscribeChains(chains: string[]): Promise<void>;
+    getOpportunities(chainId?: string, fromTime?: Date, limit?: number): Promise<Opportunity[]>;
+    getQuote(quoteRequest: QuoteRequest): Promise<QuoteResponse>;
+    submitQuote(submitQuote: SubmitQuote): Promise<VersionedTransaction>;
+    submitBid(bid: Bid, subscribeToUpdates?: boolean): Promise<BidId>;
+}
+```
+
+**Guidance**
+- Treat the current package types as the contract source; they supersede older generated-pack method names not present in this version.
+- Model opportunity and bid handling as an async, status-driven workflow.
+- Keep the chain scope explicit because bids, opportunities, and SVM config all depend on it.
+
+**Example**
+Language: typescript
+Description: Subscribe to opportunities and print bid-status updates.
+
+```ts
+import { Client } from "@pythnetwork/express-relay-js";
+
+const client = new Client(
+  { baseUrl: process.env.EXPRESS_RELAY_URL! },
+  undefined,
+  async (opportunity) => {
+    console.log("opportunity", opportunity.chainId);
+  },
+  async (status) => {
+    console.log("bid", status.id, status.type);
+  },
+);
+
+await client.subscribeChains(["solana"]);
+```
+
+#### Client.subscribeChains
+**Kind**
+function
+
+**Summary**
+Subscribes the websocket client to opportunities for the selected chain IDs.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/express-relay-js@0.29.0:lib/index.d.ts
+
+```ts
+subscribeChains(chains: string[]): Promise<void>;
+```
+
+**Guidance**
+- Call this only after constructing the client with the relevant opportunity callback.
+- Keep the chain list tight; broad subscriptions make opportunity handling noisier and more error-prone.
+- Pair subscriptions with explicit unsubscribe or connection-close logic in long-lived services.
+
+**Example**
+Language: typescript
+Description: Subscribe to one chain after wiring callbacks.
+
+```ts
+await client.subscribeChains(["solana"]);
+```
+
+#### Client.getQuote
+**Kind**
+function
+
+**Summary**
+Requests the best quote for a structured quote request.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/express-relay-js@0.29.0:lib/index.d.ts
+
+```ts
+getQuote(quoteRequest: QuoteRequest): Promise<QuoteResponse>;
+```
+
+**Guidance**
+- Use this for quote-oriented flows rather than raw opportunity bidding.
+- Keep chain, token mints, and specified token amount aligned with the actual intended swap direction.
+- Read the `cancellable` behavior carefully because it changes the submission and execution model.
+
+**Example**
+Language: typescript
+Description: Request an indicative quote for a swap.
+
+```ts
+const quote = await client.getQuote({
+  chainId: "solana",
+  inputTokenMint,
+  outputTokenMint,
+  specifiedTokenAmount: {
+    side: "input",
+    amount: 1_000_000,
+  },
+});
+
+console.log(quote.referenceId);
+```
+
+#### Client.submitQuote
+**Kind**
+function
+
+**Summary**
+Posts a signed quote submission back to the server and returns the fully signed transaction.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/express-relay-js@0.29.0:lib/index.d.ts
+
+```ts
+submitQuote(submitQuote: SubmitQuote): Promise<VersionedTransaction>;
+```
+
+**Guidance**
+- Use this only after the user-signature and reference ID are aligned to the exact quote being submitted.
+- Treat the returned transaction as a chain-specific execution artifact rather than as a generic acknowledgment.
+- Keep quote lifetimes and cancellation semantics explicit in the upstream workflow.
+
+**Example**
+Language: typescript
+Description: Submit a signed quote response and receive the final transaction.
+
+```ts
+const tx = await client.submitQuote({
+  chainId: "solana",
+  referenceId,
+  userSignature,
+});
+
+console.log(tx);
+```
+
+#### Client.submitBid
+**Kind**
+function
+
+**Summary**
+Submits a raw bid and optionally subscribes the client to status updates for that bid.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/express-relay-js@0.29.0:lib/index.d.ts
+
+```ts
+submitBid(bid: Bid, subscribeToUpdates?: boolean): Promise<BidId>;
+```
+
+**Guidance**
+- Use `subscribeToUpdates` when the bid lifecycle matters beyond immediate submission.
+- Treat the returned `BidId` as the tracking key, not as proof of successful execution.
+- Construct the bid only after the necessary chain-scoped opportunity or config data is known.
+
+**Example**
+Language: typescript
+Description: Submit a prepared bid and listen for later status updates.
+
+```ts
+const bidId = await client.submitBid(preparedBid, true);
+console.log(bidId);
+```
+
+### Lazer Low-Latency Delivery
+
+**Exports**
+- PythLazerClient.create
+- PythLazerClient.subscribe
+- PythLazerClient.getLatestPrice
+- PythLazerClient.getPrice
+- PythLazerClient.addMessageListener
+
+Lazer is the low-latency product surface. Keep it separated from ordinary Hermes use and from on-chain verification semantics.
+
+#### PythLazerClient.create
+**Kind**
+function
+
+**Summary**
+Creates an authenticated Lazer client with optional websocket-pool configuration for resilient delivery.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/pyth-lazer-sdk@6.0.0:dist/cjs/client.d.ts
+
+```ts
+static create(config: LazerClientConfig): Promise<PythLazerClient>;
+```
+
+**Guidance**
+- Treat client creation as an operational decision point: token, metadata endpoint, price endpoint, logging, and websocket pool behavior all matter.
+- Prefer explicit connection-pool and retry settings in production systems.
+- Keep credentials and endpoint entitlements out of source control and logs.
+
+**Example**
+Language: typescript
+Description: Create a Lazer client with an auth token.
+
+```ts
+import { PythLazerClient } from "@pythnetwork/pyth-lazer-sdk";
+
+const lazer = await PythLazerClient.create({
+  token: process.env.PYTH_LAZER_TOKEN!,
+});
+```
+
+#### PythLazerClient.subscribe
+**Kind**
+function
+
+**Summary**
+Registers or updates a streaming subscription for selected symbols or feed IDs, properties, formats, and delivery channel.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/pyth-lazer-sdk@6.0.0:dist/cjs/protocol.d.ts
+
+```ts
+type Request = {
+    type: "subscribe";
+    subscriptionId: number;
+    priceFeedIds?: number[] | undefined;
+    symbols?: string[] | undefined;
+    properties: PriceFeedProperty[];
+    formats: Format[];
+    deliveryFormat?: DeliveryFormat | undefined;
+    jsonBinaryEncoding?: JsonBinaryEncoding | undefined;
+    parsed?: boolean | undefined;
+    ignoreInvalidFeedIds?: boolean | undefined;
+    channel: Channel;
+} | {
+    type: "unsubscribe";
+    subscriptionId: number;
+};
+```
+
+**Guidance**
+- Choose symbols or feed IDs deliberately and keep the requested properties narrow.
+- Decide between JSON and binary delivery based on the downstream consumer, not convenience alone.
+- `parsed` and format choices change payload shape substantially; align them with the receiving code path.
+- Treat `subscriptionId` as an application-level lifecycle key that you control.
+
+**Example**
+Language: typescript
+Description: Subscribe to low-latency BTC updates with parsed JSON payloads.
+
+```ts
+lazer.subscribe({
+  type: "subscribe",
+  subscriptionId: 1,
+  symbols: ["Crypto.BTC/USD"],
+  properties: ["price", "confidence", "feedUpdateTimestamp"],
+  formats: ["evm"],
+  deliveryFormat: "json",
+  parsed: true,
+  channel: "fixed_rate@200ms",
+});
+```
+
+#### PythLazerClient.getLatestPrice
+**Kind**
+function
+
+**Summary**
+Fetches the latest Lazer price data for a selected set of feeds, formats, and properties.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/pyth-lazer-sdk@6.0.0:dist/cjs/client.d.ts
+
+```ts
+getLatestPrice(params: LatestPriceRequest): Promise<JsonUpdate>;
+```
+
+**Guidance**
+- Use this for request-response access when the application needs current low-latency data without maintaining a subscription.
+- Keep the requested properties minimal to reduce payload size and ambiguity.
+- Be explicit about formats and encoding because the returned object may include chain-specific binary representations.
+
+**Example**
+Language: typescript
+Description: Fetch the latest price snapshot for selected symbols.
+
+```ts
+const latest = await lazer.getLatestPrice({
+  symbols: ["Crypto.BTC/USD"],
+  properties: ["price", "confidence"],
+  formats: ["evm"],
+  parsed: true,
+  channel: "real_time",
+});
+
+console.log(latest.parsed);
+```
+
+#### PythLazerClient.getPrice
+**Kind**
+function
+
+**Summary**
+Fetches Lazer price data at a specific timestamp.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/pyth-lazer-sdk@6.0.0:dist/cjs/client.d.ts
+
+```ts
+getPrice(params: PriceRequest): Promise<JsonUpdate>;
+```
+
+**Guidance**
+- Use this when the application needs historical or fixed-time retrieval rather than the latest available values.
+- Keep timestamp units explicit and consistent with the calling code.
+- Do not conflate a returned off-chain timestamped response with on-chain proof or verification.
+
+**Example**
+Language: typescript
+Description: Fetch a time-bounded Lazer price response.
+
+```ts
+const historical = await lazer.getPrice({
+  timestamp: 1_741_000_000,
+  symbols: ["Crypto.BTC/USD"],
+  properties: ["price"],
+  formats: ["evm"],
+  parsed: true,
+  channel: "fixed_rate@200ms",
+});
+
+console.log(historical.parsed);
+```
+
+#### PythLazerClient.addMessageListener
+**Kind**
+function
+
+**Summary**
+Registers a listener for deduplicated JSON or binary messages received from the Lazer websocket pool.
+
+**Definition**
+Language: typescript
+Source: npm:@pythnetwork/pyth-lazer-sdk@6.0.0:dist/cjs/client.d.ts
+
+```ts
+addMessageListener(handler: (event: JsonOrBinaryResponse) => void): void;
+```
+
+**Guidance**
+- Add listeners before or immediately after creating subscriptions so no messages are dropped accidentally.
+- Handle both JSON and binary message branches explicitly if the delivery format can vary.
+- Pair this with `addAllConnectionsDownListener` or equivalent operational handling in production.
+
+**Example**
+Language: typescript
+Description: Receive stream updates and branch on the payload type.
+
+```ts
+lazer.addMessageListener((event) => {
+  if (event.type === "json") {
+    console.log(event.value.type);
+  } else {
+    console.log(event.value.subscriptionId);
+  }
+});
+```

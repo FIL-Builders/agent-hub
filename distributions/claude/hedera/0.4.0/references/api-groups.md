@@ -1,0 +1,944 @@
+# Hedera API Groups
+
+### Client Setup And Identity
+**Exports**
+- Client
+- Client.forTestnet
+- Client.forLocalNode
+- Client.setOperator
+- PrivateKey.fromStringECDSA
+
+Core Hedera SDK setup primitives for selecting a network, installing an operator, and loading signing keys.
+
+#### Client
+**Kind**
+class
+
+**Summary**
+Main JavaScript SDK entrypoint for interacting with Hedera from Node.js.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/index.d.ts
+
+```ts
+export { default as Client } from "./client/NodeClient.js";
+```
+
+**Guidance**
+- Treat this as the main Node.js SDK client for consensus-node queries and transactions.
+- Configure the client for the target network before building queries or transactions.
+- Pair it with explicit operator credentials when the workflow requires paid queries or signed writes.
+
+**Example**
+Language: javascript
+Description: Import the standard Hedera client entrypoint.
+
+```js
+import { Client } from "@hashgraph/sdk";
+```
+
+#### Client.forTestnet
+**Kind**
+config
+
+**Summary**
+Construct a client preconfigured for Hedera testnet access.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/client/NodeClient.d.ts
+
+```ts
+static forTestnet(props?: {
+  scheduleNetworkUpdate?: boolean | undefined;
+}): NodeClient;
+```
+
+**Guidance**
+- Use this as the default network constructor for testnet development instead of hand-building node maps.
+- Keep testnet, previewnet, local-node, and mainnet sessions separate; do not reuse credentials or assumptions across them.
+- If network updates matter for long-lived processes, decide explicitly whether to use the sync or async constructor variants.
+
+**Example**
+Language: javascript
+Description: Build a testnet client and set an operator.
+
+```js
+import { Client, PrivateKey } from "@hashgraph/sdk";
+
+const client = Client.forTestnet();
+const operatorKey = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+client.setOperator(process.env.OPERATOR_ID, operatorKey);
+```
+
+#### Client.forLocalNode
+**Kind**
+config
+
+**Summary**
+Construct a client preconfigured for local-node access.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/client/NodeClient.d.ts
+
+```ts
+static forLocalNode(props?: {
+  scheduleNetworkUpdate?: boolean | undefined;
+}): NodeClient;
+```
+
+**Guidance**
+- Use this for deterministic local testing, demos, and scripted development against a local Hedera network.
+- Do not assume local-node fee behavior, mirror-node timing, or network defaults match public testnet or mainnet.
+- Keep local credentials and local entity IDs isolated from public-network values.
+
+**Example**
+Language: javascript
+Description: Create a client for local Hedera development.
+
+```js
+import { Client } from "@hashgraph/sdk";
+
+const client = Client.forLocalNode();
+```
+
+#### Client.setOperator
+**Kind**
+function
+
+**Summary**
+Install the default paying account and signing key used for transactions and paid queries.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/client/Client.d.ts
+
+```ts
+setOperator(accountId: AccountId | string, privateKey: PrivateKey | string): this;
+```
+
+**Guidance**
+- Set an operator before executing signed transactions or paid queries.
+- Use environment-backed secrets and avoid hardcoding real account credentials into source control.
+- Changing the operator changes who pays and signs by default; keep that boundary explicit in multi-account workflows.
+
+**Example**
+Language: javascript
+Description: Install the default payer and signer on a client.
+
+```js
+client.setOperator(process.env.OPERATOR_ID, operatorKey);
+```
+
+#### PrivateKey.fromStringECDSA
+**Kind**
+function
+
+**Summary**
+Parse an ECDSA private key from a hex-encoded string.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/PrivateKey.d.ts
+
+```ts
+static fromStringECDSA(text: string): PrivateKey;
+```
+
+**Guidance**
+- Use the ECDSA-specific parser when the source key material is known to be ECDSA.
+- Do not guess the key algorithm from context if the deployment pipeline can provide it explicitly.
+- Keep the ECDSA-versus-ED25519 distinction explicit because signing, aliasing, and account setup workflows can depend on it.
+
+**Example**
+Language: javascript
+Description: Parse an ECDSA operator key from an environment variable.
+
+```js
+import { PrivateKey } from "@hashgraph/sdk";
+
+const key = PrivateKey.fromStringECDSA(process.env.OPERATOR_KEY);
+```
+
+### Accounts And Transaction Confirmation
+**Exports**
+- AccountCreateTransaction
+- TransferTransaction
+- AccountBalanceQuery
+- AccountInfoQuery
+- TransactionReceiptQuery
+
+Core account, HBAR, and post-submission confirmation flows.
+
+#### AccountCreateTransaction
+**Kind**
+class
+
+**Summary**
+Create a new Hedera account with key, balance, staking, and auto-renew settings.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/account/AccountCreateTransaction.d.ts
+
+```ts
+export default class AccountCreateTransaction extends Transaction {
+  constructor(props?: {
+    key?: Key | undefined;
+    initialBalance?: string | number | Long | BigNumber | Hbar | undefined;
+    receiverSignatureRequired?: boolean | undefined;
+    autoRenewPeriod?: number | Long | Duration | undefined;
+    accountMemo?: string | undefined;
+    maxAutomaticTokenAssociations?: number | Long | undefined;
+    alias?: EvmAddress | undefined;
+  });
+}
+```
+
+**Guidance**
+- Set the account key deliberately and keep receiver-signature requirements explicit when the receiving workflow depends on them.
+- Remember that aliasing, staking, and automatic token-association behavior are part of account policy, not UI metadata.
+- Confirm creation with a receipt before assuming the account exists, then expect mirror-node indexing to trail consensus.
+
+**Example**
+Language: javascript
+Description: Create an account and wait for the new account ID.
+
+```js
+import { AccountCreateTransaction, Hbar, PrivateKey } from "@hashgraph/sdk";
+
+const userKey = PrivateKey.generateECDSA();
+
+const tx = await new AccountCreateTransaction()
+  .setKeyWithoutAlias(userKey.publicKey)
+  .setInitialBalance(new Hbar(5))
+  .execute(client);
+
+const receipt = await tx.getReceipt(client);
+console.log(receipt.accountId?.toString());
+```
+
+#### TransferTransaction
+**Kind**
+class
+
+**Summary**
+Submit HBAR, fungible-token, or NFT transfers in a single Hedera transfer transaction.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/account/TransferTransaction.d.ts
+
+```ts
+export default class TransferTransaction extends AbstractTokenTransferTransaction {
+  addHbarTransfer(
+    accountId: AccountId | string,
+    amount: number | string | Long | LongObject | BigNumber | Hbar,
+  ): TransferTransaction;
+}
+```
+
+**Guidance**
+- Negative amounts debit, positive amounts credit; keep the transfer list balanced and readable.
+- For token and NFT movement, keep association, KYC, freeze, and allowance state in mind before submission.
+- Do not treat submission as success; wait for the receipt and then reconcile mirror-node visibility separately.
+
+**Example**
+Language: javascript
+Description: Transfer HBAR between two accounts.
+
+```js
+import { Hbar, TransferTransaction } from "@hashgraph/sdk";
+
+const tx = await new TransferTransaction()
+  .addHbarTransfer(process.env.OPERATOR_ID, new Hbar(-1))
+  .addHbarTransfer(process.env.RECIPIENT_ID, new Hbar(1))
+  .execute(client);
+
+await tx.getReceipt(client);
+```
+
+#### AccountBalanceQuery
+**Kind**
+class
+
+**Summary**
+Fetch an account or contract balance through a free consensus-node query.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/account/AccountBalanceQuery.d.ts
+
+```ts
+export default class AccountBalanceQuery extends Query<AccountBalance> {
+  constructor(props?: {
+    accountId?: string | AccountId | undefined;
+    contractId?: string | ContractId | undefined;
+  });
+  setAccountId(accountId: AccountId | string): this;
+}
+```
+
+**Guidance**
+- Use this when you need an authoritative balance read from the query path rather than an indexed REST view.
+- `setAccountId()` and `setContractId()` are mutually exclusive; keep the target type explicit.
+- Prefer this over broader info queries when balance alone is enough.
+
+**Example**
+Language: javascript
+Description: Query the current HBAR balance for an account.
+
+```js
+import { AccountBalanceQuery } from "@hashgraph/sdk";
+
+const balance = await new AccountBalanceQuery()
+  .setAccountId(process.env.RECIPIENT_ID)
+  .execute(client);
+
+console.log(balance.hbars.toString());
+```
+
+#### AccountInfoQuery
+**Kind**
+class
+
+**Summary**
+Retrieve account metadata such as keys, staking settings, and token relationships.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/account/AccountInfoQuery.d.ts
+
+```ts
+export default class AccountInfoQuery extends Query<AccountInfo> {
+  constructor(props?: {
+    accountId?: string | AccountId | undefined;
+  });
+  setAccountId(accountId: AccountId | string): AccountInfoQuery;
+}
+```
+
+**Guidance**
+- Use this when balance alone is insufficient and you need full account metadata.
+- Pair it with mirror-node reads when you need both authoritative account policy and indexed historical context.
+- Account info does not replace transaction receipts; it answers current state, not whether a specific write succeeded.
+
+**Example**
+Language: javascript
+Description: Inspect account metadata after creation or update.
+
+```js
+import { AccountInfoQuery } from "@hashgraph/sdk";
+
+const info = await new AccountInfoQuery()
+  .setAccountId(process.env.RECIPIENT_ID)
+  .execute(client);
+
+console.log(info.accountMemo);
+```
+
+#### TransactionReceiptQuery
+**Kind**
+class
+
+**Summary**
+Fetch the transaction receipt that confirms consensus status and entity-creation outputs.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/transaction/TransactionReceiptQuery.d.ts
+
+```ts
+export default class TransactionReceiptQuery extends Query<TransactionReceipt> {
+  constructor(props?: {
+    transactionId?: string | TransactionId | undefined;
+    includeDuplicates?: boolean | undefined;
+    includeChildren?: boolean | undefined;
+    validateStatus?: boolean | undefined;
+  });
+  setTransactionId(transactionId: TransactionId | string): this;
+}
+```
+
+**Guidance**
+- Use this to determine whether a submitted transaction actually reached consensus and succeeded.
+- Keep receipt confirmation separate from mirror-node visibility; they are related but not synchronous.
+- Enable duplicate or child inclusion only when the workflow actually needs that extra complexity.
+
+**Example**
+Language: javascript
+Description: Confirm a transaction by ID.
+
+```js
+import { TransactionReceiptQuery } from "@hashgraph/sdk";
+
+const receipt = await new TransactionReceiptQuery()
+  .setTransactionId(tx.transactionId)
+  .execute(client);
+
+console.log(receipt.status.toString());
+```
+
+### Tokens And Associations
+**Exports**
+- TokenCreateTransaction
+- TokenAssociateTransaction
+- TokenInfoQuery
+
+HTS creation, association, and token inspection flows.
+
+#### TokenCreateTransaction
+**Kind**
+class
+
+**Summary**
+Create a fungible or non-fungible Hedera token with treasury, keys, supply, and fee policy.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/token/TokenCreateTransaction.d.ts
+
+```ts
+export default class TokenCreateTransaction extends Transaction {
+  constructor(props?: {
+    tokenName?: string | undefined;
+    tokenSymbol?: string | undefined;
+    decimals?: number | Long | undefined;
+    initialSupply?: number | bigint | Long | BigNumber | undefined;
+    treasuryAccountId?: string | AccountId | undefined;
+    tokenType?: TokenType | undefined;
+    supplyType?: TokenSupplyType | undefined;
+  });
+}
+```
+
+**Guidance**
+- Treat treasury account choice and token keys as protocol-level authority decisions, not convenience settings.
+- Remember that account association requirements can block later transfers even when token creation succeeded.
+- Use a receipt to obtain the created token ID and only then proceed to association or transfer workflows.
+
+**Example**
+Language: javascript
+Description: Create a basic fungible token.
+
+```js
+import { TokenCreateTransaction } from "@hashgraph/sdk";
+
+const tx = await new TokenCreateTransaction()
+  .setTokenName("Example USD")
+  .setTokenSymbol("XUSD")
+  .setDecimals(2)
+  .setInitialSupply(1000000)
+  .setTreasuryAccountId(process.env.OPERATOR_ID)
+  .execute(client);
+
+const receipt = await tx.getReceipt(client);
+console.log(receipt.tokenId?.toString());
+```
+
+#### TokenAssociateTransaction
+**Kind**
+class
+
+**Summary**
+Associate an account with one or more tokens so it can hold or interact with them.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/token/TokenAssociateTransaction.d.ts
+
+```ts
+export default class TokenAssociateTransaction extends Transaction {
+  constructor(props?: {
+    tokenIds?: (string | TokenId)[] | undefined;
+    accountId?: string | AccountId | undefined;
+  });
+  setTokenIds(tokenIds: (TokenId | string)[]): this;
+  setAccountId(accountId: AccountId | string): this;
+}
+```
+
+**Guidance**
+- Association is a prerequisite for many token flows; check it before blaming transfer logic.
+- The target account typically needs to authorize the association according to the surrounding signing model.
+- Keep token ID and account ID selection explicit when batching multiple associations.
+
+**Example**
+Language: javascript
+Description: Associate a user account with a token before transfer.
+
+```js
+import { TokenAssociateTransaction } from "@hashgraph/sdk";
+
+const tx = await new TokenAssociateTransaction()
+  .setAccountId(process.env.RECIPIENT_ID)
+  .setTokenIds([process.env.TOKEN_ID])
+  .freezeWith(client)
+  .execute(client);
+
+await tx.getReceipt(client);
+```
+
+#### TokenInfoQuery
+**Kind**
+class
+
+**Summary**
+Retrieve token metadata and policy information from a consensus-node query path.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/token/TokenInfoQuery.d.ts
+
+```ts
+export default class TokenInfoQuery extends Query<TokenInfo> {
+  constructor(properties?: {
+    tokenId?: string | TokenId | undefined;
+  });
+  setTokenId(tokenId: TokenId | string): TokenInfoQuery;
+}
+```
+
+**Guidance**
+- Use this to inspect token policy, treasury, and configuration when debugging HTS workflows.
+- Pair it with mirror-node REST when you need indexed holdings, history, or NFT-specific browsing.
+- Do not substitute token info for transfer confirmation; it answers token metadata, not a transaction outcome.
+
+**Example**
+Language: javascript
+Description: Inspect a token's current metadata.
+
+```js
+import { TokenInfoQuery } from "@hashgraph/sdk";
+
+const info = await new TokenInfoQuery()
+  .setTokenId(process.env.TOKEN_ID)
+  .execute(client);
+
+console.log(info.name, info.symbol);
+```
+
+### Consensus Service And Mirror Topic Reads
+**Exports**
+- TopicMessageSubmitTransaction
+- TopicMessageQuery
+- GET /api/v1/topics/{topicId}/messages
+
+HCS write and read flows across consensus submission and mirror-node consumption.
+
+#### TopicMessageSubmitTransaction
+**Kind**
+class
+
+**Summary**
+Submit a message to a Hedera topic for ordered consensus publication.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/topic/TopicMessageSubmitTransaction.d.ts
+
+```ts
+export default class TopicMessageSubmitTransaction extends Transaction {
+  constructor(props?: {
+    topicId?: string | TopicId | undefined;
+    message?: string | Uint8Array | undefined;
+    maxChunks?: number | undefined;
+    chunkSize?: number | undefined;
+  });
+  setTopicId(topicId: TopicId | string): this;
+  setMessage(message: string | Uint8Array): this;
+}
+```
+
+**Guidance**
+- Use this for topic writes; the resulting receipt carries sequence-number context that mirror reads consume later.
+- Large payloads can be chunked, so keep message size and consumer expectations aligned.
+- If the topic has a `submitKey`, the transaction must satisfy that authorization requirement.
+
+**Example**
+Language: javascript
+Description: Publish a simple topic message.
+
+```js
+import { TopicMessageSubmitTransaction } from "@hashgraph/sdk";
+
+const tx = await new TopicMessageSubmitTransaction()
+  .setTopicId(process.env.TOPIC_ID)
+  .setMessage("hello from Hedera")
+  .execute(client);
+
+await tx.getReceipt(client);
+```
+
+#### TopicMessageQuery
+**Kind**
+class
+
+**Summary**
+Subscribe to topic messages through the mirror stream for a topic and time window.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/topic/TopicMessageQuery.d.ts
+
+```ts
+export default class TopicMessageQuery {
+  setTopicId(topicId: TopicId | string): TopicMessageQuery;
+  setStartTime(startTime: Timestamp | Date | number): TopicMessageQuery;
+  setLimit(limit: Long | number): TopicMessageQuery;
+  subscribe(client: Client, errorHandler, listener): SubscriptionHandle;
+}
+```
+
+**Guidance**
+- Use this for topic consumption, not topic submission.
+- Set `startTime` and `limit` deliberately so mirror-stream reads are reproducible enough for the task.
+- Treat subscription logic as mirror-driven ingestion that can see data after consensus, not before.
+
+**Example**
+Language: javascript
+Description: Subscribe to recent topic messages.
+
+```js
+import { TopicMessageQuery } from "@hashgraph/sdk";
+
+new TopicMessageQuery()
+  .setTopicId(process.env.TOPIC_ID)
+  .subscribe(client, null, (message) => {
+    console.log(Buffer.from(message.contents).toString("utf8"));
+  });
+```
+
+#### GET /api/v1/topics/{topicId}/messages
+**Kind**
+endpoint
+
+**Summary**
+Read indexed topic messages for a topic through mirror-node REST.
+
+**Definition**
+Language: openapi
+Source: official Hedera mirror node REST docs
+
+```yaml
+paths:
+  /api/v1/topics/{topicId}/messages:
+    get:
+      summary: List topic messages
+      parameters:
+        - in: path
+          name: topicId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc] }
+```
+
+**Guidance**
+- Use this for indexed message retrieval and pagination when you do not need a live SDK subscription.
+- Mirror-node ordering and visibility are read-model concerns; they do not replace receipt-based write confirmation.
+- Keep topic writes and topic reads conceptually separate even when the same feature uses both.
+
+**Example**
+Language: bash
+Description: Fetch recent topic messages on testnet.
+
+```bash
+curl -s "https://testnet.mirrornode.hedera.com/api/v1/topics/0.0.5005/messages?limit=5&order=desc" | jq .
+```
+
+### Smart Contracts And Simulation
+**Exports**
+- ContractCallQuery
+- ContractExecuteTransaction
+- MirrorNodeContractCallQuery
+- POST /api/v1/contracts/call
+
+Read-only simulation and state-changing contract workflows on Hedera.
+
+#### ContractCallQuery
+**Kind**
+class
+
+**Summary**
+Execute a read-only smart-contract call through the SDK query path.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/contract/ContractCallQuery.d.ts
+
+```ts
+export default class ContractCallQuery extends Query<ContractFunctionResult> {
+  constructor(props?: {
+    contractId?: string | ContractId | undefined;
+    gas?: number | Long | undefined;
+    functionParameters?: Uint8Array | FunctionParameters | undefined;
+    maxResultSize?: number | Long | undefined;
+  });
+  setContractId(contractId: ContractId | string): ContractCallQuery;
+  setFunction(name: string, params?: ContractFunctionParameters | null): ContractCallQuery;
+}
+```
+
+**Guidance**
+- Use this for read-only contract state inspection through the SDK query path.
+- Do not confuse it with state mutation; use `ContractExecuteTransaction` for writes.
+- Set gas and result-size assumptions deliberately for complex read paths.
+
+**Example**
+Language: javascript
+Description: Read a contract view function.
+
+```js
+import { ContractCallQuery } from "@hashgraph/sdk";
+
+const result = await new ContractCallQuery()
+  .setContractId(process.env.CONTRACT_ID)
+  .setGas(100000)
+  .setFunction("name")
+  .execute(client);
+
+console.log(result.getString(0));
+```
+
+#### ContractExecuteTransaction
+**Kind**
+class
+
+**Summary**
+Execute a state-changing smart-contract function and optionally send HBAR with the call.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/contract/ContractExecuteTransaction.d.ts
+
+```ts
+export default class ContractExecuteTransaction extends Transaction {
+  constructor(props?: {
+    contractId?: string | ContractId | undefined;
+    gas?: number | Long | undefined;
+    amount?: string | number | Long | BigNumber | Hbar | undefined;
+    function?: FunctionParameters | undefined;
+  });
+  setContractId(contractId: ContractId | string): ContractExecuteTransaction;
+  setGas(gas: number | Long): ContractExecuteTransaction;
+  setFunction(name: string, functionParameters?: ContractFunctionParameters): this;
+}
+```
+
+**Guidance**
+- Use this for state changes; the receipt or record confirms whether execution actually succeeded.
+- Gas and payable amount are protocol-level execution inputs, not convenience hints.
+- If you need a dry run first, simulate separately rather than assuming write success from ABI compatibility alone.
+
+**Example**
+Language: javascript
+Description: Execute a contract state change.
+
+```js
+import { ContractExecuteTransaction, ContractFunctionParameters } from "@hashgraph/sdk";
+
+const tx = await new ContractExecuteTransaction()
+  .setContractId(process.env.CONTRACT_ID)
+  .setGas(250000)
+  .setFunction("setValue", new ContractFunctionParameters().addUint256(42))
+  .execute(client);
+
+await tx.getReceipt(client);
+```
+
+#### MirrorNodeContractCallQuery
+**Kind**
+class
+
+**Summary**
+Simulate a read-only smart-contract call through the mirror node.
+
+**Definition**
+Language: typescript
+Source: npm:@hashgraph/sdk@2.80.0:package/lib/query/MirrorNodeContractCallQuery.d.ts
+
+```ts
+export default class MirrorNodeContractCallQuery extends MirrorNodeContractQuery {
+  execute(client: Client): Promise<string>;
+}
+```
+
+**Guidance**
+- Use this when the workflow explicitly wants mirror-node-based contract simulation rather than consensus-node query execution.
+- Keep the simulation boundary explicit: this path does not mutate contract state.
+- When debugging mismatches, compare the simulated read path with the actual write path rather than treating them as interchangeable.
+
+**Example**
+Language: javascript
+Description: Simulate a read-only contract call through the mirror node helper.
+
+```js
+import { MirrorNodeContractCallQuery } from "@hashgraph/sdk";
+
+const data = await new MirrorNodeContractCallQuery()
+  .setContractId(process.env.CONTRACT_ID)
+  .setFunction("name")
+  .execute(client);
+
+console.log(data);
+```
+
+#### POST /api/v1/contracts/call
+**Kind**
+endpoint
+
+**Summary**
+Mirror-node REST endpoint for contract-call simulation and estimation-style reads.
+
+**Definition**
+Language: openapi
+Source: official Hedera mirror node REST docs
+
+```yaml
+paths:
+  /api/v1/contracts/call:
+    post:
+      summary: Simulate contract call
+      requestBody:
+        required: true
+      responses:
+        "200": { description: Simulation result }
+```
+
+**Guidance**
+- Use this for `eth_call`-style simulation and read behavior through mirror infrastructure.
+- It does not mutate contract state; pair it with execution transactions when the real workflow writes on-chain state.
+- Keep request encoding, gas assumptions, and block-context expectations explicit when porting Ethereum-style tooling.
+
+**Example**
+Language: bash
+Description: Simulate a contract call on testnet mirror node REST.
+
+```bash
+curl -s -X POST "https://testnet.mirrornode.hedera.com/api/v1/contracts/call" \
+  -H "content-type: application/json" \
+  -d '{"to":"0.0.7001","data":"0x06fdde03","block":"latest"}' | jq .
+```
+
+### Mirror Node Indexed Reads
+**Exports**
+- GET /api/v1/accounts/{idOrAliasOrEvmAddress}
+- GET /api/v1/tokens/{tokenId}
+- GET /api/v1/transactions/{transactionId}
+
+Indexed account, token, and transaction views for UI, reporting, and post-consensus inspection.
+
+#### GET /api/v1/accounts/{idOrAliasOrEvmAddress}
+**Kind**
+endpoint
+
+**Summary**
+Fetch indexed account detail by account ID, alias, or EVM address.
+
+**Definition**
+Language: openapi
+Source: official Hedera mirror node REST docs
+
+```yaml
+paths:
+  /api/v1/accounts/{idOrAliasOrEvmAddress}:
+    get:
+      summary: Get account detail
+      parameters:
+        - in: path
+          name: idOrAliasOrEvmAddress
+          required: true
+          schema: { type: string }
+```
+
+**Guidance**
+- Use this for indexed account views and REST-friendly address lookups.
+- Keep ID format handling explicit because numeric IDs, aliases, and EVM addresses do not behave identically in every surrounding workflow.
+- Do not use this endpoint as proof that a fresh write has finalized until receipt confirmation and indexing delay are both accounted for.
+
+**Example**
+Language: bash
+Description: Fetch an account from testnet mirror node REST.
+
+```bash
+curl -s "https://testnet.mirrornode.hedera.com/api/v1/accounts/0.0.1001" | jq .
+```
+
+#### GET /api/v1/tokens/{tokenId}
+**Kind**
+endpoint
+
+**Summary**
+Fetch indexed token detail from mirror-node REST.
+
+**Definition**
+Language: openapi
+Source: official Hedera mirror node REST docs
+
+```yaml
+paths:
+  /api/v1/tokens/{tokenId}:
+    get:
+      summary: Get token detail
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema: { type: string }
+```
+
+**Guidance**
+- Use this for indexed token metadata and REST-driven UI workflows.
+- Pair it with SDK token queries when you need consensus-node semantics or tighter integration with write flows.
+- Keep token ID handling explicit across treasury, association, and NFT workflows.
+
+**Example**
+Language: bash
+Description: Fetch token metadata from testnet mirror node REST.
+
+```bash
+curl -s "https://testnet.mirrornode.hedera.com/api/v1/tokens/0.0.2002" | jq .
+```
+
+#### GET /api/v1/transactions/{transactionId}
+**Kind**
+endpoint
+
+**Summary**
+Fetch indexed transaction detail from mirror-node REST by transaction ID.
+
+**Definition**
+Language: openapi
+Source: official Hedera mirror node REST docs
+
+```yaml
+paths:
+  /api/v1/transactions/{transactionId}:
+    get:
+      summary: Get transaction detail
+      parameters:
+        - in: path
+          name: transactionId
+          required: true
+          schema: { type: string }
+```
+
+**Guidance**
+- Use this for indexed transaction inspection after consensus has already been established.
+- Receipt queries answer transaction success earlier and more authoritatively; mirror-node transaction views answer when indexed detail is available.
+- Keep duplicate, child, and delayed-visibility cases in mind when reconciling mirror data with application status.
+
+**Example**
+Language: bash
+Description: Fetch a transaction from testnet mirror node REST.
+
+```bash
+curl -s "https://testnet.mirrornode.hedera.com/api/v1/transactions/0.0.1001-1700000000.000000001" | jq .
+```

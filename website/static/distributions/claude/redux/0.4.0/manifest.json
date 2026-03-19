@@ -1,0 +1,17 @@
+{
+  "tool_id": "redux",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/redux/0.4.0.md",
+  "display_name": "Redux",
+  "description": "Use for Redux tasks. Helps with the low-level Redux 5 core package for reducer composition, store creation, middleware composition, dispatch contracts, and utility guards while keeping modern boundary guidance explicit around Redux Toolkit and `react-redux`.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

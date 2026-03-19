@@ -1,0 +1,17 @@
+{
+  "tool_id": "openserv-labs-sdk",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/openserv-labs-sdk/0.4.0.md",
+  "display_name": "OpenServ Labs SDK",
+  "description": "Use for OpenServ Labs SDK tasks. Helps with the OpenServ Labs SDK at a senior-developer level: instantiate an agent, register typed capabilities before start, process tasks with explicit status and logs, escalate to humans when blocked, and route platform-governed external calls through integrations instead of ad hoc HTTP.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

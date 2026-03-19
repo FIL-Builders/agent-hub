@@ -1,0 +1,17 @@
+{
+  "tool_id": "worldcoin",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/worldcoin/0.4.0.md",
+  "display_name": "Worldcoin",
+  "description": "Use for Worldcoin tasks. Helps with build and reason about World Mini Apps, World ID proof workflows, wallet-auth flows, payment and transaction requests, and backend verification or reconciliation paths without collapsing those distinct trust models into one undifferentiated client flow.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

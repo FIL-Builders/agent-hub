@@ -1,0 +1,760 @@
+# ethers API Groups
+
+### Providers and Network Access
+**Exports**
+- JsonRpcProvider
+- BrowserProvider
+- WebSocketProvider
+- FallbackProvider
+- getDefaultProvider
+
+Core entry points for connecting to networks, injected wallets, and resilient RPC backends.
+
+#### JsonRpcProvider
+**Kind**
+class
+
+**Summary**
+HTTP or HTTPS JSON-RPC provider for general-purpose backend reads and writes.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/providers/provider-jsonrpc.d.ts
+
+```ts
+export declare class JsonRpcProvider extends JsonRpcApiPollingProvider {
+    constructor(url?: string | FetchRequest, network?: Networkish, options?: JsonRpcApiProviderOptions);
+    send(method: string, params: Array<any> | Record<string, any>): Promise<any>;
+}
+```
+
+**Guidance**
+- Use `JsonRpcProvider` for server-side jobs, scripts, indexing utilities, and any flow where explicit backend choice matters.
+- Pass an explicit `network` when accidental chain mismatches would be expensive or unsafe.
+- Reuse provider instances instead of recreating them inside hot paths.
+
+**Example**
+Language: javascript
+Description: Connect to a specific RPC endpoint and read chain state.
+
+```js
+import { JsonRpcProvider } from "ethers";
+
+const provider = new JsonRpcProvider(process.env.RPC_URL, "mainnet");
+console.log(await provider.getBlockNumber());
+```
+
+#### BrowserProvider
+**Kind**
+class
+
+**Summary**
+Wraps an injected EIP-1193 provider from a browser wallet.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/providers/provider-browser.d.ts
+
+```ts
+export declare class BrowserProvider extends JsonRpcApiPollingProvider {
+    constructor(ethereum: Eip1193Provider, network?: Networkish, _options?: BrowserProviderOptions);
+    hasSigner(address: number | string): Promise<boolean>;
+    getSigner(address?: number | string): Promise<JsonRpcSigner>;
+    static discover(options?: BrowserDiscoverOptions): Promise<null | BrowserProvider>;
+}
+```
+
+**Guidance**
+- Use this in frontend apps to wrap `window.ethereum` or another EIP-1193 provider.
+- Explicitly request accounts before assuming a signer exists.
+- Handle the "no injected provider" case instead of assuming a wallet is installed.
+- Validate or pin the active network before constructing chain-specific contract instances such as token contracts.
+- Treat `accountsChanged` and `chainChanged` as state invalidation events; recreate signer-bound objects after either event.
+
+**Example**
+Language: javascript
+Description: Connect to an injected wallet and obtain a signer.
+
+```js
+import { BrowserProvider } from "ethers";
+
+const provider = new BrowserProvider(window.ethereum);
+await provider.send("eth_requestAccounts", []);
+const signer = await provider.getSigner();
+console.log(await signer.getAddress());
+```
+
+#### WebSocketProvider
+**Kind**
+class
+
+**Summary**
+Maintains a live JSON-RPC WebSocket connection for subscriptions and streaming updates.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/providers/provider-websocket.d.ts
+
+```ts
+export declare class WebSocketProvider extends SocketProvider {
+    constructor(url: string | WebSocketLike | WebSocketCreator, network?: Networkish, options?: JsonRpcApiProviderOptions);
+    destroy(): Promise<void>;
+}
+```
+
+**Guidance**
+- Prefer `WebSocketProvider` for block, log, and event subscriptions where polling is too stale or too expensive.
+- Pair it with reconnect and shutdown handling; long-lived socket connections fail in real systems.
+- Use HTTP providers for one-off reads when you do not need subscriptions.
+
+**Example**
+Language: javascript
+Description: Subscribe to new blocks over WebSocket.
+
+```js
+import { WebSocketProvider } from "ethers";
+
+const provider = new WebSocketProvider(process.env.WS_RPC_URL, "mainnet");
+provider.on("block", (blockNumber) => {
+  console.log("block", blockNumber);
+});
+```
+
+#### FallbackProvider
+**Kind**
+class
+
+**Summary**
+Combines multiple backends for failover, agreement checks, and resilience.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/providers/provider-fallback.d.ts
+
+```ts
+export declare class FallbackProvider extends AbstractProvider {
+    readonly quorum: number;
+    constructor(providers: Array<AbstractProvider | FallbackProviderConfig>, network?: Networkish, options?: FallbackProviderOptions);
+    destroy(): Promise<void>;
+}
+```
+
+**Guidance**
+- Use `FallbackProvider` when backend disagreement or availability is a production concern.
+- Tune quorum and provider mix deliberately; more providers does not automatically mean better behavior.
+- Keep backend latency and rate limits in mind because quorum logic changes how requests complete.
+
+**Example**
+Language: javascript
+Description: Build a resilient provider from two HTTP backends.
+
+```js
+import { FallbackProvider, JsonRpcProvider } from "ethers";
+
+const provider = new FallbackProvider([
+  new JsonRpcProvider(process.env.RPC_URL_A),
+  new JsonRpcProvider(process.env.RPC_URL_B),
+]);
+
+console.log(await provider.getBlockNumber());
+```
+
+#### getDefaultProvider
+**Kind**
+function
+
+**Summary**
+Creates a provider from a network name or endpoint using built-in backend selection logic.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/providers/default-provider.d.ts
+
+```ts
+export declare function getDefaultProvider(network?: string | Networkish | WebSocketLike, options?: any): AbstractProvider;
+```
+
+**Guidance**
+- Use `getDefaultProvider` for quick scripts, demos, or low-ceremony tooling.
+- Prefer explicit provider classes in production so backend choice, API keys, and failover policy remain visible in code.
+- Treat any default backend composition as an implementation detail that may not match your latency or reliability requirements.
+
+**Example**
+Language: javascript
+Description: Create a quick mainnet provider with explicit API keys.
+
+```js
+import { getDefaultProvider } from "ethers";
+
+const provider = getDefaultProvider("mainnet", {
+  infura: process.env.INFURA_KEY,
+  alchemy: process.env.ALCHEMY_KEY,
+});
+
+console.log(await provider.getNetwork());
+```
+
+### Wallets and Signatures
+**Exports**
+- Wallet
+- HDNodeWallet
+- verifyMessage
+
+Signing primitives for private keys, mnemonic-backed accounts, and off-chain signature verification.
+
+#### Wallet
+**Kind**
+class
+
+**Summary**
+Manages a single private key and signs transactions, messages, and related payloads.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/wallet/wallet.d.ts
+
+```ts
+export declare class Wallet extends BaseWallet {
+    constructor(key: string | SigningKey, provider?: null | Provider);
+    connect(provider: null | Provider): Wallet;
+    static createRandom(provider?: null | Provider): HDNodeWallet;
+    static fromPhrase(phrase: string, provider?: Provider): HDNodeWallet;
+}
+```
+
+**Guidance**
+- Never hardcode raw private keys or mnemonics in committed source.
+- Attach a provider before sending transactions; an unconnected wallet can sign but cannot broadcast.
+- Be explicit when code expects a single raw private key wallet versus a mnemonic-derived HD wallet.
+
+**Example**
+Language: javascript
+Description: Send ETH from a private-key wallet connected to a provider.
+
+```js
+import { JsonRpcProvider, Wallet, parseEther } from "ethers";
+
+const provider = new JsonRpcProvider(process.env.RPC_URL);
+const wallet = new Wallet(process.env.PRIVATE_KEY, provider);
+
+const tx = await wallet.sendTransaction({
+  to: "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  value: parseEther("0.001"),
+});
+
+await tx.wait();
+console.log(tx.hash);
+```
+
+#### HDNodeWallet
+**Kind**
+class
+
+**Summary**
+Hierarchical deterministic wallet with mnemonic and derivation-path metadata.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/wallet/hdwallet.d.ts
+
+```ts
+export declare class HDNodeWallet extends BaseWallet {
+    readonly publicKey: string;
+    readonly mnemonic: null | Mnemonic;
+    readonly path: null | string;
+    connect(provider: null | Provider): HDNodeWallet;
+}
+```
+
+**Guidance**
+- Use `HDNodeWallet` when derivation path, mnemonic provenance, or deterministic account management matters.
+- Keep path policy explicit in deployment or wallet-management scripts so account selection is reproducible.
+- Avoid exposing or serializing mnemonic material unless the workflow explicitly requires it.
+
+**Example**
+Language: javascript
+Description: Derive a wallet from a mnemonic phrase.
+
+```js
+import { Wallet } from "ethers";
+
+const wallet = Wallet.fromPhrase(process.env.MNEMONIC);
+console.log(wallet.address);
+console.log(wallet.path);
+```
+
+#### verifyMessage
+**Kind**
+function
+
+**Summary**
+Recovers the signing address for an EIP-191 personal message signature.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/hash/message.d.ts
+
+```ts
+export declare function verifyMessage(message: Uint8Array | string, sig: SignatureLike): string;
+```
+
+**Guidance**
+- Use this for off-chain authentication, wallet login flows, and proving ownership of a signature.
+- Be precise about the signed payload representation; UTF-8 strings and raw bytes are not interchangeable.
+- Pair it with a nonce or challenge flow for authentication instead of signing static messages.
+
+**Example**
+Language: javascript
+Description: Recover the signer of a personal message.
+
+```js
+import { verifyMessage } from "ethers";
+
+const signerAddress = verifyMessage("Sign in to Example", signature);
+console.log(signerAddress);
+```
+
+### Contracts and ABI
+**Exports**
+- Contract
+- ContractFactory
+- Interface
+- AbiCoder
+
+High-level and low-level tools for deployed contracts, ABI parsing, calldata generation, and deployment.
+
+#### Contract
+**Kind**
+class
+
+**Summary**
+Runtime wrapper around a deployed contract address and ABI.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/contract/contract.d.ts
+
+```ts
+declare const Contract_base: new (
+    target: string | Addressable,
+    abi: Interface | InterfaceAbi,
+    runner?: ContractRunner | null | undefined
+) => BaseContract & Omit<ContractInterface, keyof BaseContract>;
+
+export declare class Contract extends Contract_base {
+}
+```
+
+**Guidance**
+- Use a provider for read-only calls and a signer for state-changing methods.
+- Prefer human-readable ABI fragments for small interactions when carrying a full artifact adds noise.
+- Keep ABI and deployed address provenance explicit; stale ABI artifacts are a common source of runtime bugs.
+- Treat a write like `transfer(...)` as returning a transaction response; chain success is established later through `wait(...)`, not at submission time.
+- Recreate or reconnect signer-bound contracts after account or chain changes in browser workflows.
+
+**Example**
+Language: javascript
+Description: Read an ERC-20 balance from a deployed contract.
+
+```js
+import { Contract, JsonRpcProvider } from "ethers";
+
+const provider = new JsonRpcProvider(process.env.RPC_URL);
+const abi = ["function balanceOf(address) view returns (uint256)"];
+const token = new Contract(
+  "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+  abi,
+  provider
+);
+
+console.log(await token.balanceOf("vitalik.eth"));
+```
+
+#### ContractFactory
+**Kind**
+class
+
+**Summary**
+Deploys contracts from ABI and bytecode through a connected runner.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/contract/factory.d.ts
+
+```ts
+export declare class ContractFactory<A extends Array<any> = Array<any>, I = BaseContract> {
+    constructor(abi: Interface | InterfaceAbi, bytecode: BytesLike | { object: string }, runner?: null | ContractRunner);
+    getDeployTransaction(...args: ContractMethodArgs<A>): Promise<ContractDeployTransaction>;
+    deploy(...args: ContractMethodArgs<A>): Promise<BaseContract & {
+        deploymentTransaction(): ContractTransactionResponse;
+    } & Omit<I, keyof BaseContract>>;
+    connect(runner: null | ContractRunner): ContractFactory<A, I>;
+    static fromSolidity<A extends Array<any> = Array<any>, I = ContractInterface>(output: any, runner?: ContractRunner): ContractFactory<A, I>;
+}
+```
+
+**Guidance**
+- Keep ABI and bytecode from the same compiler output; mismatches are easy to miss and hard to debug.
+- Wait for deployment before performing follow-up writes or assumptions about the contract address.
+- Prefer explicit gas and fee policy in automated deployment scripts.
+
+**Example**
+Language: javascript
+Description: Deploy a contract artifact and wait for deployment.
+
+```js
+import { ContractFactory, JsonRpcProvider, Wallet } from "ethers";
+import artifact from "./Greeter.json" assert { type: "json" };
+
+const provider = new JsonRpcProvider(process.env.RPC_URL);
+const signer = new Wallet(process.env.PRIVATE_KEY, provider);
+const factory = new ContractFactory(artifact.abi, artifact.bytecode, signer);
+const contract = await factory.deploy("hello");
+
+await contract.waitForDeployment();
+console.log(contract.target);
+```
+
+#### Interface
+**Kind**
+class
+
+**Summary**
+Parses ABI fragments and provides encoding, decoding, and fragment lookup helpers.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/abi/interface.d.ts
+
+```ts
+export declare class Interface {
+    readonly fragments: ReadonlyArray<Fragment>;
+    readonly deploy: ConstructorFragment;
+    readonly fallback: null | FallbackFragment;
+    readonly receive: boolean;
+    constructor(fragments: InterfaceAbi);
+    format(minimal?: boolean): Array<string>;
+    formatJson(): string;
+    getAbiCoder(): AbiCoder;
+    getFunction(key: string, values?: Array<any | Typed>): null | FunctionFragment;
+    getEvent(key: string, values?: Array<any | Typed>): null | EventFragment;
+}
+```
+
+**Guidance**
+- Use `Interface` for ABI-centric workflows such as encoding calldata, decoding logs, and introspecting function fragments.
+- Prefer this over `AbiCoder` when you already have contract ABI semantics available.
+- Handle ambiguous overloaded names carefully; function name lookup alone is not always sufficient.
+
+**Example**
+Language: javascript
+Description: Encode calldata for a contract method without creating a `Contract`.
+
+```js
+import { Interface } from "ethers";
+
+const iface = new Interface([
+  "function transfer(address to, uint256 value)",
+]);
+
+const data = iface.encodeFunctionData("transfer", [
+  "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+  1n,
+]);
+
+console.log(data);
+```
+
+#### AbiCoder
+**Kind**
+class
+
+**Summary**
+Low-level encoder and decoder for ABI values outside the context of a specific contract interface.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/abi/abi-coder.d.ts
+
+```ts
+export declare class AbiCoder {
+    getDefaultValue(types: ReadonlyArray<string | ParamType>): Result;
+    encode(types: ReadonlyArray<string | ParamType>, values: ReadonlyArray<any>): string;
+    decode(types: ReadonlyArray<string | ParamType>, data: BytesLike, loose?: boolean): Result;
+    static defaultAbiCoder(): AbiCoder;
+}
+```
+
+**Guidance**
+- Use this for standalone ABI tuples and values when you do not have a full contract ABI.
+- Keep encoded type arrays and value arrays aligned exactly; positional mistakes are easy to introduce.
+- Prefer the shared default coder unless you have a specific reason to manage coder instances yourself.
+
+**Example**
+Language: javascript
+Description: Encode two low-level ABI values.
+
+```js
+import { AbiCoder } from "ethers";
+
+const coder = AbiCoder.defaultAbiCoder();
+const encoded = coder.encode(["uint256", "bool"], [42n, true]);
+console.log(encoded);
+```
+
+### Addresses, Units, and Hashing
+**Exports**
+- parseEther
+- formatEther
+- parseUnits
+- formatUnits
+- getAddress
+- isAddress
+- keccak256
+- id
+
+Utility functions for safe value conversion, address validation, and hashing primitives.
+
+#### parseEther
+**Kind**
+function
+
+**Summary**
+Converts a decimal ether string into wei as `bigint`.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/utils/units.d.ts
+
+```ts
+export declare function parseEther(ether: string): bigint;
+```
+
+**Guidance**
+- Use `parseEther` for ETH-denominated user input with 18 decimals.
+- Wrap parsing around user input validation; invalid decimals should not fall through silently.
+- Keep the integer result in `bigint` form until the presentation layer.
+
+**Example**
+Language: javascript
+Description: Convert a decimal ETH amount into wei.
+
+```js
+import { parseEther } from "ethers";
+
+console.log(parseEther("0.5"));
+```
+
+#### formatEther
+**Kind**
+function
+
+**Summary**
+Formats a wei-like value into an ether decimal string.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/utils/units.d.ts
+
+```ts
+export declare function formatEther(wei: BigNumberish): string;
+```
+
+**Guidance**
+- Use for rendering balances and transaction values to users.
+- Do not round-trip formatted values back into arithmetic unless you parse them again deliberately.
+- Keep raw values in integer form for storage and computation.
+
+**Example**
+Language: javascript
+Description: Format wei for display.
+
+```js
+import { formatEther, parseEther } from "ethers";
+
+console.log(formatEther(parseEther("1.25")));
+```
+
+#### parseUnits
+**Kind**
+function
+
+**Summary**
+Converts a decimal string into an integer using an explicit unit scale.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/utils/units.d.ts
+
+```ts
+export declare function parseUnits(value: string, unit?: string | Numeric): bigint;
+```
+
+**Guidance**
+- Use `parseUnits` for token amounts whose decimals are not 18.
+- Keep token decimals explicit and sourced from the token contract or metadata you trust.
+- Avoid mixing parsed values from different decimal domains in the same code path.
+- Prefer text inputs and explicit validation for user-entered amounts; browser `number` inputs and floating-point parsing create subtle bugs.
+- Do not silently round values that exceed the supported decimal precision for the token.
+
+**Example**
+Language: javascript
+Description: Convert a 6-decimal token amount into base units.
+
+```js
+import { parseUnits } from "ethers";
+
+console.log(parseUnits("12.5", 6));
+```
+
+#### formatUnits
+**Kind**
+function
+
+**Summary**
+Formats an integer value using a specified unit scale.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/utils/units.d.ts
+
+```ts
+export declare function formatUnits(value: BigNumberish, unit?: string | Numeric): string;
+```
+
+**Guidance**
+- Use when rendering token balances or gas values with known decimals.
+- Ensure the unit scale is correct for the asset; wrong decimals create plausible-looking but incorrect values.
+- Avoid doing business logic on formatted strings.
+
+**Example**
+Language: javascript
+Description: Format a 6-decimal token balance.
+
+```js
+import { formatUnits } from "ethers";
+
+console.log(formatUnits(12345000n, 6));
+```
+
+#### getAddress
+**Kind**
+function
+
+**Summary**
+Normalizes and checksum-validates an Ethereum address.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/address/address.d.ts
+
+```ts
+export declare function getAddress(address: string): string;
+```
+
+**Guidance**
+- Use `getAddress` when you need a canonical checksum string.
+- Let it throw on bad checksums instead of silently rewriting mixed-case invalid input.
+- Normalize once near the boundary of your system and carry the canonical form forward.
+- Treat a thrown error as expected validation behavior for user input rather than an exceptional edge case.
+- Apply additional business rules separately, such as rejecting the zero address in transfer flows.
+
+**Example**
+Language: javascript
+Description: Normalize a lower-case address to its checksum form.
+
+```js
+import { getAddress } from "ethers";
+
+console.log(getAddress("0xd8da6bf26964af9d7eed9e03e53415d37aa96045"));
+```
+
+#### isAddress
+**Kind**
+function
+
+**Summary**
+Returns whether a value is a syntactically valid address or ICAP address.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/address/checks.d.ts
+
+```ts
+export declare function isAddress(value: any): value is string;
+```
+
+**Guidance**
+- Use as a quick boolean filter for candidate addresses.
+- Use `getAddress` when you need normalization as well as validation.
+- Remember that ENS names are not valid direct addresses for this helper.
+
+**Example**
+Language: javascript
+Description: Quick validation before deeper processing.
+
+```js
+import { isAddress } from "ethers";
+
+console.log(isAddress("0x123"));
+```
+
+#### keccak256
+**Kind**
+function
+
+**Summary**
+Computes the Keccak-256 hash of bytes-like data.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/crypto/keccak.d.ts
+
+```ts
+export declare function keccak256(_data: BytesLike): string;
+```
+
+**Guidance**
+- Pass bytes or hex data, not arbitrary plain strings.
+- Use this for calldata-like values, byte arrays, and other binary-oriented hashing.
+- If the source value is human text, use `id` instead.
+
+**Example**
+Language: javascript
+Description: Hash hex data with Keccak-256.
+
+```js
+import { keccak256 } from "ethers";
+
+console.log(keccak256("0x1337"));
+```
+
+#### id
+**Kind**
+function
+
+**Summary**
+Computes a Keccak-256 identifier from a UTF-8 string.
+
+**Definition**
+Language: typescript
+Source: npm:ethers@6.16.0:package/lib.commonjs/hash/id.d.ts
+
+```ts
+export declare function id(value: string): string;
+```
+
+**Guidance**
+- Use `id` when the input is textual and should first be converted to UTF-8 bytes.
+- This is useful for textual identifiers, signatures, and hash-based labels derived from strings.
+- Do not substitute `id` for hashing raw binary payloads.
+
+**Example**
+Language: javascript
+Description: Hash a textual event signature string.
+
+```js
+import { id } from "ethers";
+
+console.log(id("Transfer(address,address,uint256)"));
+```

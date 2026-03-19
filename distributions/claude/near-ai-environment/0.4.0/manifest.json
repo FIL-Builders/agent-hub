@@ -1,0 +1,17 @@
+{
+  "tool_id": "near-ai-environment",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/near-ai-environment/0.4.0.md",
+  "display_name": "NEAR AI Environment",
+  "description": "Use for NEAR AI Environment tasks. Helps with the NEAR AI Python environment at a senior-developer level: manage chat completions and signed completions, persist thread state through environment helpers, register and expose tools correctly, and configure an async NEAR client for read and write operations.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

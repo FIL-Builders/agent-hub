@@ -1,0 +1,17 @@
+{
+  "tool_id": "ens",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/ens/0.4.0.md",
+  "display_name": "ENS",
+  "description": "Use for ENS tasks. Helps with eNS for ordinary dapp integration, verified primary-name handling, resolver-backed record management, `.eth` registration and renewal, and wrapped-name operations, with ENSjs `^4.2.2` as the default TypeScript integration path.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

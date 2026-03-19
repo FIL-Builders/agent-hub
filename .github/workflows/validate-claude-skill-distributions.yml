@@ -47,16 +47,8 @@ jobs:
           set -e
           test "$status" -eq 1
 
-      - run: npm run generate:claude-skill:pilot
-
+      - run: npm run generate:claude-skill:all
       - run: |
-          node scripts/validate-claude-skill-pack.js \
-            distributions/claude/agent-hub/0.4.0 \
-            distributions/claude/react/0.4.0 \
-            distributions/claude/typescript/0.4.0 \
-            distributions/claude/nextjs/0.4.0 \
-            distributions/claude/playwright/0.4.0 \
-            distributions/claude/supabase-js/0.4.0 \
-            distributions/claude/scaffold-eth-2/0.4.0
-
-      - run: npm run check:claude-skill
+          find distributions/claude -mindepth 2 -maxdepth 2 -type d | sort | \
+            xargs node scripts/validate-claude-skill-pack.js
+      - run: npm run check:claude-skill:all

@@ -1,0 +1,17 @@
+{
+  "tool_id": "monad",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/monad/0.4.0.md",
+  "display_name": "Monad Protocol Docs",
+  "description": "Use for Monad Protocol Docs tasks. Helps with build on Monad at a senior-developer level: connect to the testnet correctly, use the documented system contracts, understand Monad’s transparent parallel execution model, avoid historical-state and nonce-management mistakes, and design applications around its fast finality and distinct gas semantics.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

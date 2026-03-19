@@ -1,0 +1,17 @@
+{
+  "tool_id": "ethers",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/ethers/0.4.0.md",
+  "display_name": "ethers",
+  "description": "Use for ethers tasks. Helps with ethers v6 for Ethereum-compatible providers, wallets, contract interaction, ABI work, unit conversion, address handling, and signature-oriented workflows in production-style JavaScript and TypeScript codebases.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

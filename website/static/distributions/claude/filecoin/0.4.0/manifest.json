@@ -1,0 +1,16 @@
+{
+  "tool_id": "filecoin",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/filecoin/0.4.0.md",
+  "display_name": "Filecoin",
+  "description": "Use for Filecoin tasks. Helps with filecoin as a developer platform: reading chain and actor state through Lotus JSON-RPC, estimating gas and submitting messages safely, using FEVM Ethereum-compatible RPC without losing Filecoin-specific chain semantics, and choosing the right endpoint and client surface for the task.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

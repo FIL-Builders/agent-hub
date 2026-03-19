@@ -106,7 +106,8 @@ const SKILL_OVERRIDES = {
 const args = process.argv.slice(2);
 const options = {
   check: false,
-  pilot: false
+  pilot: false,
+  all: false
 };
 
 const inputArgs = [];
@@ -117,6 +118,10 @@ for (const arg of args) {
   }
   if (arg === "--pilot") {
     options.pilot = true;
+    continue;
+  }
+  if (arg === "--all") {
+    options.all = true;
     continue;
   }
   inputArgs.push(arg);
@@ -159,10 +164,28 @@ for (const packPath of packPaths) {
 process.exit(hadErrors ? 1 : 0);
 
 function resolveInputPackPaths(inputArgs, options) {
+  if (options.all) {
+    return listAllActivePackPaths();
+  }
   if (options.pilot) {
     return PILOT_TOOLS.map((toolId) => path.join(AGENTS_DIR, toolId, "0.4.0.md"));
   }
   return inputArgs.map((arg) => path.resolve(process.cwd(), arg));
+}
+
+function listAllActivePackPaths() {
+  const packPaths = [];
+  for (const toolId of fs.readdirSync(AGENTS_DIR).sort((a, b) => a.localeCompare(b))) {
+    const toolDir = path.join(AGENTS_DIR, toolId);
+    if (!fs.statSync(toolDir).isDirectory()) {
+      continue;
+    }
+    const candidate = path.join(toolDir, "0.4.0.md");
+    if (fs.existsSync(candidate)) {
+      packPaths.push(candidate);
+    }
+  }
+  return packPaths;
 }
 
 function compilePack(packPath) {

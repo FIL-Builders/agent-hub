@@ -1,0 +1,17 @@
+{
+  "tool_id": "helia",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/helia/0.4.0.md",
+  "display_name": "Helia",
+  "description": "Use for Helia tasks. Helps with helia 6 and `@helia/unixfs` 7 for node creation, UnixFS add and retrieval flows, routing-aware CID access, and environment-sensitive persistence decisions while keeping core Helia, UnixFS, and lower-level retrieval behavior distinct.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}
