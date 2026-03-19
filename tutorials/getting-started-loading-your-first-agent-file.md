@@ -12,16 +12,16 @@ Welcome to AgentHub! In this quick tutorial, you’ll learn how to **find, load,
 
 ## **Step 1: Browse the AgentHub Registry**
 
-Go to the [AgentHub agents directory](https://github.com/FIL-Builders/agent-hub/tree/main/agents) on GitHub.
+Go to the [AgentHub packs directory](https://github.com/FIL-Builders/agent-hub/tree/main/agents) on GitHub.
 
-* Agents are organized by tool or API (for example, “react” or “github-api”).
+* Packs are organized by tool or API (for example, `react` or `github-api`).
 * Click on a tool you want to work with.
 
 ---
 
 ## **Step 2: Open and Copy the Canonical Markdown Pack**
 
-* Inside each tool’s folder, you’ll find a versioned Markdown file (for example, `0.3.0.md`).
+* Inside each tool’s folder, you’ll find a versioned Markdown file (for example, `0.4.0.md`).
 * Click on the Markdown file to view its contents.
 * **Copy the full contents** to your clipboard.
 
@@ -84,7 +84,7 @@ A: Yes—any LLM that can accept pasted instructions or context can benefit from
 **Q: How do I know what’s in the Markdown file?**
 A: Each file is human-readable and reviewed. Read the comments, rationale, and best practices inside!
 
-**Q: What if I find a mistake or want to improve an agent?**
+**Q: What if I find a mistake or want to improve a pack?**
 A: [Contribute back via Pull Request](https://github.com/FIL-Builders/agent-hub/blob/main/CONTRIBUTING.md)—community improvements are welcome!
 
 ---

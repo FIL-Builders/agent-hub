@@ -5,7 +5,7 @@ import { buildPrompt } from '@site/src/utils/prompt';
 import { parseAgentMeta } from '@site/src/utils/agentSpec';
 
 /**
- * SpecCard displays a raw agent specification file in a styled card and
+ * SpecCard displays a canonical Markdown pack in a styled card and
  * keeps actions close to the content for copy/download/open flows.
  */
 const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions = false }) => {

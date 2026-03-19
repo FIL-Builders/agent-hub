@@ -6,7 +6,7 @@ import AIAgentOnboardingPrompt from '@site/src/components/AIAgentOnboardingPromp
 
 # Get Better Agent Answers with Agent Hub MCP
 
-Stop pasting giant agent specs into prompts.
+Stop pasting giant technical packs into prompts.
 
 Agent Hub MCP gives your model a cleaner path: connect once, discover available packs, list versions, and fetch the exact spec it needs at runtime. The result is smaller prompts, fresher context, and more repeatable results when you pin versions.
 
