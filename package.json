@@ -7,6 +7,7 @@
     "gen-mcp": "node scripts/gen-mcp-manifest.js",
     "sync-agents": "node scripts/sync-agents-static.js",
     "validate:agent-pack": "node scripts/validate-agent-pack-v0.4.0.js",
+    "validate:claude-skill": "node scripts/validate-claude-skill-pack.js",
     "build:site": "cd website && npm install && npm run build",
     "build": "npm run gen-mcp && npm run sync-agents && npm run build:site"
   },
