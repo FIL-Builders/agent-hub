@@ -1,0 +1,62 @@
+name: Validate Claude Skill Distributions
+
+on:
+  pull_request:
+    paths:
+      - "agents/**"
+      - "distributions/claude/**"
+      - "scripts/pack-to-claude-skill.js"
+      - "scripts/validate-claude-skill-pack.js"
+      - "scripts/fixtures/claude-skill-pack/**"
+      - "spec/open-claude-skill-distribution-v0.1.md"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "agents/**"
+      - "distributions/claude/**"
+      - "scripts/pack-to-claude-skill.js"
+      - "scripts/validate-claude-skill-pack.js"
+      - "scripts/fixtures/claude-skill-pack/**"
+      - "spec/open-claude-skill-distribution-v0.1.md"
+      - "package.json"
+      - "package-lock.json"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run validate:claude-skill -- scripts/fixtures/claude-skill-pack/valid-basic
+
+      - run: |
+          set +e
+          node scripts/validate-claude-skill-pack.js scripts/fixtures/claude-skill-pack/invalid-missing-ref
+          status=$?
+          set -e
+          test "$status" -eq 1
+
+      - run: npm run generate:claude-skill:pilot
+
+      - run: |
+          node scripts/validate-claude-skill-pack.js \
+            distributions/claude/agent-hub/0.4.0 \
+            distributions/claude/react/0.4.0 \
+            distributions/claude/typescript/0.4.0 \
+            distributions/claude/nextjs/0.4.0 \
+            distributions/claude/playwright/0.4.0 \
+            distributions/claude/supabase-js/0.4.0 \
+            distributions/claude/scaffold-eth-2/0.4.0
+
+      - run: npm run check:claude-skill
