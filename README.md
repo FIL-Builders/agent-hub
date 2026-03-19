@@ -157,6 +157,12 @@ Run the logged-in Claude Code runtime validation probes:
 npm run check:claude-code-skill-runtime
 ```
 
+Post the resulting runtime validation report straight to issue `#13`:
+
+```bash
+npm run check:claude-code-skill-runtime -- --issue 13
+```
+
 Build the full site and synced static artifacts:
 
 ```bash

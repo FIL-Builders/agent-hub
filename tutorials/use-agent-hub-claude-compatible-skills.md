@@ -231,6 +231,19 @@ You can also target a subset explicitly:
 npm run check:claude-code-skill-runtime -- react playwright
 ```
 
+If you want the script to post the report directly to issue `#13` after a
+successful logged-in run:
+
+```bash
+npm run check:claude-code-skill-runtime -- --issue 13
+```
+
+If you only want to save the report locally first:
+
+```bash
+npm run check:claude-code-skill-runtime -- --output /tmp/claude-runtime-report.md
+```
+
 If Claude Code is still logged out, the script exits with a clear message
 telling you to complete `/login` first.
 

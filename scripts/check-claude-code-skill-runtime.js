@@ -9,6 +9,7 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const CLAUDE_CONFIG_PATH = path.join(os.homedir(), '.claude.json');
 const MCP_URL = 'https://agent-hub-1.netlify.app/mcp';
 const DEFAULT_SKILLS = ['react', 'playwright', 'supabase-js'];
+const DEFAULT_REPO = 'FIL-Builders/agent-hub';
 
 const PROBES = {
   react: {
@@ -78,8 +79,86 @@ function removeProjectConfig(projectPath) {
 }
 
 function parseArgs(argv) {
-  const selected = argv.length ? argv : DEFAULT_SKILLS;
-  return selected.filter(Boolean);
+  const options = {
+    skills: [],
+    output: '',
+    issue: '',
+    repo: DEFAULT_REPO,
+  };
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+
+    if (arg === '--output') {
+      options.output = argv[index + 1] || '';
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--issue') {
+      options.issue = argv[index + 1] || '';
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--repo') {
+      options.repo = argv[index + 1] || options.repo;
+      index += 1;
+      continue;
+    }
+
+    if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    }
+
+    if (arg.startsWith('-')) {
+      throw new Error(`Unknown flag: ${arg}`);
+    }
+
+    options.skills.push(arg);
+  }
+
+  if (!options.skills.length) {
+    options.skills = DEFAULT_SKILLS.slice();
+  }
+
+  return options;
+}
+
+function printHelp() {
+  console.log(`
+Run logged-in Claude Code runtime probes against installed Agent Hub skills.
+
+Usage:
+  npm run check:claude-code-skill-runtime
+  npm run check:claude-code-skill-runtime -- react playwright
+  npm run check:claude-code-skill-runtime -- --issue 13
+  npm run check:claude-code-skill-runtime -- --output /tmp/report.md
+  `);
+}
+
+function maybeWriteReport(outputPath, report) {
+  if (!outputPath) {
+    return;
+  }
+
+  fs.writeFileSync(path.resolve(outputPath), `${report}\n`);
+}
+
+function maybePostReport(issueNumber, repo, report) {
+  if (!issueNumber) {
+    return;
+  }
+
+  const result = runResult('gh', ['issue', 'comment', issueNumber, '--repo', repo, '--body-file', '-'], {
+    cwd: REPO_ROOT,
+    input: report,
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `Failed to post runtime report to issue ${issueNumber}`);
+  }
 }
 
 function assertSupportedSkills(skillIds) {
@@ -91,7 +170,8 @@ function assertSupportedSkills(skillIds) {
 }
 
 function main() {
-  const skillIds = parseArgs(process.argv.slice(2));
+  const options = parseArgs(process.argv.slice(2));
+  const skillIds = options.skills;
   assertSupportedSkills(skillIds);
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-hub-claude-runtime-'));
@@ -148,7 +228,10 @@ function main() {
       reportLines.push('');
     });
 
-    console.log(reportLines.join('\n'));
+    const report = reportLines.join('\n');
+    maybeWriteReport(options.output, report);
+    maybePostReport(options.issue, options.repo, report);
+    console.log(report);
   } finally {
     removeProjectConfig(tempRoot);
     fs.rmSync(tempRoot, { recursive: true, force: true });
