@@ -151,6 +151,12 @@ Check Claude Code local skill install + MCP setup preflight:
 npm run check:claude-code-local-setup
 ```
 
+Run the logged-in Claude Code runtime validation probes:
+
+```bash
+npm run check:claude-code-skill-runtime
+```
+
 Build the full site and synced static artifacts:
 
 ```bash

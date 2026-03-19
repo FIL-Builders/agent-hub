@@ -17,6 +17,7 @@
     "install:claude-skill:pilot": "node scripts/install-claude-skill.js --pilot",
     "check:mcp-distributions": "node scripts/check-mcp-distribution-tools.mjs",
     "check:claude-code-local-setup": "node scripts/check-claude-code-local-setup.js",
+    "check:claude-code-skill-runtime": "node scripts/check-claude-code-skill-runtime.js",
     "build:site": "cd website && npm install && npm run build",
     "build": "npm run gen-mcp && npm run sync-agents && npm run build:site"
   },

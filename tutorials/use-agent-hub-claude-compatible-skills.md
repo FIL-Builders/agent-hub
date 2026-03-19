@@ -202,6 +202,38 @@ If `claude auth status` is logged out, the check will still validate local
 install and MCP config, but it will skip the final runtime session probe. That
 is the remaining Milestone B blocker in issue `#13`.
 
+### Claude Code Runtime Validation
+
+Once Claude Code is logged in, Agent Hub also includes a runtime validation
+command that probes real skill usage with three pilot packs:
+
+```bash
+npm run check:claude-code-skill-runtime
+```
+
+By default it installs and probes:
+
+* `react`
+* `playwright`
+* `supabase-js`
+
+The script:
+
+* creates a temporary Claude Code project
+* installs the selected generated skills
+* adds the deployed Agent Hub MCP server
+* runs three short Claude Code prompts against those installed skills
+* prints a markdown-ready report you can paste into issue `#13`
+
+You can also target a subset explicitly:
+
+```bash
+npm run check:claude-code-skill-runtime -- react playwright
+```
+
+If Claude Code is still logged out, the script exits with a clear message
+telling you to complete `/login` first.
+
 ## Related Guides
 
 * [Get Better Agent Answers with Agent Hub MCP](./use-agent-hub-through-mcp.md)
