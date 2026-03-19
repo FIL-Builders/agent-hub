@@ -1,0 +1,580 @@
+# TypeScript API Groups
+
+### Type Relationships
+**Exports**
+- Generics
+- keyof
+- Conditional Types
+- infer
+- satisfies
+
+Core TypeScript constructs for expressing relationships between values, types, and derived types.
+
+#### Generics
+**Kind**
+type
+
+**Summary**
+Generic parameters let one function, type, or interface express a type relationship across multiple positions.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/generics.html
+
+```ts
+function identity<T>(value: T): T;
+type Box<T> = { value: T };
+```
+
+**Guidance**
+- Use generics when the output type or callback type must track the input type.
+- Avoid adding generic parameters that do not constrain or derive anything.
+- Preserve inference by letting values drive generic arguments whenever practical.
+
+**Example**
+Language: typescript
+Description: A generic helper that preserves the element type through the callback.
+
+```ts
+function mapValues<T, R>(
+  values: readonly T[],
+  mapper: (value: T, index: number) => R,
+): R[] {
+  return values.map(mapper);
+}
+```
+
+#### keyof
+**Kind**
+other
+
+**Summary**
+`keyof` produces the union of valid property keys for a type.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/keyof-types.html
+
+```ts
+type Keys<T> = keyof T;
+```
+
+**Guidance**
+- Use `keyof` to constrain property-name parameters or derive key unions from source types.
+- Combine with indexed access types like `T[K]` to keep property access type-safe.
+- Remember that index signatures widen the resulting key union.
+
+**Example**
+Language: typescript
+Description: A property reader that only accepts valid keys.
+
+```ts
+function getProp<T, K extends keyof T>(obj: T, key: K): T[K] {
+  return obj[key];
+}
+```
+
+#### Conditional Types
+**Kind**
+type
+
+**Summary**
+Conditional types choose one result type or another based on assignability.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/conditional-types.html
+
+```ts
+type Result<T> = T extends SomeConstraint ? A : B;
+```
+
+**Guidance**
+- Use conditional types when a type-level output genuinely depends on a type-level input.
+- Watch for distributive behavior when the checked type is a naked type parameter.
+- Split deep conditional logic into named helpers before it becomes unreadable.
+
+**Example**
+Language: typescript
+Description: Extract a `message` property when the shape supports it.
+
+```ts
+type MessageOf<T> = T extends { message: unknown } ? T["message"] : never;
+```
+
+#### infer
+**Kind**
+other
+
+**Summary**
+`infer` introduces a type variable inside a conditional type so structure can be extracted from another type.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/conditional-types.html
+
+```ts
+type ElementType<T> = T extends Array<infer U> ? U : T;
+```
+
+**Guidance**
+- Use `infer` inside conditional types when you need to pull out a nested type from an existing shape.
+- Keep `infer` helpers small and specific so the extracted type is obvious to readers.
+- If the resulting conditional type becomes opaque, break it into named intermediate helpers.
+
+**Example**
+Language: typescript
+Description: Derive the resolved value type from an async function.
+
+```ts
+type AsyncValue<T> = T extends Promise<infer U> ? U : T;
+```
+
+#### satisfies
+**Kind**
+other
+
+**Summary**
+`satisfies` checks that a value conforms to a target type without widening the value to that type.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/release-notes/typescript-4-9.html#the-satisfies-operator
+
+```ts
+const routes = {
+  home: "/",
+  about: "/about",
+} satisfies Record<string, `/${string}`>;
+```
+
+**Guidance**
+- Use `satisfies` when you want shape-checking but also want to preserve narrow literal inference.
+- Prefer it over broad `as SomeType` assertions for config-like objects and constant maps.
+- It changes checking only; it does not change runtime values or runtime validation.
+
+**Example**
+Language: typescript
+Description: Validate a config object shape while preserving specific literal values.
+
+```ts
+const config = {
+  mode: "strict",
+  retries: 3,
+} satisfies { mode: "strict" | "loose"; retries: number };
+```
+
+### Narrowing and Soundness
+**Exports**
+- unknown
+- Type Predicates
+- Discriminated Unions
+
+High-value primitives for turning uncertain values into safely usable values.
+
+#### unknown
+**Kind**
+type
+
+**Summary**
+`unknown` represents a value whose type is not yet trusted and must be narrowed before specific use.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/functions.html#unknown
+
+```ts
+let value: unknown;
+```
+
+**Guidance**
+- Use `unknown` at trust boundaries such as JSON, request input, environment data, or third-party outputs.
+- Narrow it with `typeof`, `instanceof`, discriminants, or type predicates before property access or function calls.
+- Prefer it over `any` when the data is genuinely unknown.
+
+**Example**
+Language: typescript
+Description: Narrow an untrusted input into a usable port value.
+
+```ts
+function parsePort(value: unknown): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value);
+  throw new Error("Expected a string or number");
+}
+```
+
+#### Type Predicates
+**Kind**
+other
+
+**Summary**
+A type predicate tells the compiler what a successful runtime check proves about a value.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates
+
+```ts
+function isFoo(value: unknown): value is Foo;
+```
+
+**Guidance**
+- Use type predicates when the same narrowing logic is reused across multiple call sites.
+- Make the runtime check honest; a lying predicate makes downstream code unsound.
+- Prefer small, targeted predicates over one giant validator with vague semantics.
+
+**Example**
+Language: typescript
+Description: Reuse a guard for values that should look like a user object.
+
+```ts
+type User = { id: string; name: string };
+
+function isUser(value: unknown): value is User {
+  return !!value &&
+    typeof value === "object" &&
+    "id" in value &&
+    "name" in value;
+}
+```
+
+#### Discriminated Unions
+**Kind**
+type
+
+**Summary**
+A discriminated union uses a shared literal field so control flow can narrow reliably by branch.
+
+**Definition**
+Language: typescript
+Source: https://www.typescriptlang.org/docs/handbook/2/narrowing.html#discriminated-unions
+
+```ts
+type Shape =
+  | { kind: "circle"; radius: number }
+  | { kind: "square"; sideLength: number };
+```
+
+**Guidance**
+- Use a stable discriminant such as `kind`, `type`, or `status` across all union members.
+- Prefer discriminants over structural guessing when branches need precise narrowing.
+- Exhaustive `switch` statements scale better than chains of assertions when unions grow.
+
+**Example**
+Language: typescript
+Description: Compute area with branch-safe access to shape-specific fields.
+
+```ts
+function area(shape: Shape): number {
+  switch (shape.kind) {
+    case "circle":
+      return Math.PI * shape.radius ** 2;
+    case "square":
+      return shape.sideLength ** 2;
+  }
+}
+```
+
+### Built-in Utility Types
+**Exports**
+- Partial
+- Omit
+- ReturnType
+- Awaited
+
+Standard-library helpers that encode common type transformations.
+
+#### Partial
+**Kind**
+type
+
+**Summary**
+`Partial<T>` makes every property on `T` optional.
+
+**Definition**
+Language: typescript
+Source: npm:typescript@5.9.3:package/lib/lib.es5.d.ts
+
+```ts
+type Partial<T> = {
+  [P in keyof T]?: T[P];
+};
+```
+
+**Guidance**
+- Use for patch-style updates or builder-like APIs where omission is meaningful.
+- Do not use it as a blanket replacement for domain-specific input models that require runtime guarantees.
+- Remember that optional properties can still exist with an `undefined` value.
+
+**Example**
+Language: typescript
+Description: Model a user patch shape without duplicating every field.
+
+```ts
+type User = { id: string; name: string; email: string };
+type UserPatch = Partial<User>;
+```
+
+#### Omit
+**Kind**
+type
+
+**Summary**
+`Omit<T, K>` removes a set of keys from `T`.
+
+**Definition**
+Language: typescript
+Source: npm:typescript@5.9.3:package/lib/lib.es5.d.ts
+
+```ts
+type Omit<T, K extends keyof any> = Pick<T, Exclude<keyof T, K>>;
+```
+
+**Guidance**
+- Use when you want to derive a public or input-facing shape from a richer source type.
+- Prefer `Omit` over hand-copied derivative interfaces that will drift from the source.
+- Keep the omitted-key set explicit and reviewable.
+
+**Example**
+Language: typescript
+Description: Remove a sensitive field from a user type.
+
+```ts
+type User = { id: string; name: string; passwordHash: string };
+type PublicUser = Omit<User, "passwordHash">;
+```
+
+#### ReturnType
+**Kind**
+type
+
+**Summary**
+`ReturnType<T>` extracts the return type from a function type.
+
+**Definition**
+Language: typescript
+Source: npm:typescript@5.9.3:package/lib/lib.es5.d.ts
+
+```ts
+type ReturnType<T extends (...args: any) => any> =
+  T extends (...args: any) => infer R ? R : any;
+```
+
+**Guidance**
+- Use when a function signature is the single source of truth for the produced value.
+- Prefer it over repeating object shapes in multiple places.
+- Be careful with function unions whose extracted return type may become too broad.
+
+**Example**
+Language: typescript
+Description: Derive a config type from a factory function.
+
+```ts
+function buildConfig() {
+  return { strict: true, noEmit: true };
+}
+
+type BuildConfig = ReturnType<typeof buildConfig>;
+```
+
+#### Awaited
+**Kind**
+type
+
+**Summary**
+`Awaited<T>` recursively unwraps promise-like values using the same model as `await`.
+
+**Definition**
+Language: typescript
+Source: npm:typescript@5.9.3:package/lib/lib.es5.d.ts
+
+```ts
+type Awaited<T> =
+  T extends null | undefined ? T :
+  T extends object & { then(onfulfilled: infer F, ...args: infer _): any; } ?
+    F extends ((value: infer V, ...args: infer _) => any) ? Awaited<V> : never :
+  T;
+```
+
+**Guidance**
+- Use for async helpers that need the resolved value type of a promise-returning function or promise-like value.
+- Prefer it over home-grown promise-unwrapping helpers when the built-in behavior matches the need.
+- Remember that it recursively unwraps nested promise-like structures.
+
+**Example**
+Language: typescript
+Description: Derive the resolved type from an async loader.
+
+```ts
+async function loadUser() {
+  return { id: "u1", name: "Ada" };
+}
+
+type LoadedUser = Awaited<ReturnType<typeof loadUser>>;
+```
+
+### Compiler Configuration
+**Exports**
+- strict
+- moduleResolution
+- paths
+- noEmit
+
+Compiler options with outsized impact on correctness, imports, and build flow.
+
+#### strict
+**Kind**
+config
+
+**Summary**
+`strict` enables the main family of TypeScript strictness checks as a single baseline switch.
+
+**Definition**
+Language: json
+Source: https://www.typescriptlang.org/tsconfig#strict
+
+```json
+{
+  "compilerOptions": {
+    "strict": true
+  }
+}
+```
+
+**Guidance**
+- Use this as the default baseline unless the repo is in a staged migration.
+- Expect stricter checking around nullability, parameter compatibility, and unchecked assumptions.
+- Prefer explicit, local opt-outs over globally disabling strictness.
+
+**Example**
+Language: json
+Description: A small strict type-checking baseline for application code.
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true
+  }
+}
+```
+
+#### moduleResolution
+**Kind**
+config
+
+**Summary**
+`moduleResolution` chooses how the compiler resolves import specifiers and packages.
+
+**Definition**
+Language: json
+Source: https://www.typescriptlang.org/tsconfig#moduleResolution
+
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "bundler"
+  }
+}
+```
+
+**Guidance**
+- Match this setting to the actual environment: bundler, Node.js hybrid package rules, or another supported resolver model.
+- Do not assume `module` alone chooses the correct lookup behavior.
+- Many import and declaration errors come from a mismatch between compiler assumptions and the real runtime or bundler.
+
+**Example**
+Language: json
+Description: A bundler-oriented modern ESM setup.
+
+```json
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler"
+  }
+}
+```
+
+#### paths
+**Kind**
+config
+
+**Summary**
+`paths` remaps module specifiers for compiler lookup relative to project structure.
+
+**Definition**
+Language: json
+Source: https://www.typescriptlang.org/tsconfig#paths
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  }
+}
+```
+
+**Guidance**
+- Use only when the rest of the toolchain or runtime agrees on the same alias rules.
+- Remember that `paths` affects TypeScript resolution, not emitted runtime specifiers.
+- Keep aliases simple and obvious; wide alias schemes are hard to debug.
+
+**Example**
+Language: json
+Description: Align two simple aliases with a `src`-based project layout.
+
+```json
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@components/*": ["src/components/*"],
+      "@lib/*": ["src/lib/*"]
+    }
+  }
+}
+```
+
+#### noEmit
+**Kind**
+config
+
+**Summary**
+`noEmit` tells the compiler to type-check without writing output files.
+
+**Definition**
+Language: json
+Source: https://www.typescriptlang.org/tsconfig#noEmit
+
+```json
+{
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
+```
+
+**Guidance**
+- Use when another tool emits JavaScript and `tsc` is only responsible for correctness checks.
+- Prefer this in CI or editor-driven workflows where emitted output would be discarded.
+- It changes emission only; it does not reduce the scope of checking.
+
+**Example**
+Language: json
+Description: A type-check-only compiler setup for bundler-managed builds.
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true
+  }
+}
+```

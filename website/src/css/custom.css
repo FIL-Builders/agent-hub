@@ -969,6 +969,7 @@ html[data-theme='dark'] .glass-panel::after {
 }
 
 .agent-lang-pill,
+.agent-distribution-pill,
 .agent-version-latest,
 .pill-link {
   display: inline-flex;
@@ -983,6 +984,13 @@ html[data-theme='dark'] .glass-panel::after {
   padding: 0.4rem 0.6rem;
   text-decoration: none;
   word-break: break-word;
+}
+
+.agent-distribution-pill {
+  margin-left: 0.45rem;
+  border-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent) / 0.16);
 }
 
 .agent-versions-row {
@@ -1013,6 +1021,13 @@ html[data-theme='dark'] .glass-panel::after {
   overflow: hidden;
 }
 
+.agent-card-note {
+  margin: 0;
+  color: hsl(var(--foreground));
+  line-height: 1.6;
+  font-size: 0.96rem;
+}
+
 .agent-card-footer {
   display: flex;
   justify-content: space-between;
@@ -1021,8 +1036,20 @@ html[data-theme='dark'] .glass-panel::after {
   margin-top: auto;
 }
 
+.agent-card-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
 .pill-link {
   color: hsl(var(--foreground));
+}
+
+.pill-link--accent {
+  border-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  background: hsl(var(--accent) / 0.14);
 }
 
 .pill-link:hover {
@@ -1233,6 +1260,97 @@ html[data-theme='dark'] .glass-panel::after {
 
 .spec-card-content.markdown > :last-child {
   margin-bottom: 0;
+}
+
+.skill-bundle-shell {
+  display: grid;
+  grid-template-columns: minmax(16rem, 0.72fr) minmax(0, 1.35fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.skill-bundle-nav {
+  position: sticky;
+  top: calc(var(--ifm-navbar-height) + 1rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.2rem;
+}
+
+.skill-bundle-nav__header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.skill-bundle-nav__title {
+  margin: 0;
+}
+
+.skill-bundle-nav__copy {
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.6;
+}
+
+.skill-bundle-nav__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.skill-bundle-nav__files {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.skill-bundle-nav__file {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background) / 0.7);
+  color: hsl(var(--foreground));
+  text-align: left;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.skill-bundle-nav__file.is-active,
+.skill-bundle-nav__file:hover,
+.skill-bundle-nav__file:focus-visible {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.12);
+  color: hsl(var(--foreground));
+}
+
+.skill-bundle-main {
+  min-width: 0;
+}
+
+.skill-bundle-install {
+  margin: 0 0 1rem;
+  padding: 1rem 1.15rem;
+}
+
+.skill-bundle-install__copy {
+  margin: 0;
+  color: hsl(var(--foreground));
+  line-height: 1.65;
+}
+
+.skill-bundle-code {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  overflow: auto;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--secondary) / 0.12);
+  color: hsl(var(--foreground));
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.82rem;
+  line-height: 1.6;
 }
 
 .spec-card-line {
@@ -1767,6 +1885,14 @@ footer a {
     grid-template-columns: 1fr;
   }
 
+  .skill-bundle-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-bundle-nav {
+    position: static;
+  }
+
   .theme-doc-sidebar-container {
     box-shadow: none;
     background: transparent;
@@ -1823,5 +1949,13 @@ footer a {
 
   .spec-card-content {
     font-size: 0.82rem;
+  }
+
+  .agent-distribution-pill {
+    margin-left: 0;
+  }
+
+  .agent-card-footer__links {
+    width: 100%;
   }
 }
