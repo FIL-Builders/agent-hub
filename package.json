@@ -11,6 +11,7 @@
     "generate:claude-skill": "node scripts/pack-to-claude-skill.js",
     "generate:claude-skill:pilot": "node scripts/pack-to-claude-skill.js --pilot",
     "check:claude-skill": "node scripts/pack-to-claude-skill.js --pilot --check",
+    "check:mcp-distributions": "node scripts/check-mcp-distribution-tools.mjs",
     "build:site": "cd website && npm install && npm run build",
     "build": "npm run gen-mcp && npm run sync-agents && npm run build:site"
   },

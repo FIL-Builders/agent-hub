@@ -9,7 +9,7 @@
   directory = "netlify/functions"
 
 [functions."mcp"]
-  included_files = ["agents/**"]
+  included_files = ["agents/**", "distributions/**"]
 
 [[redirects]]
   from = "/.well-known/mcp/health"

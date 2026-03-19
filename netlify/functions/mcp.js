@@ -149,6 +149,10 @@ export const config = { path: "/mcp" };
 
 async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
   const server = new McpServer({ name: "agent-hub", version: "1.1.0" }, { capabilities: { logging: {} } });
+  const DISTRIBUTIONS_DIR = path.join(process.cwd(), "distributions", "claude");
+  const DISTRIBUTION_LABELS = {
+    claude: "Claude-compatible skill"
+  };
 
   // Register tools using the config API so inputSchema is honored (raw Zod shape)
   server.registerTool(
@@ -233,6 +237,108 @@ async function buildServer({ McpServer, z, fs, path, AGENTS_DIR }) {
     }
   );
 
+  // Chosen PR 4 design: add new distribution-specific tools instead of changing
+  // the existing pack tools. This preserves backward compatibility for current
+  // Markdown-pack clients while exposing generated Claude-compatible bundles.
+  server.registerTool(
+    "agenthub_distributions",
+    {
+      title: "AgentHub: List Distributions",
+      description:
+        "List available distributions for a tool_id and version.\n" +
+        "- version: string or 'latest' (default 'latest').\n" +
+        "Returns JSON text: { tool_id, version, distributions: [{ distribution, label, entrypoint, files, description }] }.",
+      inputSchema: {
+        tool_id: z.string().describe("Tool folder under agents/"),
+        version: z.string().optional().default("latest")
+      }
+    },
+    async ({ tool_id, version = "latest" }) => {
+      const selectedVersion = await resolveVersion({ fs, path, AGENTS_DIR, tool_id, version });
+      const distributions = await listDistributions({
+        fs,
+        path,
+        DISTRIBUTIONS_DIR,
+        tool_id,
+        version: selectedVersion,
+        distributionLabels: DISTRIBUTION_LABELS
+      });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ tool_id, version: selectedVersion, distributions }, null, 2)
+          }
+        ]
+      };
+    }
+  );
+
+  server.registerTool(
+    "agenthub_fetch_distribution",
+    {
+      title: "AgentHub: Fetch Distribution",
+      description:
+        "Fetch a generated distribution bundle for a tool_id and version.\n" +
+        "- version: string or 'latest' (default 'latest').\n" +
+        "- distribution: distribution slug (default 'claude').\n" +
+        "Returns JSON text with entrypoint and file contents.",
+      inputSchema: {
+        tool_id: z.string().describe("Tool folder under agents/"),
+        version: z.string().optional().default("latest"),
+        distribution: z.string().optional().default("claude")
+      }
+    },
+    async ({ tool_id, version = "latest", distribution = "claude" }) => {
+      const selectedVersion = await resolveVersion({ fs, path, AGENTS_DIR, tool_id, version });
+      const bundle = await readDistributionBundle({
+        fs,
+        path,
+        DISTRIBUTIONS_DIR,
+        tool_id,
+        version: selectedVersion,
+        distribution,
+        distributionLabels: DISTRIBUTION_LABELS
+      });
+
+      return { content: [{ type: "text", text: JSON.stringify(bundle, null, 2) }] };
+    }
+  );
+
+  server.registerTool(
+    "agenthub_fetch_distribution_file",
+    {
+      title: "AgentHub: Fetch Distribution File",
+      description:
+        "Fetch a specific file from a generated distribution bundle.\n" +
+        "- version: string or 'latest' (default 'latest').\n" +
+        "- distribution: distribution slug (default 'claude').\n" +
+        "- file_path: relative path inside the distribution bundle, e.g. 'SKILL.md'.\n" +
+        "Returns raw file text.",
+      inputSchema: {
+        tool_id: z.string().describe("Tool folder under agents/"),
+        version: z.string().optional().default("latest"),
+        distribution: z.string().optional().default("claude"),
+        file_path: z.string().describe("Relative file path inside the distribution bundle")
+      }
+    },
+    async ({ tool_id, version = "latest", distribution = "claude", file_path }) => {
+      const selectedVersion = await resolveVersion({ fs, path, AGENTS_DIR, tool_id, version });
+      const fileText = await readDistributionFile({
+        fs,
+        path,
+        DISTRIBUTIONS_DIR,
+        tool_id,
+        version: selectedVersion,
+        distribution,
+        filePath: file_path
+      });
+
+      return { content: [{ type: "text", text: fileText }] };
+    }
+  );
+
   // Optional helper: return same docs available via GET /mcp as an MCP tool
   server.registerTool(
     "agenthub_docs",
@@ -271,6 +377,24 @@ async function listVersions({ fs, path, AGENTS_DIR, tool_id }) {
     .map((file) => file.replace(/\.md$/i, "")))];
 }
 
+async function resolveVersion({ fs, path, AGENTS_DIR, tool_id, version = "latest" }) {
+  const versions = await listVersions({ fs, path, AGENTS_DIR, tool_id }).catch(() => []);
+  if (!versions.length) {
+    throw new Error(`Unknown tool_id '${tool_id}'. No versions found under agents/${tool_id}.`);
+  }
+
+  let selected = version;
+  if (version === "latest") {
+    selected = [...versions].sort().reverse()[0];
+  }
+
+  if (!versions.includes(selected)) {
+    throw new Error(`Unknown version '${version}' for tool '${tool_id}'. Available: [${versions.join(", ")}]`);
+  }
+
+  return selected;
+}
+
 async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
   let v = version;
   if (v === "latest") {
@@ -280,6 +404,119 @@ async function readAgentByName({ fs, path, AGENTS_DIR, name, version }) {
   }
   const filePath = path.join(AGENTS_DIR, name, `${v}.md`);
   return await fs.readFile(filePath, "utf-8");
+}
+
+async function listDistributions({ fs, path, DISTRIBUTIONS_DIR, tool_id, version, distributionLabels }) {
+  const distributions = [];
+  const manifestPath = path.join(DISTRIBUTIONS_DIR, tool_id, version, "manifest.json");
+  try {
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    distributions.push({
+      distribution: manifest.distribution || "claude",
+      label: distributionLabels[manifest.distribution || "claude"] || manifest.distribution || "claude",
+      entrypoint: manifest.entrypoint,
+      files: manifest.files,
+      description: manifest.description
+    });
+  } catch (error) {
+    if (error && error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+
+  return distributions;
+}
+
+function normalizeDistributionFilePath(filePath = "") {
+  const normalized = String(filePath || "").replace(/^\/+/, "");
+  if (!normalized || normalized.includes("..") || pathIsAbsolute(normalized)) {
+    throw new Error(`Invalid distribution file path '${filePath}'. Expected a relative file path inside the bundle.`);
+  }
+  return normalized;
+}
+
+function pathIsAbsolute(candidate) {
+  return candidate.startsWith("/") || /^[A-Za-z]:[\\/]/.test(candidate);
+}
+
+async function readDistributionManifest({ fs, path, DISTRIBUTIONS_DIR, tool_id, version, distribution }) {
+  if (distribution !== "claude") {
+    throw new Error(`Unknown distribution '${distribution}' for tool '${tool_id}'. Available: [claude]`);
+  }
+
+  const manifestPath = path.join(DISTRIBUTIONS_DIR, tool_id, version, "manifest.json");
+  let manifest;
+  try {
+    manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+  } catch (error) {
+    if (error && error.code === "ENOENT") {
+      throw new Error(
+        `No '${distribution}' distribution found for tool '${tool_id}' at version '${version}'.`
+      );
+    }
+    throw error;
+  }
+
+  return {
+    manifest,
+    bundleDir: path.join(DISTRIBUTIONS_DIR, tool_id, version)
+  };
+}
+
+async function readDistributionFile({ fs, path, DISTRIBUTIONS_DIR, tool_id, version, distribution, filePath }) {
+  const { manifest, bundleDir } = await readDistributionManifest({
+    fs,
+    path,
+    DISTRIBUTIONS_DIR,
+    tool_id,
+    version,
+    distribution
+  });
+  const normalized = normalizeDistributionFilePath(filePath);
+  if (!manifest.files.includes(normalized)) {
+    throw new Error(
+      `Unknown file '${filePath}' for distribution '${distribution}' on tool '${tool_id}' version '${version}'. ` +
+      `Available: [${manifest.files.join(", ")}]`
+    );
+  }
+  return await fs.readFile(path.join(bundleDir, normalized), "utf8");
+}
+
+async function readDistributionBundle({
+  fs,
+  path,
+  DISTRIBUTIONS_DIR,
+  tool_id,
+  version,
+  distribution,
+  distributionLabels
+}) {
+  const { manifest, bundleDir } = await readDistributionManifest({
+    fs,
+    path,
+    DISTRIBUTIONS_DIR,
+    tool_id,
+    version,
+    distribution
+  });
+
+  const files = [];
+  for (const file of manifest.files) {
+    files.push({
+      path: file,
+      content: await fs.readFile(path.join(bundleDir, file), "utf8")
+    });
+  }
+
+  return {
+    tool_id,
+    version,
+    distribution,
+    label: distributionLabels[distribution] || distribution,
+    entrypoint: manifest.entrypoint,
+    description: manifest.description,
+    files
+  };
 }
 
 function corsHeaders() {
@@ -350,6 +587,71 @@ function buildDocsJSON({ baseUrl }) {
         }
       },
       {
+        name: "agenthub_distributions",
+        description:
+          "List generated distributions for a tool_id and version, including Claude-compatible skill bundles when available.",
+        params: { tool_id: "string", version: "optional string|'latest' (default 'latest')" },
+        response: "JSON text: { tool_id, version, distributions: [{ distribution, label, entrypoint, files, description }] }",
+        examples: {
+          rpc: {
+            jsonrpc: "2.0",
+            id: "4",
+            method: "callTool",
+            params: { name: "agenthub_distributions", arguments: { tool_id: "react", version: "latest" } }
+          }
+        }
+      },
+      {
+        name: "agenthub_fetch_distribution",
+        description:
+          "Fetch a full generated distribution bundle for a tool_id and version. Today this is primarily used for Claude-compatible skill bundles.",
+        params: {
+          tool_id: "string",
+          version: "optional string|'latest' (default 'latest')",
+          distribution: "optional string (default 'claude')"
+        },
+        response: "JSON text with entrypoint and file contents",
+        examples: {
+          rpc: {
+            jsonrpc: "2.0",
+            id: "5",
+            method: "callTool",
+            params: {
+              name: "agenthub_fetch_distribution",
+              arguments: { tool_id: "react", version: "latest", distribution: "claude" }
+            }
+          }
+        }
+      },
+      {
+        name: "agenthub_fetch_distribution_file",
+        description:
+          "Fetch a single file from a generated distribution bundle, for example 'SKILL.md' or a references file.",
+        params: {
+          tool_id: "string",
+          version: "optional string|'latest' (default 'latest')",
+          distribution: "optional string (default 'claude')",
+          file_path: "relative file path inside the distribution bundle"
+        },
+        response: "Raw file text",
+        examples: {
+          rpc: {
+            jsonrpc: "2.0",
+            id: "6",
+            method: "callTool",
+            params: {
+              name: "agenthub_fetch_distribution_file",
+              arguments: {
+                tool_id: "react",
+                version: "latest",
+                distribution: "claude",
+                file_path: "SKILL.md"
+              }
+            }
+          }
+        }
+      },
+      {
         name: "agenthub_docs",
         description: "Return these docs as JSON text",
         params: {},
@@ -358,6 +660,7 @@ function buildDocsJSON({ baseUrl }) {
     ],
     notes: [
       "Agents directory layout: agents/<tool_id>/<version>.md",
+      "Claude-compatible distributions live under distributions/claude/<tool_id>/<version>/",
       "Filtering is only on tool_id; descriptions/tags are not indexed",
       "Versions are compared lexicographically (not semver-aware)",
       "No authentication; consider adding in production",
