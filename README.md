@@ -145,6 +145,12 @@ Check the MCP distribution tools locally:
 npm run check:mcp-distributions
 ```
 
+Check Claude Code local skill install + MCP setup preflight:
+
+```bash
+npm run check:claude-code-local-setup
+```
+
 Build the full site and synced static artifacts:
 
 ```bash

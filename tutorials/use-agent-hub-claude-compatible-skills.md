@@ -182,6 +182,26 @@ or:
 Use this when you are validating generated skills in Claude Code or another
 filesystem-based Claude-compatible environment.
 
+### Claude Code Local Setup Check
+
+Agent Hub also includes a local preflight command that validates the
+filesystem-based pieces of Claude Code integration:
+
+```bash
+npm run check:claude-code-local-setup
+```
+
+This check:
+
+* installs the pilot skills into a temporary `.claude/skills/` directory
+* adds the deployed Agent Hub MCP server to a temporary Claude Code project config
+* confirms Claude Code reports the MCP server as connected
+* cleans up the temporary project config afterward
+
+If `claude auth status` is logged out, the check will still validate local
+install and MCP config, but it will skip the final runtime session probe. That
+is the remaining Milestone B blocker in issue `#13`.
+
 ## Related Guides
 
 * [Get Better Agent Answers with Agent Hub MCP](./use-agent-hub-through-mcp.md)
