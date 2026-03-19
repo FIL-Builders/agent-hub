@@ -1,6 +1,6 @@
 # MCP Server on Netlify — Minimal HTTP Setup
 
-This repo exposes a minimal, standard MCP server using Netlify Functions and the official MCP SDK’s Streamable HTTP transport. It serves a small, stable tool surface to browse and fetch versioned agent Markdown files from `agents/**`.
+This repo exposes a minimal, standard MCP server using Netlify Functions and the official MCP SDK’s Streamable HTTP transport. It serves a small, stable tool surface to browse and fetch versioned agent Markdown files from `agents/**` and generated Claude-compatible skill bundles from `distributions/claude/**`.
 
 Key files:
 - `netlify/functions/mcp.js:1` — Streamable HTTP MCP server (SDK)
@@ -16,6 +16,9 @@ Key files:
     - `agenthub_list` — args `{ q?: string, limit?: number, offset?: number }`; returns a JSON page of `{ tool_id, versions }`.
     - `agenthub_versions` — args `{ tool_id }`; returns `{ tool_id, versions }`.
     - `agenthub_fetch` — args `{ tool_id, version?: string|'latest' }`; returns raw spec text.
+    - `agenthub_distributions` — args `{ tool_id, version?: string|'latest' }`; returns available generated distributions for that tool/version.
+    - `agenthub_fetch_distribution` — args `{ tool_id, version?: string|'latest', distribution?: string }`; returns a machine-readable distribution bundle with file contents.
+    - `agenthub_fetch_distribution_file` — args `{ tool_id, version?: string|'latest', distribution?: string, file_path }`; returns raw file text from a generated bundle.
     - `agenthub_docs` — returns server/tool docs as JSON.
 
 
@@ -34,6 +37,18 @@ agents/
 - `listTools` is built from the folders present in `agents/`.
 - `getToolManifest` and `runTool` read versions by filename (without `.md`).
 - `runTool` with `version: "latest"` sorts versions lexicographically descending and returns the first one.
+
+Generated Claude-compatible skills live in:
+
+```
+distributions/
+  claude/
+    <tool_id>/
+      <version>/
+        SKILL.md
+        references/
+        manifest.json
+```
 
 
 ## Quick Start (Local Dev)
@@ -68,8 +83,8 @@ curl -sS -X POST http://localhost:8888/mcp \
 
 ## JSON‑RPC Methods (via SDK)
 
-- tools/list → returns 4 tools
-- tools/call → routes to `agenthub_list`, `agenthub_versions`, `agenthub_fetch`, `agenthub_docs`
+- tools/list → returns 7 tools
+- tools/call → routes to `agenthub_list`, `agenthub_versions`, `agenthub_fetch`, `agenthub_distributions`, `agenthub_fetch_distribution`, `agenthub_fetch_distribution_file`, `agenthub_docs`
 
 
 SSE is not required in this minimal setup.
@@ -78,7 +93,7 @@ SSE is not required in this minimal setup.
 ## Deployment Notes
 
 - `export const config = { path: "/mcp" }` in `netlify/functions/mcp.js:1` exposes `/mcp` directly.
-- `[functions."mcp"].included_files = ["agents/**"]` ensures the Markdown agents ship with the function bundle.
+- `[functions."mcp"].included_files = ["agents/**", "distributions/**"]` ensures both canonical packs and generated skill bundles ship with the function bundle.
 - Push to a Netlify‑connected repo, or build locally with `npm run build` and let Netlify CI run the same.
 
 - GET `/.well-known/mcp/health`
