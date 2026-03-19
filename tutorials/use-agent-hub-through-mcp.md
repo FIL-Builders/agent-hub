@@ -10,12 +10,19 @@ Stop pasting giant agent specs into prompts.
 
 Agent Hub MCP gives your model a cleaner path: connect once, discover available packs, list versions, and fetch the exact spec it needs at runtime. The result is smaller prompts, fresher context, and more repeatable results when you pin versions.
 
+Agent Hub also supports generated Claude-compatible skills as a second
+distribution path. MCP is the runtime retrieval path. The generated
+Claude-compatible skill is the local file-install path.
+
 With MCP, your coding agent can:
 
 * discover available packs
 * list versions for a specific tool
 * fetch the exact Markdown spec it needs
 * retrieve context deliberately instead of carrying oversized prompt material up front
+
+If you specifically want the local file-based path instead, read
+[Use Agent Hub Claude-Compatible Skills](/tutorials/use-agent-hub-claude-compatible-skills).
 
 If you want the proof that delivery shape matters, read [Better Context, Better Fixes: Why AgentHub MCP Won a Real React Test](/blog/0005-why-agenthub-mcp-won-react-context-test). In our latest four-way React comparison, Agent Hub MCP outperformed direct-file, no-pack, and inline-pack delivery, finishing first at **59/60**, **9.8/10**, and **rank #1**.
 
@@ -49,6 +56,12 @@ That is why the onboarding prompt now asks the agent to fetch the `agent-hub` pa
 * pin versions when reproducibility matters
 * skip Agent Hub when the task does not need versioned technical context
 
+If the environment also supports local Claude-compatible skills, the routing
+guidance should help the agent distinguish between:
+
+* MCP for runtime retrieval
+* generated local skills for file-based installation
+
 ---
 
 ## **What Agent Hub MCP Gives You**
@@ -66,6 +79,10 @@ Today that surface includes:
 * `agenthub_docs` — fetch server and tooling docs
 
 This is the difference between manually opening a Markdown file for every session and letting your MCP-aware client pull the right pack when it actually needs it.
+
+That runtime path is different from the generated Claude-compatible skill path.
+If you want a local `SKILL.md` bundle rather than live retrieval, use the
+generated distribution instead of the raw canonical pack.
 
 ---
 
@@ -293,6 +310,28 @@ Use an explicit version when:
 * your workflow or product depends on a known pack revision
 
 This is one of the quiet advantages of Agent Hub over ad hoc prompt snippets: versioned context is much easier to reason about and audit.
+
+---
+
+## **Canonical Pack Vs Generated Claude-Compatible Skill**
+
+Use the canonical pack when you want:
+
+* the authoritative Agent Hub source
+* raw Markdown retrieved via `agenthub_fetch`
+* the thing contributors edit and review directly
+
+Use the generated Claude-compatible skill when you want:
+
+* a local `SKILL.md` bundle
+* a file-based install for Claude-compatible environments
+* progressive disclosure through `SKILL.md` plus supporting references
+
+Agent Hub supports both, but they have different jobs.
+
+If you need the file-based path, read:
+
+* [Use Agent Hub Claude-Compatible Skills](/tutorials/use-agent-hub-claude-compatible-skills)
 
 ---
 
