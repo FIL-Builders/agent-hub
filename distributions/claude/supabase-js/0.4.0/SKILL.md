@@ -9,7 +9,7 @@ Use this skill when the task depends on Supabase client behavior across auth, da
 
 ## Purpose
 
-This pack teaches an agent to use `@supabase/supabase-js` as the isomorphic JavaScript client for Supabase services: initialize the client correctly for the target runtime, use auth/session APIs with the right trust model, query PostgREST tables and RPC functions, manage storage buckets and files, subscribe to Realtime channels, and invoke deployed Edge Functions without confusing client SDK usage with dashboard configuration or server-side authoring workflows.
+This skill teaches an agent to use `@supabase/supabase-js` as the isomorphic JavaScript client for Supabase services: initialize the client correctly for the target runtime, use auth/session APIs with the right trust model, query PostgREST tables and RPC functions, manage storage buckets and files, subscribe to Realtime channels, and invoke deployed Edge Functions without confusing client SDK usage with dashboard configuration or server-side authoring workflows.
 
 ## When to use this skill
 

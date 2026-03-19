@@ -187,6 +187,41 @@ Use the same rubric each time so scores are comparable across packs.
 * `5-6`: partially helpful, but shallow or incomplete
 * `0-4`: materially wrong or not useful
 
+## Comparing A Canonical Pack To A Generated Claude-Compatible Skill
+
+When you compare a canonical Agent Hub pack to a generated Claude-compatible
+skill, keep the evaluation honest about the tradeoff:
+
+* the canonical pack is the richer authoring source of truth
+* the generated skill is the distribution optimized for routing and progressive disclosure
+
+That means the generated skill does not need to win on one-file density to pass.
+It needs to preserve enough task-critical fidelity that an agent can still do
+real work correctly.
+
+### Additional checks for a generated skill
+
+During inspection, add these questions:
+
+* does `SKILL.md` clearly say when the skill should trigger?
+* is `SKILL.md` lean, or did the generator just dump the whole pack into it?
+* do the `Read next` links point to files that actually exist?
+* is the critical API surface preserved in `references/api-groups.md`?
+* did the generator drop any operational guidance that a real task still needs?
+
+### Pass / fail rule for generated skills
+
+A generated Claude-compatible skill is good enough to ship when:
+
+* it remains clearly triggerable from `name` and `description`
+* it preserves the task-critical API and workflow guidance from the canonical pack
+* it keeps the entrypoint small enough to be useful as a local skill
+* any losses are limited to non-critical density or provenance detail, not answer quality
+
+If a generated skill forces an agent to lose the key caveats, APIs, or
+troubleshooting steps needed for the target task, it is not ready even if the
+folder structure is valid.
+
 ## Suggested Sub-Agent Prompt Template
 
 Use a prompt like this for each candidate:
@@ -300,6 +335,3 @@ The best evaluations are specific and repeatable. Avoid loose statements like
 show the outputs, score them, and explain the tradeoff.
 
 That makes the decision auditable and gives the next iteration a clear target.
----
-hide_table_of_contents: true
----

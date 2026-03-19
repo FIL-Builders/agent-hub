@@ -9,7 +9,7 @@ Use this skill when the task is about Agent Hub itself: fetching packs, choosing
 
 ## Purpose
 
-This pack teaches an agent to use Agent Hub as a versioned context-delivery system: discover available packs, inspect versions, fetch the exact pack needed at task time, verify MCP-based retrieval without overfitting the workflow to any single example pack such as `react`, and follow the repo’s own v0.4 pack generation workflow when creating or revising Agent Hub packs locally.
+This skill teaches an agent to use Agent Hub as a versioned context-delivery system: discover available packs, inspect versions, fetch the exact pack needed at task time, verify MCP-based retrieval without overfitting the workflow to any single example pack such as `react`, and follow the repo’s own v0.4 pack generation workflow when creating or revising Agent Hub packs locally.
 
 ## When to use this skill
 

@@ -2,11 +2,11 @@
 hide_table_of_contents: true
 ---
 
-# Getting Started: Loading Your First Agent File
+# Getting Started: Loading Your First Agent Pack
 
 ---
 
-Welcome to AgentHub! In this quick tutorial, you’ll learn how to **find, load, and benefit from your first AgentHub agent file**—all in just a few minutes. No plugins, no custom tools—just copy, paste, and power up your LLM sessions with expert knowledge.
+Welcome to AgentHub! In this quick tutorial, you’ll learn how to **find, load, and benefit from your first AgentHub pack**—all in just a few minutes. No plugins, no custom tools—just copy, paste, and give your LLM sessions better guidance.
 
 ---
 
@@ -19,7 +19,7 @@ Go to the [AgentHub agents directory](https://github.com/FIL-Builders/agent-hub/
 
 ---
 
-## **Step 2: Open and Copy the Agent Markdown File**
+## **Step 2: Open and Copy the Canonical Markdown Pack**
 
 * Inside each tool’s folder, you’ll find a versioned Markdown file (for example, `0.3.0.md`).
 * Click on the Markdown file to view its contents.
@@ -27,30 +27,30 @@ Go to the [AgentHub agents directory](https://github.com/FIL-Builders/agent-hub/
 
 ---
 
-## **Step 3: Load the Agent File Into Your LLM**
+## **Step 3: Load the Pack Into Your LLM**
 
 How you do this depends on your LLM stack:
 
 * **ChatGPT, Claude, Perplexity, etc.:**
 
   * Start a new chat.
-  * Paste the agent Markdown spec as your first message or system prompt.
+  * Paste the canonical Markdown pack as your first message or system prompt.
   * Continue with your development questions and requests.
 
 * **Ollama, LM Studio, LocalAI, etc.:**
 
   * Use the “system prompt” or “context” field in your interface.
-  * Paste the agent Markdown spec before your instructions.
+  * Paste the canonical Markdown pack before your instructions.
 
 * **Custom LLM/agentic tools:**
 
-  * Supply the agent file as part of your context window or prompt assembly step.
+  * Supply the pack as part of your context window or prompt assembly step.
 
 ---
 
 ## **Step 4: Start Your Session!**
 
-With the agent file loaded, your LLM will now:
+With the pack loaded, your LLM will now:
 
 * Apply best practices for the tool or API
 * Avoid common pitfalls and anti-patterns
@@ -59,7 +59,7 @@ With the agent file loaded, your LLM will now:
 **Example Prompt:**
 
 ```
-(system prompt): [paste agent Markdown spec here]
+(system prompt): [paste canonical Markdown pack here]
 (user prompt): Generate a React component for a signup form with email validation.
 ```
 
@@ -67,9 +67,9 @@ With the agent file loaded, your LLM will now:
 
 ## **Pro Tips**
 
-* **Stack agents:** You can load multiple agent files if you’re using more than one tool (e.g., React + Redux).
-* **Customize:** Feel free to edit or annotate the Markdown spec for your specific needs.
-* **Check for updates:** The [AgentHub registry](https://github.com/FIL-Builders/agent-hub/tree/main/agents) is growing—come back for new and improved agent files.
+* **Stack packs:** You can load multiple packs if you’re using more than one tool (e.g., React + Redux).
+* **Customize:** Feel free to edit or annotate the Markdown pack for your specific needs.
+* **Check for updates:** The [AgentHub registry](https://github.com/FIL-Builders/agent-hub/tree/main/agents) is growing—come back for new and improved packs.
 
 ---
 
@@ -91,10 +91,10 @@ A: [Contribute back via Pull Request](https://github.com/FIL-Builders/agent-hub/
 
 ## **Next Steps**
 
-* Try your first agent file now!
-* Browse for agents covering other tools or APIs you use.
-* Want to help others? Write or improve an agent file for your favorite stack.
+* Try your first pack now!
+* Browse for packs covering other tools or APIs you use.
+* Want to help others? Write or improve a pack for your favorite stack.
 
 ---
 
-**AgentHub makes every LLM session smarter. Welcome aboard, and happy agent-crafting! 🌱**
+**AgentHub makes every LLM session smarter. Welcome aboard, and happy pack-crafting! 🌱**

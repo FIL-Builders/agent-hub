@@ -9,7 +9,7 @@ Use this skill when the task is about Playwright test authoring, locator strateg
 
 ## Purpose
 
-This pack teaches an agent to use Playwright Test at a senior-developer level: write resilient locator-first tests, use fixtures and projects instead of ad hoc shared setup, debug failures with traces and HTML reports, and run Playwright reliably in CI without falling back to brittle sleeps or selector hacks.
+This skill teaches an agent to use Playwright Test at a senior-developer level: write resilient locator-first tests, use fixtures and projects instead of ad hoc shared setup, debug failures with traces and HTML reports, and run Playwright reliably in CI without falling back to brittle sleeps or selector hacks.
 
 ## When to use this skill
 

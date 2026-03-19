@@ -53,7 +53,7 @@ export default function AgentCard({ project, latest, older = [], meta = {}, late
           <button className="agent-action-btn" onClick={() => setOpenMenu((v) => !v)} title="Actions">Actions ▾</button>
           {openMenu && (
             <div className="spec-dropdown-menu" style={{ right: 0, left: 'auto' }}>
-              <a className="spec-dropdown-item" href={specPageUrl}>🔍 View Spec</a>
+              <a className="spec-dropdown-item" href={specPageUrl}>🔍 View Canonical Pack</a>
               {skillPageUrl && (
                 <a className="spec-dropdown-item" href={skillPageUrl}>🧠 View Claude Skill</a>
               )}
@@ -125,7 +125,7 @@ export default function AgentCard({ project, latest, older = [], meta = {}, late
         <div className="action-sheet-overlay" onClick={() => setSheetOpen(false)}>
           <div className="action-sheet" role="dialog" aria-label="Available Actions" onClick={(e) => e.stopPropagation()}>
             <div className="action-sheet-header">Available Actions</div>
-            <a className="action-sheet-item" href={specPageUrl} onClick={() => setSheetOpen(false)}>🔍 View Spec</a>
+            <a className="action-sheet-item" href={specPageUrl} onClick={() => setSheetOpen(false)}>🔍 View Canonical Pack</a>
             {skillPageUrl && (<a className="action-sheet-item" href={skillPageUrl} onClick={() => setSheetOpen(false)}>🧠 View Claude Skill</a>)}
             <a className="action-sheet-item" href={rawUrl} download onClick={() => setSheetOpen(false)}>⬇️ Download</a>
             {promptText && (<a className="action-sheet-item" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setSheetOpen(false)}>🤖 Open in ChatGPT</a>)}
