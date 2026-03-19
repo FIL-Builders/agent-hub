@@ -126,6 +126,19 @@ Check generated Claude-compatible bundles for drift:
 npm run check:claude-skill
 ```
 
+Install a generated Claude-compatible skill into `.claude/skills/` in the
+current project:
+
+```bash
+npm run install:claude-skill -- agent-hub --project
+```
+
+Install a generated Claude-compatible skill into `~/.claude/skills/`:
+
+```bash
+npm run install:claude-skill -- react --global
+```
+
 Check the MCP distribution tools locally:
 
 ```bash

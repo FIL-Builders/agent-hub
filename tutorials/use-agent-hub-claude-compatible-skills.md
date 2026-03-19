@@ -140,6 +140,48 @@ The important Agent Hub behavior is:
 If your environment supports local skill installation, use the generated bundle.
 If it prefers runtime retrieval, use MCP instead.
 
+### Claude Code Local Install
+
+Claude Code discovers custom skills from the filesystem. In practice, that
+means you can install a generated Agent Hub skill into:
+
+* `.claude/skills/` in the current project
+* `~/.claude/skills/` for a user-wide install
+
+Agent Hub now includes a helper for this:
+
+```bash
+# Install one generated skill into the current project's .claude/skills/
+npm run install:claude-skill -- agent-hub --project
+
+# Install one generated skill into ~/.claude/skills/
+npm run install:claude-skill -- react --global
+
+# Install the current pilot set into the current project's .claude/skills/
+npm run install:claude-skill:pilot
+```
+
+The installer copies:
+
+```text
+distributions/claude/<tool>/0.4.0/
+```
+
+into:
+
+```text
+.claude/skills/<tool>/
+```
+
+or:
+
+```text
+~/.claude/skills/<tool>/
+```
+
+Use this when you are validating generated skills in Claude Code or another
+filesystem-based Claude-compatible environment.
+
 ## Related Guides
 
 * [Get Better Agent Answers with Agent Hub MCP](./use-agent-hub-through-mcp.md)
