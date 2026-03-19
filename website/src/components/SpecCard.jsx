@@ -51,7 +51,7 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
       <div className="spec-card-header">
         {!hideHeader && (
           <div className="spec-card-headings">
-            <h3 className="spec-card-title">{specName || repoPath || 'Spec'}</h3>
+            <h3 className="spec-card-title">{specName || repoPath || 'Canonical Pack'}</h3>
             {purpose && <p className="spec-card-purpose">{purpose}</p>}
           </div>
         )}
@@ -60,7 +60,7 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
             <a className="spec-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
           )}
           {viewUrl && (
-            <a className="spec-action-btn" href={viewUrl} title="View Spec">🔍 View Spec</a>
+            <a className="spec-action-btn" href={viewUrl} title="View Canonical Pack">🔍 View Canonical Pack</a>
           )}
           {promptText && (
             <a className="spec-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
@@ -76,7 +76,7 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
             {menuOpen && (
               <div className="spec-dropdown-menu" role="menu">
                 {rawUrl && (<a className="spec-dropdown-item" role="menuitem" href={rawUrl} download onClick={() => setMenuOpen(false)}>⬇️ Download</a>)}
-                {viewUrl && (<a className="spec-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>🔍 View Spec</a>)}
+                {viewUrl && (<a className="spec-dropdown-item" role="menuitem" href={viewUrl} onClick={() => setMenuOpen(false)}>🔍 View Canonical Pack</a>)}
                 {promptText && (<a className="spec-dropdown-item" role="menuitem" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>🤖 Open in ChatGPT</a>)}
                 {promptText && (<a className="spec-dropdown-item" role="menuitem" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={() => setMenuOpen(false)}>✨ Open in Claude</a>)}
                 <button className="spec-dropdown-item" role="menuitem" onClick={() => { handleCopy(); setMenuOpen(false); }}>📋 Copy</button>

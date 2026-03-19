@@ -18,7 +18,7 @@ With MCP, your coding agent can:
 
 * discover available packs
 * list versions for a specific tool
-* fetch the exact Markdown spec it needs
+* fetch the exact canonical pack it needs
 * retrieve context deliberately instead of carrying oversized prompt material up front
 
 If you specifically want the local file-based path instead, read
@@ -380,7 +380,7 @@ If you are building coding agents, internal copilots, or AI-native tooling, MCP 
 * Connect the deployed MCP endpoint to your client
 * Fetch `agent-hub`, `typescript`, or another pack you use every day
 * Read the React comparison post to see why MCP delivery won in practice: [Better Context, Better Fixes: Why AgentHub MCP Won a Real React Test](/blog/0005-why-agenthub-mcp-won-react-context-test)
-* Browse the full pack catalog at [Agent Specs](/agents/)
+* Browse the full pack catalog at [Agent Packs](/agents/)
 
 ---
 
