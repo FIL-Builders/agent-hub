@@ -13,11 +13,33 @@ The current contribution model is the Markdown-native `v0.4` workflow. If you
 see older `0.1`-`0.3` files in the repo, treat them as historical context
 unless a current tutorial or prompt explicitly tells you to use them.
 
+## Canonical Packs Vs Generated Claude-Compatible Skills
+
+Agent Hub now has two artifact classes:
+
+- canonical packs in `agents/<tool>/<version>.md`
+- generated Claude-compatible skills in `distributions/claude/<tool>/<version>/`
+
+The canonical pack is the source of truth.
+The generated Claude-compatible skill is a derived distribution for
+Claude-compatible environments.
+
+Default contributor rule:
+
+1. edit the canonical pack
+2. regenerate the Claude-compatible skill
+3. do not hand-edit generated skill files unless the repo explicitly says otherwise
+
+If you need the distribution model explained in one place, read:
+
+- `tutorials/use-agent-hub-claude-compatible-skills.md`
+
 ## What A Good Contribution Looks Like
 
 The active Agent Hub surface is built around:
 
 - versioned Markdown packs in `agents/<tool>/`
+- generated Claude-compatible skills in `distributions/claude/`
 - intermediate documentation packs in `parse/`
 - generation prompts in `prompts/`
 - the normative spec in `spec/open-agent-spec-v0.4.0.md`
@@ -45,6 +67,9 @@ If you are generating or revising a pack with a local AI coding agent, also use:
 
 If a tool-specific generation brief already exists in `prompts/`, use that too.
 
+If your change should also refresh a generated Claude-compatible skill, plan to
+regenerate that distribution after updating the canonical pack.
+
 ## Contributing A New Or Updated Pack
 
 ### 1. Pick the target
@@ -54,6 +79,10 @@ Choose one of these paths:
 - add a new pack under `agents/<tool>/0.4.0.md`
 - improve an existing `0.4.0.md` pack
 - regenerate a pack using the current `v0.4` prompts and review process
+
+You may also need to regenerate:
+
+- `distributions/claude/<tool>/0.4.0/`
 
 If the repo already has an older pack for that tool, use it only as a coverage
 benchmark. Do not treat older generated packs as authoritative sources for API
@@ -81,7 +110,8 @@ The normal `v0.4` flow is:
 
 1. create or update the intermediate documentation pack in `parse/`
 2. create or update the final expert pack in `agents/<tool>/0.4.0.md`
-3. if needed, add or update a tool-specific generation brief in `prompts/`
+3. regenerate the Claude-compatible skill distribution when needed
+4. if needed, add or update a tool-specific generation brief in `prompts/`
 
 Use the checked-in prompts and runbook instead of inventing a new pack shape.
 
@@ -94,6 +124,21 @@ node scripts/validate-agent-pack-v0.4.0.js agents/<tool>/0.4.0.md
 ```
 
 Fix all structural failures before opening a PR.
+
+If the change affects a Claude-compatible distribution, regenerate and validate
+that output too:
+
+```bash
+npm run generate:claude-skill -- agents/<tool>/0.4.0.md
+npm run validate:claude-skill -- distributions/claude/<tool>/0.4.0
+```
+
+If you are touching one of the current pilot packs or modifying the compiler,
+also run:
+
+```bash
+npm run check:claude-skill
+```
 
 If you changed prompts or regenerated a pack that replaces an existing one,
 follow the evaluation process in:
@@ -122,6 +167,10 @@ npm run validate:agent-pack -- agents/<tool>/0.4.0.md
 
 The website and MCP surface only expose active packs from `agents/`.
 
+Generated Claude-compatible skills for active packs live in:
+
+- `distributions/claude/`
+
 Older packs that are no longer meant to appear in the live product are kept in:
 
 - `archive/agents/`
@@ -134,7 +183,7 @@ Use the archive only for historical preservation or recovery.
 Open a GitHub pull request with:
 
 - a short summary of what changed
-- the target pack or tutorial path
+- the target canonical pack, generated distribution, or tutorial path
 - validation results
 - evaluation results if you are replacing or regenerating an existing pack
 
@@ -146,6 +195,9 @@ We prefer contributions that stay reviewable:
 - explicit version updates
 - clear source discipline
 - no speculative format changes without updating the spec or prompts that govern them
+
+If you regenerated a Claude-compatible skill bundle, say so explicitly in the PR
+body and include the command you used.
 
 ## UI, Docs, And Website Contributions
 
@@ -162,12 +214,21 @@ If you change public-facing site content or workflows:
 - preserve the existing visual language unless the change is intentionally a redesign
 - run `npm run build`
 
+If you change onboarding, MCP docs, or generated skill behavior, make sure the
+docs still distinguish clearly between:
+
+- canonical pack
+- generated Claude-compatible skill
+- MCP retrieval path
+- manual skill install path
+
 ## Need Help?
 
 If you are unsure how to contribute, start here:
 
 - `tutorials/authoritative-documents-for-v0.4-pack-generation.md`
 - `tutorials/evaluating-agenthub-pack-outputs.md`
+- `tutorials/use-agent-hub-claude-compatible-skills.md`
 - `agents/agent-hub/0.4.0.md`
 
 If something in the repo is ambiguous or stale, a pull request that fixes the
