@@ -6,7 +6,6 @@ import SkillBundleCard from '@site/src/components/SkillBundleCard';
 import SpecCard from '@site/src/components/SpecCard';
 import agentSpecs from '@site/src/generated/agent-index.json';
 import distributionIndex from '@site/src/generated/distribution-index.json';
-import {buildPrompt} from '@site/src/utils/prompt';
 import {
   buildPackPageUrl,
   stripSpecExtension,
@@ -43,10 +42,6 @@ function sortSpecsDesc(specs = []) {
 
 function buildCanonicalDownloadUrl(project, version) {
   return `agents/${project}/${version}.md`;
-}
-
-function buildCanonicalRawUrl(project, version) {
-  return `https://raw.githubusercontent.com/FIL-Builders/agent-hub/refs/heads/main/agents/${project}/${version}.md`;
 }
 
 export default function AgentPackPage() {
@@ -305,16 +300,17 @@ export default function AgentPackPage() {
     );
   }
 
-  const rawUrl = buildCanonicalRawUrl(project, selectedVersion);
-  const promptText = buildPrompt(rawUrl);
   const canonicalDownloadUrl = `/${buildCanonicalDownloadUrl(project, selectedVersion)}`;
   const installGuideUrl = buildInstallOptionsUrl(project, selectedVersion);
   const installPromptUrl = buildInstallOptionsUrl(project, selectedVersion, 'install-via-prompt');
 
-  async function handleCopyPrompt() {
+  async function handleCopyPackText() {
+    if (!canonicalRaw) {
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(promptText);
-      setCtaState('prompt-copied');
+      await navigator.clipboard.writeText(canonicalRaw);
+      setCtaState('pack-copied');
       window.setTimeout(() => setCtaState('idle'), 1600);
     } catch {
       setCtaState('idle');
@@ -450,9 +446,10 @@ export default function AgentPackPage() {
                 <button
                   type="button"
                   className="button button--secondary button--sm"
-                  onClick={handleCopyPrompt}
+                  onClick={handleCopyPackText}
+                  disabled={canonicalStatus !== 'ready' || !canonicalRaw}
                 >
-                  {ctaState === 'prompt-copied' ? 'Pack Text Copied' : 'Copy Pack Text'}
+                  {ctaState === 'pack-copied' ? 'Pack Text Copied' : 'Copy Pack Text'}
                 </button>
                 <a className="button button--secondary button--sm" href={canonicalDownloadUrl} download>
                   Download Markdown
