@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "> **The open registry & spec for API‑savvy LLM agents — built in public, one thoughtful file at a time.**",
   "main": "index.js",
+  "bin": {
+    "agent-hub": "bin/agent-hub.js"
+  },
   "scripts": {
     "gen-mcp": "node scripts/gen-mcp-manifest.js",
     "sync-agents": "node scripts/sync-agents-static.js",

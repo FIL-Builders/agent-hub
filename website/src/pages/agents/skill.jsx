@@ -2,6 +2,7 @@ import React from 'react';
 import Layout from '@theme/Layout';
 import { useLocation } from '@docusaurus/router';
 import SkillBundleCard from '@site/src/components/SkillBundleCard';
+import { buildPackPageUrl } from '@site/src/utils/agentSpec';
 import {
   buildSkillBundleUrl,
   buildSkillManifestUrl,
@@ -17,6 +18,13 @@ export default function AgentSkillPage() {
   const project = query.get('project');
   const version = query.get('version');
   const initialFile = query.get('file') || 'SKILL.md';
+  const packPageUrl = project && version
+    ? buildPackPageUrl(project, {
+      version,
+      format: 'claude',
+      file: initialFile === 'SKILL.md' ? '' : initialFile,
+    })
+    : '/agents/';
 
   const [manifest, setManifest] = React.useState(null);
   const [selectedFile, setSelectedFile] = React.useState(initialFile);
@@ -101,9 +109,9 @@ export default function AgentSkillPage() {
   return (
     <Layout title={project && version ? `${project} – Claude Skill ${version}` : 'Claude-Compatible Skill'}>
       <main className="container spec-page agenthub-page-shell">
-        <div className="spec-page-nav">
-          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Packs</a>
-          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
+        <div className="spec-page-nav cg-glass-panel cg-industrial-border-accent">
+          <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-desktop">← Pack Overview</a>
+          <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
         {status === 'loading' && (
           <div className="ai-card cg-glass-panel cg-industrial-border" aria-busy="true">

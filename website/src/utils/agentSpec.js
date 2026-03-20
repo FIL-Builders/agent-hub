@@ -16,6 +16,29 @@ export function stripSpecExtension(filename = '') {
   return filename.replace(/\.md$/i, '');
 }
 
+export function buildPackPageUrl(project, {
+  version = '',
+  format = '',
+  file = '',
+} = {}) {
+  const params = new URLSearchParams();
+
+  if (project) {
+    params.set('project', project);
+  }
+  if (version) {
+    params.set('version', version);
+  }
+  if (format) {
+    params.set('format', format);
+  }
+  if (file) {
+    params.set('file', file);
+  }
+
+  return `/agents/pack?${params.toString()}`;
+}
+
 export function splitFrontmatter(specText = '') {
   if (!specText.startsWith(`${FRONTMATTER_BOUNDARY}\n`)) {
     return { frontmatter: '', body: specText };
