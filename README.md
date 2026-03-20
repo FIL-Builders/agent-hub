@@ -99,6 +99,7 @@ If you are contributing packs, remember:
 - canonical pack first
 - generated distribution second
 - regenerate rather than hand-edit generated skill bundles
+- a pack-generation task should normally produce both the canonical pack and the matching Claude-compatible skill
 
 ## Local Commands
 
@@ -112,6 +113,12 @@ Generate a Claude-compatible skill bundle:
 
 ```bash
 npm run generate:claude-skill -- agents/<tool>/0.4.0.md
+```
+
+Finalize a pack the default way:
+
+```bash
+npm run finalize:agent-pack -- agents/<tool>/0.4.0.md
 ```
 
 Generate the current pilot set:

@@ -10,6 +10,7 @@ This runbook defines the operational procedure for generating:
 
 - Markdown documentation packs
 - AgentHub Expert Knowledge Packs in Open Agent Spec v0.4.0 format
+- derived Claude-compatible skill distributions for those packs
 
 Use this runbook together with:
 
@@ -46,10 +47,11 @@ Follow these steps in order:
 6. Acquire authoritative upstream sources for the locked version.
 7. Build or refresh the documentation pack.
 8. Generate the v0.4.0 agent pack.
-9. Validate structure and provenance.
-10. Critique the pack against real task archetypes.
-11. Revise weak areas and re-check the pack.
-12. Stop only when the completion criteria are satisfied.
+9. Generate the derived Claude-compatible skill distribution.
+10. Validate structure and provenance.
+11. Critique the pack against real task archetypes.
+12. Revise weak areas and re-check the outputs.
+13. Stop only when the completion criteria are satisfied.
 
 Do not skip version locking.
 
@@ -253,9 +255,11 @@ When generating an agent pack:
 9. write the pack in strict section order
 10. ensure every symbol has the required fields
 11. ensure every `Definition` has a concrete `Source`
-12. validate the pack
-13. run a critique pass against task archetypes
-14. revise the pack where the critique finds weak operational guidance
+12. validate the canonical pack
+13. generate the matching Claude-compatible skill distribution
+14. validate the generated Claude-compatible skill distribution
+15. run a critique pass against task archetypes
+16. revise the pack where the critique finds weak operational guidance, then re-finalize the derived distribution
 
 ## 12 - Critique Pass
 
@@ -318,12 +322,14 @@ and a comparison or review job.
 In that case, the worker must:
 
 1. generate and validate the documentation pack or agent pack in the forked workspace
-2. compare the regenerated output against the baseline file requested by the task
-3. return a structured handoff report in the final response
+2. if an agent pack was generated, also generate and validate the matching Claude-compatible skill distribution
+3. compare the regenerated output against the baseline file requested by the task
+4. return a structured handoff report in the final response
 
 The structured handoff report must include:
 
 - output path
+- generated Claude-compatible skill path when applicable
 - baseline path, when one was provided
 - validation result
 - locked target version
@@ -357,12 +363,14 @@ A generation run is complete only when:
 6. the source set is recorded clearly
 7. the output follows the required structure
 8. the validator passes when one is provided
-9. a critique pass has been completed
-10. the pack has been revised if the critique exposed important weaknesses
-11. unresolved gaps are marked `Needs verification`
-12. the pack does not teach deprecated or compatibility-only patterns as the
+9. if the run produced an agent pack, the matching Claude-compatible skill distribution exists
+10. if the run produced an agent pack, the generated Claude-compatible skill distribution validates
+11. a critique pass has been completed
+12. the pack has been revised if the critique exposed important weaknesses
+13. unresolved gaps are marked `Needs verification`
+14. the pack does not teach deprecated or compatibility-only patterns as the
     preferred current approach
-13. if the run happened in a forked workspace, the final response contains the
+15. if the run happened in a forked workspace, the final response contains the
     full structured handoff report
 
 ## 17 - Stop Conditions
@@ -387,6 +395,7 @@ Do not invent definitions to fill gaps.
 At the end of a run, report:
 
 - output path
+- generated Claude-compatible skill path when applicable
 - locked target version
 - local files used
 - upstream sources fetched or inspected

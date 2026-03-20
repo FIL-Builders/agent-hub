@@ -24,12 +24,17 @@ You will be given:
 Treat the listed local files as starting inputs, not as hard limits.
 
 ### 3 - Task
-Write exactly one Markdown document to the requested output path.
+Write the canonical Markdown pack to the requested output path and generate the
+matching Claude-compatible skill distribution for that same tool and version.
 
 The output must follow:
 - `spec/open-agent-spec-v0.4.0.md`
 - `prompts/master-prompt-v0.4.0.md`
 - `prompts/codex-agent-pack-runbook-v0.4.0.md`
+
+The canonical pack remains the source of truth.
+The Claude-compatible skill must be derived from that pack, not authored
+independently first.
 
 Do not edit unrelated files.
 
@@ -49,6 +54,9 @@ For agent-pack generation specifically:
    without inventing structure or APIs
 8. if a baseline file is provided, compare your generated output against it and
    report the meaningful differences
+9. after the canonical pack validates, generate the matching Claude-compatible
+   skill distribution
+10. validate that generated Claude-compatible skill before you stop
 
 Do not run this workflow on a reasoning-only helper agent when the task needs
 `exec_command`.
@@ -58,6 +66,7 @@ Do not run this workflow on a reasoning-only helper agent when the task needs
 Before you stop, verify:
 
 - the output file exists at the requested path
+- the matching Claude-compatible skill exists under `distributions/claude/<tool>/<version>/`
 - `## Snapshot` contains required fields
 - every group has an `**Exports**` list
 - every export has a matching symbol subsection
@@ -65,6 +74,7 @@ Before you stop, verify:
 - `Definition` and `Example` both contain fenced code blocks
 - every `Definition` includes a concrete `Source`
 - the `Source` values reflect the locked target version as closely as possible
+- the generated Claude-compatible skill validates
 - if a baseline file was provided, you can name the material improvements,
   regressions, and recommendation clearly
 
@@ -72,12 +82,15 @@ Before you stop, verify:
 
 In your final response:
 - state the output path
+- state the generated Claude-compatible skill path
 - state the baseline path when one was provided
 - list the local files you used
 - list the upstream sources you fetched or inspected
 - state the locked target version
 - list any invariant fields you preserved
 - note any `Needs verification` gaps
+- state the canonical-pack validation result
+- state the Claude-compatible skill generation and validation result
 - if a baseline file was provided, include:
   - validation result
   - section-level diff summary

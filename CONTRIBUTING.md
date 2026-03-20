@@ -67,8 +67,9 @@ If you are generating or revising a pack with a local AI coding agent, also use:
 
 If a tool-specific generation brief already exists in `prompts/`, use that too.
 
-If your change should also refresh a generated Claude-compatible skill, plan to
-regenerate that distribution after updating the canonical pack.
+If you generate or revise an active canonical pack, plan to regenerate the
+matching Claude-compatible skill distribution as part of the same task by
+default.
 
 ## Contributing A New Or Updated Pack
 
@@ -110,7 +111,7 @@ The normal `v0.4` flow is:
 
 1. create or update the intermediate documentation pack in `parse/`
 2. create or update the final expert pack in `agents/<tool>/0.4.0.md`
-3. regenerate the Claude-compatible skill distribution when needed
+3. regenerate the matching Claude-compatible skill distribution
 4. if needed, add or update a tool-specific generation brief in `prompts/`
 
 Use the checked-in prompts and runbook instead of inventing a new pack shape.
@@ -131,6 +132,12 @@ that output too:
 ```bash
 npm run generate:claude-skill -- agents/<tool>/0.4.0.md
 npm run validate:claude-skill -- distributions/claude/<tool>/0.4.0
+```
+
+Or run the default end-to-end finalization step:
+
+```bash
+npm run finalize:agent-pack -- agents/<tool>/0.4.0.md
 ```
 
 If you are touching one of the current pilot packs or modifying the compiler,

@@ -27,6 +27,7 @@ The `v0.4.0` workflow now has multiple important documents:
 * the validator
 * generated documentation packs
 * generated agent packs
+* generated Claude-compatible skill distributions
 * evaluation guidance
 
 That is the right shape for the workflow, but only if it is clear which files
@@ -213,6 +214,22 @@ These files are authoritative only for:
 
 They are not authoritative for the `v0.4.0` structure in the abstract.
 
+### Claude-compatible skill outputs
+
+Examples:
+
+* `distributions/claude/react/0.4.0/SKILL.md`
+* `distributions/claude/react/0.4.0/references/*`
+
+These files are authoritative only for:
+
+* the generated Claude-compatible distribution for that exact canonical pack
+* the installable skill bundle emitted from that generation run
+* distribution-specific review of routing, progressive disclosure, and file layout
+
+They are not authoritative for the canonical pack content and they must be
+regenerated from the canonical pack rather than edited first.
+
 No generated pack should override:
 
 * the spec
@@ -293,7 +310,21 @@ Use this table when you need to resolve a question quickly.
 | How should a model draft the final expert pack? | `prompts/master-prompt-v0.4.0.md` |
 | How should a model draft the documentation pack? | `prompts/documentation-prompt-v0.4.0.md` |
 | What did a specific run produce? | the relevant file in `parse/` or `agents/` |
+| What Claude-compatible bundle did that canonical pack produce? | the relevant files in `distributions/claude/` |
 | How should two outputs be compared? | `tutorials/evaluating-agenthub-pack-outputs.md` |
+
+## Default Output Set For A Pack Generation Task
+
+When the task is "generate a pack for `<tool>`", the operational default output
+set is:
+
+1. the intermediate documentation pack in `parse/`
+2. the canonical pack in `agents/<tool>/<version>.md`
+3. the derived Claude-compatible skill in `distributions/claude/<tool>/<version>/`
+
+For the pack-generation workflow, the task is not complete when only the
+canonical pack exists. The matching Claude-compatible skill distribution should
+also be generated and validated unless the task explicitly says to skip it.
 
 ## Change Management Rules
 
