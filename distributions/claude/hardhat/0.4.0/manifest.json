@@ -1,0 +1,17 @@
+{
+  "tool_id": "hardhat",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/hardhat/0.4.0.md",
+  "display_name": "Hardhat",
+  "description": "Use for Hardhat tasks. Helps with hardhat 3 core APIs for project configuration, secure config values, network management, task authoring, compilation, and artifact access in modern Ethereum development workflows.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

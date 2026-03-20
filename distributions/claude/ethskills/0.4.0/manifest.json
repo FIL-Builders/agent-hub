@@ -1,0 +1,17 @@
+{
+  "tool_id": "ethskills",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/ethskills/0.4.0.md",
+  "display_name": "ETHSkills",
+  "description": "Use for ETHSkills tasks. Helps with eTHSkills as a routing and correction layer for production Ethereum work: start broad dApp builds from `ship`, fetch only the topic skills that match the task, preserve current Ethereum reality checks around gas, tooling, standards, and L2s, and follow the ETHSkills contribution rule when revising the skill set itself.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

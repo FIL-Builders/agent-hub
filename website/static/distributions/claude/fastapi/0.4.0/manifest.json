@@ -1,0 +1,17 @@
+{
+  "tool_id": "fastapi",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/fastapi/0.4.0.md",
+  "display_name": "FastAPI",
+  "description": "Use for FastAPI tasks. Helps with fastAPI 0.135.1 for typed path operations, request validation, dependency injection, async and sync handler behavior, background tasks, and OpenAPI generation while keeping FastAPI-specific semantics distinct from generic Starlette, ASGI, or third-party integration advice.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

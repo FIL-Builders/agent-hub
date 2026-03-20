@@ -1,0 +1,17 @@
+{
+  "tool_id": "loopshouse",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/loopshouse/0.4.0.md",
+  "display_name": "Loopshouse CLI",
+  "description": "Use for Loopshouse CLI tasks. Helps with the `loopshouse` package at a senior-developer level: authenticate through the Loops House CLI, manage hackathon projects, browse and ideate against hackathons, submit projects at the right stage, and expose the same workflows as an MCP server for agent integration.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

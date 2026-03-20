@@ -1,0 +1,17 @@
+{
+  "tool_id": "kadena",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/kadena/0.4.0.md",
+  "display_name": "Kadena Pact Lang API",
+  "description": "Use for Kadena Pact Lang API tasks. Helps with the Kadena `pact-lang-api` package at a senior-developer level: build transaction metadata correctly, submit writes and wait for their results, simulate reads safely, use capability-based wallet signing flows, and avoid the common timing and observation mistakes that make Pact integrations unreliable.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "tool_id": "near-intents-1click-and-explorer",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/near-intents-1click-and-explorer/0.4.0.md",
+  "display_name": "NEAR Intents 1Click And Explorer",
+  "description": "Use for NEAR Intents 1Click And Explorer tasks. Helps with the NEAR Intents 1Click and Explorer APIs at a senior-developer level: discover supported tokens, request a dry or committed quote, track a swap using `depositAddress`, optionally submit the origin-chain transaction hash, and paginate explorer history without confusing historical analytics with live execution state.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

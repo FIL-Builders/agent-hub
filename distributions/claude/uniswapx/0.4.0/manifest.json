@@ -1,0 +1,17 @@
+{
+  "tool_id": "uniswapx",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/uniswapx/0.4.0.md",
+  "display_name": "UniswapX Integrator APIs",
+  "description": "Use for UniswapX Integrator APIs tasks. Helps with integrate with UniswapX at a senior-developer level: implement the quote endpoint with correct last-look behavior, query open orders from the orders API, execute fills through the reactor, and preserve the identifiers and lifecycle boundaries needed for reconciliation.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

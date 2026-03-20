@@ -1,0 +1,17 @@
+{
+  "tool_id": "1inch",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/1inch/0.4.0.md",
+  "display_name": "1inch",
+  "description": "Use for 1inch tasks. Helps with the current 1inch docs surface and Fusion SDK for chain-aware swap routing, Fusion quote and order workflows, order monitoring, and transaction-broadcast boundary decisions without collapsing classic execution, Fusion orders, approvals, and submission into one undifferentiated swap flow.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

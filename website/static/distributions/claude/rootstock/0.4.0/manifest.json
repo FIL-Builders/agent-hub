@@ -1,0 +1,17 @@
+{
+  "tool_id": "rootstock",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/rootstock/0.4.0.md",
+  "display_name": "Rootstock JSON-RPC And Bridge",
+  "description": "Use for Rootstock JSON-RPC And Bridge tasks. Helps with rootstock at a senior-developer level through its Ethereum-compatible JSON-RPC surface and the native Bridge precompile: read the latest block to learn the current minimum valid gas price, estimate and send transactions safely, and query the live federation address instead of hard-coding bridge parameters.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

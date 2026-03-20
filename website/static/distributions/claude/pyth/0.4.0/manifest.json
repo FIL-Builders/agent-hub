@@ -1,0 +1,17 @@
+{
+  "tool_id": "pyth",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/pyth/0.4.0.md",
+  "display_name": "Pyth",
+  "description": "Use for Pyth tasks. Helps with the current Pyth developer surface correctly across off-chain price delivery, on-chain verification and consumption, lower-level Pythnet account access, Entropy randomness, Express Relay auction flows, and Lazer low-latency delivery without collapsing those surfaces into one generic oracle model.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

@@ -59,10 +59,10 @@ export default function AgentSpecPage() {
   const purpose = React.useMemo(() => parseAgentMeta(specRaw).purpose || '', [specRaw]);
 
   return (
-    <Layout title={project && file ? `${project} – ${file}` : 'Agent Spec'}>
+    <Layout title={project && file ? `${project} – ${file}` : 'Agent Pack'}>
       <main className="container spec-page agenthub-page-shell">
         <div className="spec-page-nav">
-          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Specs</a>
+          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Packs</a>
           <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
         {status === 'loading' && (
@@ -82,7 +82,7 @@ export default function AgentSpecPage() {
         {status === 'ready' ? (
           <>
             <div className="agenthub-page-header cg-glass-panel cg-industrial-border">
-              <p className="agenthub-page-header__label">Specification</p>
+              <p className="agenthub-page-header__label">Canonical Pack</p>
               <h1 className="spec-page-title">{project} / {file}</h1>
             </div>
             {/* Mobile actions button under title */}
@@ -113,7 +113,7 @@ export default function AgentSpecPage() {
         ) : null}
         {status === 'error' && (
           <div className="ai-card cg-glass-panel cg-industrial-border">
-            <h3>Specification Not Found</h3>
+            <h3>Agent Pack Not Found</h3>
             <p>
               Unable to load spec for project <code>{project || '(missing)'}</code> and
               file <code>{file || '(missing)'}</code>.
@@ -191,7 +191,7 @@ function ActionSheet({ open, onClose, project, file }) {
       >
         <div className="action-sheet-header">Available Actions</div>
         <a className="action-sheet-item" href={rawUrl} download onClick={onClose}>⬇️ Download</a>
-        <a className="action-sheet-item" href={viewUrl} onClick={onClose}>🔍 View Spec</a>
+        <a className="action-sheet-item" href={viewUrl} onClick={onClose}>🔍 View Canonical Pack</a>
         <a className="action-sheet-item" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={onClose}>🤖 Open in ChatGPT</a>
         <a className="action-sheet-item" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" onClick={onClose}>✨ Open in Claude</a>
         <button className="action-sheet-item" onClick={() => { navigator.clipboard.writeText(rawUrl).finally(onClose); }}>📋 Copy</button>

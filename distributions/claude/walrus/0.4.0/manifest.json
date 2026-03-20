@@ -1,0 +1,17 @@
+{
+  "tool_id": "walrus",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/walrus/0.4.0.md",
+  "display_name": "Walrus HTTP API",
+  "description": "Use for Walrus HTTP API tasks. Helps with the Walrus HTTP API at a senior-developer level: write blobs through publisher-capable endpoints, read blobs through aggregator-capable endpoints, set retention and deletion behavior correctly, and introspect a live deployment before binding tightly to its exact HTTP surface.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

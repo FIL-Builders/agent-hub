@@ -1,0 +1,17 @@
+{
+  "tool_id": "lighthouse-web3-sdk",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/lighthouse-web3-sdk/0.4.0.md",
+  "display_name": "Lighthouse Web3 SDK",
+  "description": "Use for Lighthouse Web3 SDK tasks. Helps with the Lighthouse Web3 SDK at a senior-developer level: create or manage an SDK wallet, produce signed auth messages, obtain short-lived upload auth where needed, upload encrypted content correctly, inspect uploaded files, and separate upload completion from deal durability.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

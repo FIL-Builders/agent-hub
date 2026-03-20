@@ -1,0 +1,17 @@
+{
+  "tool_id": "nextjs",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/nextjs/0.4.0.md",
+  "display_name": "Next.js",
+  "description": "Use for Next.js App Router, data fetching, rendering, and deployment tasks. Helps with framework APIs, routing, caching, and production debugging.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

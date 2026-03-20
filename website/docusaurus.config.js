@@ -76,7 +76,7 @@ const config = {
     navbar: {
       title: 'Agent Hub',
       items: [
-        { to: '/agents/', label: 'Agent Specs', position: 'left' },
+        { to: '/agents/', label: 'Agent Packs', position: 'left' },
         {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',

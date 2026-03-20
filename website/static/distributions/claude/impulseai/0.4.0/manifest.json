@@ -1,0 +1,17 @@
+{
+  "tool_id": "impulseai",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/impulseai/0.4.0.md",
+  "display_name": "Impulse AI HTTP API",
+  "description": "Use for Impulse AI HTTP API tasks. Helps with the Impulse AI HTTP API at a senior-developer level: manage API keys, create and inspect datasets, launch and track fine-tuning jobs, distinguish models from jobs, and keep billing or usage data separate from training orchestration.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

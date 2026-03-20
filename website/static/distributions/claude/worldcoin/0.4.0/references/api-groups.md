@@ -1,0 +1,766 @@
+# Worldcoin API Groups
+
+### MiniKit Runtime And Installation
+**Exports**
+- MiniKit.install
+- MiniKit.isInstalled
+
+Core Mini App runtime setup and environment checks for World App webview
+integrations.
+
+#### MiniKit.install
+**Kind**
+function
+
+**Summary**
+Initializes MiniKit for the current World App context and loads app state plus command availability.
+
+**Definition**
+Language: typescript
+Source: npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+type MiniKitInstallReturnType =
+  | { success: true }
+  | {
+      success: false;
+      errorCode: MiniKitInstallErrorCodes;
+      errorMessage: string;
+    };
+
+declare class MiniKit {
+  static install(appId?: string): MiniKitInstallReturnType;
+}
+```
+
+**Guidance**
+- Call `install(...)` during Mini App startup before relying on command availability or user context.
+- Treat installation failure as an environment or compatibility signal, not a recoverable no-op.
+- Pass the configured Mini App app ID when available so later command flows and API reconciliation stay aligned.
+
+**Example**
+Language: typescript
+Description: Install MiniKit once during app bootstrap.
+
+```ts
+import { MiniKit } from "@worldcoin/minikit-js";
+
+const installResult = MiniKit.install(process.env.NEXT_PUBLIC_APP_ID);
+
+if (!installResult.success) {
+  console.error(installResult.errorCode, installResult.errorMessage);
+}
+```
+
+#### MiniKit.isInstalled
+**Kind**
+function
+
+**Summary**
+Checks whether the current environment has an installed and available MiniKit runtime.
+
+**Definition**
+Language: typescript
+Source: npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+declare class MiniKit {
+  static isInstalled(debug?: boolean): boolean;
+}
+```
+
+**Guidance**
+- Guard MiniKit command execution with `isInstalled()` when the app may also render in ordinary browsers or unsupported environments.
+- Use the check to branch UX, not to silently continue into command flows that will fail later.
+- Installation state is a runtime property; it does not replace backend verification or reconciliation.
+
+**Example**
+Language: typescript
+
+```ts
+if (!MiniKit.isInstalled()) {
+  throw new Error("This flow is only available inside World App");
+}
+```
+
+### Identity And Authentication Flows
+**Exports**
+- MiniKit.commandsAsync.verify
+- MiniKit.commandsAsync.walletAuth
+- verifySiweMessage
+- POST /api/v4/verify/{rp_id}
+- useIDKitRequest
+- IDKitRequestWidget
+
+These symbols cover the two major World trust surfaces most often confused with
+each other: wallet authentication and World ID verification.
+
+#### MiniKit.commandsAsync.verify
+**Kind**
+function
+
+**Summary**
+Starts a Mini App verification flow and returns a proof payload that still requires trusted backend verification.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/verify; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+type VerifyCommandInput = {
+  action: string;
+  signal?: string;
+  verification_level?: VerificationLevel | [VerificationLevel, ...VerificationLevel[]];
+  skip_proof_compression?: boolean;
+};
+
+type MiniAppVerifyActionSuccessPayload = {
+  status: "success";
+  proof: string;
+  merkle_root: string;
+  nullifier_hash: string;
+  verification_level: VerificationLevel;
+  version: number;
+};
+
+declare class MiniKit {
+  static get commandsAsync(): {
+    verify: (
+      payload: VerifyCommandInput
+    ) => Promise<{
+      commandPayload: VerifyCommandInput | null;
+      finalPayload: MiniAppVerifyActionPayload;
+    }>;
+  };
+}
+```
+
+**Guidance**
+- Use this for Mini App proof-of-human gating or similar proof workflows, not login.
+- Keep `action` and optional `signal` stable across the client request and backend verification path.
+- Treat the success payload as untrusted until your backend verifies it and applies your nullifier or replay policy.
+
+**Example**
+Language: typescript
+
+```ts
+const { finalPayload } = await MiniKit.commandsAsync.verify({
+  action: "claim-reward-2026",
+  signal: userId,
+});
+
+if (finalPayload.status === "success") {
+  await fetch("/api/verify", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      payload: finalPayload,
+      action: "claim-reward-2026",
+      signal: userId,
+    }),
+  });
+}
+```
+
+#### MiniKit.commandsAsync.walletAuth
+**Kind**
+function
+
+**Summary**
+Runs the World App wallet authentication flow and returns an ERC-191-compatible signed SIWE payload.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/wallet-auth; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+type WalletAuthInput = {
+  nonce: string;
+  statement?: string;
+  requestId?: string;
+  expirationTime?: Date;
+  notBefore?: Date;
+};
+
+type MiniAppWalletAuthSuccessPayload = {
+  status: "success";
+  message: string;
+  signature: string;
+  address: string;
+  version: number;
+};
+
+declare class MiniKit {
+  static get commandsAsync(): {
+    walletAuth: (
+      payload: WalletAuthInput
+    ) => Promise<{
+      commandPayload: { siweMessage: string } | null;
+      finalPayload: MiniAppWalletAuthPayload;
+    }>;
+  };
+}
+```
+
+**Guidance**
+- Use `walletAuth` as the primary Mini App login flow.
+- Issue the nonce on the backend and store it in a tamper-resistant place before the client command runs.
+- Do not treat wallet authentication as proof-of-human; it proves wallet control, not World ID uniqueness.
+
+**Example**
+Language: typescript
+
+```ts
+const { nonce } = await fetch("/api/nonce").then((r) => r.json());
+
+const { finalPayload } = await MiniKit.commandsAsync.walletAuth({
+  nonce,
+  statement: "Sign in to Example App",
+  expirationTime: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+});
+
+if (finalPayload.status === "success") {
+  await fetch("/api/complete-siwe", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ payload: finalPayload, nonce }),
+  });
+}
+```
+
+#### verifySiweMessage
+**Kind**
+function
+
+**Summary**
+Verifies a MiniKit wallet-auth payload against your backend-issued nonce and returns parsed SIWE data.
+
+**Definition**
+Language: typescript
+Source: npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+declare const verifySiweMessage: (
+  payload: MiniAppWalletAuthSuccessPayload,
+  nonce: string,
+  statement?: string,
+  requestId?: string,
+  userProvider?: Client
+) => Promise<{
+  isValid: boolean;
+  siweMessageData: SiweMessage;
+}>;
+```
+
+**Guidance**
+- Verify the exact nonce you issued, not just the signature.
+- Bind the verified address to your own application session only after checking replay, expiry, and any statement or request ID invariants you enforce.
+- Use this for wallet login completion, not for World ID proof verification.
+
+**Example**
+Language: typescript
+
+```ts
+import { verifySiweMessage } from "@worldcoin/minikit-js";
+
+export async function POST(request: Request) {
+  const { payload, nonce } = await request.json();
+  const result = await verifySiweMessage(payload, nonce);
+
+  if (!result.isValid) {
+    return Response.json({ ok: false }, { status: 401 });
+  }
+
+  return Response.json({
+    ok: true,
+    wallet: result.siweMessageData.address,
+  });
+}
+```
+
+#### POST /api/v4/verify/{rp_id}
+**Kind**
+endpoint
+
+**Summary**
+The current Developer Portal endpoint for verifying World ID 4.0 proofs and legacy 3.0 proofs on a trusted backend.
+
+**Definition**
+Language: http
+Source: https://docs.world.org/api-reference/developer-portal/verify; https://docs.world.org/world-id/idkit/integrate
+
+```http
+POST https://developer.world.org/api/v4/verify/{rp_id}
+Content-Type: application/json
+
+{
+  "protocol_version": "3.0" | "4.0",
+  "nonce": "<nonce>",
+  "action": "<action>",
+  "responses": [ ... ],
+  "environment": "production" | "staging"
+}
+```
+
+**Guidance**
+- Prefer `rp_id` for current integrations; the docs note that `app_id` is still accepted only for backward compatibility.
+- Forward current IDKit result payloads as-is rather than inventing a custom remapping layer.
+- Verification success should flow into your application-specific anti-replay, nullifier, and authorization rules before any privileged action is granted.
+
+**Example**
+Language: typescript
+
+```ts
+export async function POST(request: Request) {
+  const proof = await request.json();
+
+  const response = await fetch(
+    `https://developer.world.org/api/v4/verify/${process.env.WORLD_RP_ID}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(proof),
+    }
+  );
+
+  return Response.json(await response.json(), { status: response.status });
+}
+```
+
+#### useIDKitRequest
+**Kind**
+hook
+
+**Summary**
+React hook for building custom World ID request flows with explicit open, polling, and result state.
+
+**Definition**
+Language: typescript
+Source: npm:@worldcoin/idkit@4.0.9/dist/index.d.ts
+
+```ts
+type IDKitRequestHookConfig = IDKitRequestConfig & {
+  preset: Preset;
+  polling?: {
+    interval?: number;
+    timeout?: number;
+  };
+};
+
+type UseIDKitRequestHookResult = {
+  open: () => void;
+  reset: () => void;
+  isAwaitingUserConnection: boolean;
+  isAwaitingUserConfirmation: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  connectorURI: string | null;
+  result: IDKitResult | null;
+  errorCode: IDKitErrorCodes | null;
+  isOpen: boolean;
+};
+
+declare function useIDKitRequest(
+  config: IDKitRequestHookConfig
+): UseIDKitRequestHookResult;
+```
+
+**Guidance**
+- Use this when you need custom React UI around the verification lifecycle instead of the prebuilt widget.
+- Fetch `rp_context` from your backend immediately before opening the request so nonce and expiry windows stay fresh.
+- Keep `action`, `signal`, environment, and backend verification route aligned across the full flow.
+
+**Example**
+Language: typescript
+
+```ts
+const request = useIDKitRequest({
+  app_id: "app_xxxxx",
+  action: "verify-account-2026",
+  rp_context: rpContext,
+  allow_legacy_proofs: true,
+  environment: "production",
+  preset: orbLegacy({ signal: userId }),
+});
+
+return <button onClick={request.open}>Verify with World ID</button>;
+```
+
+#### IDKitRequestWidget
+**Kind**
+component
+
+**Summary**
+Prebuilt React component that drives an IDKit request flow and delegates verification and success handling to callbacks.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/world-id/overview; npm:@worldcoin/idkit@4.0.9/dist/index.d.ts
+
+```tsx
+type IDKitRequestWidgetProps = IDKitRequestHookConfig & {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  handleVerify?: (result: IDKitResult) => Promise<void> | void;
+  onSuccess: (result: IDKitResult) => Promise<void> | void;
+  onError?: (errorCode: IDKitErrorCodes) => Promise<void> | void;
+  autoClose?: boolean;
+  language?: "en" | "es" | "th";
+};
+
+declare function IDKitRequestWidget(
+  props: IDKitRequestWidgetProps
+): ReactElement | null;
+```
+
+**Guidance**
+- Use the widget when you want the shortest path to a current React integration.
+- Put trusted backend verification in `handleVerify` or an equivalent server-backed function before using `onSuccess` to unlock state.
+- Use current RP-signed request data and treat staging or production environment selection as an explicit configuration choice.
+
+**Example**
+Language: typescript
+
+```tsx
+<IDKitRequestWidget
+  open={open}
+  onOpenChange={setOpen}
+  app_id="app_xxxxx"
+  action="verify-account-2026"
+  rp_context={rpContext}
+  allow_legacy_proofs={true}
+  preset={orbLegacy({ signal: userId })}
+  handleVerify={verifyOnBackend}
+  onSuccess={unlockFeature}
+/>
+```
+
+### Payments, Transactions, And Reconciliation
+**Exports**
+- MiniKit.commandsAsync.pay
+- MiniKit.commandsAsync.sendTransaction
+- GET /api/v2/minikit/transaction/{transaction_id}
+
+These symbols cover World Chain client submission flows and the trusted
+reconciliation path needed to turn submissions into business-final outcomes.
+
+#### MiniKit.commandsAsync.pay
+**Kind**
+function
+
+**Summary**
+Requests a World App payment flow for WLD or USDC on World Chain and returns a submitted payment payload.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/pay; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+type TokensPayload = {
+  symbol: Tokens;
+  token_amount: string;
+};
+
+type PayCommandInput = {
+  reference: string;
+  to: string;
+  tokens: TokensPayload[];
+  network?: Network;
+  description: string;
+};
+
+type MiniAppPaymentSuccessPayload = {
+  status: "success";
+  transaction_status: "submitted";
+  transaction_id: string;
+  reference: string;
+  from: string;
+  chain: Network;
+  timestamp: string;
+  version: number;
+};
+```
+
+**Guidance**
+- Initialize and persist the `reference` on the backend before launching the command.
+- Keep token decimals and minimum-transfer assumptions explicit; the docs call out a minimum equivalent value and current WLD or USDC support on World Chain.
+- Always verify or reconcile the resulting `transaction_id` on the backend before granting paid entitlements.
+
+**Example**
+Language: typescript
+
+```ts
+import { MiniKit, Tokens, tokenToDecimals } from "@worldcoin/minikit-js";
+
+const { id } = await fetch("/api/initiate-payment", { method: "POST" }).then((r) => r.json());
+
+const { finalPayload } = await MiniKit.commandsAsync.pay({
+  reference: id,
+  to: merchantAddress,
+  tokens: [{ symbol: Tokens.USDC, token_amount: tokenToDecimals(3, Tokens.USDC).toString() }],
+  description: "Premium upgrade",
+});
+
+if (finalPayload.status === "success") {
+  await fetch("/api/confirm-payment", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(finalPayload),
+  });
+}
+```
+
+#### MiniKit.commandsAsync.sendTransaction
+**Kind**
+function
+
+**Summary**
+Submits one or more contract calls, optionally with Permit2, through World App as a transaction flow.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/send-transaction; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+type Transaction = {
+  address: string;
+  abi: Abi | readonly unknown[];
+  functionName: string;
+  value?: string;
+  args: readonly unknown[];
+};
+
+type SendTransactionInput = {
+  transaction: Transaction[];
+  permit2?: Permit2[];
+  formatPayload?: boolean;
+};
+
+type MiniAppSendTransactionSuccessPayload = {
+  status: "success";
+  transaction_status: "submitted";
+  transaction_id: string;
+  reference: string;
+  from: string;
+  chain: Network;
+  timestamp: string;
+  mini_app_id?: string;
+  version: number;
+};
+```
+
+**Guidance**
+- Use `sendTransaction` when the app needs contract interaction beyond the simplified payment flow.
+- Keep ABI scope minimal and align allowlists or Permit2 configuration in the Developer Portal before shipping.
+- Treat the returned payload as a submitted transaction that still needs later confirmation or reconciliation.
+
+**Example**
+Language: typescript
+
+```ts
+const { finalPayload } = await MiniKit.commandsAsync.sendTransaction({
+  transaction: [
+    {
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [recipient, amount],
+    },
+  ],
+});
+
+if (finalPayload.status === "success") {
+  await fetch("/api/confirm-transaction", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(finalPayload),
+  });
+}
+```
+
+#### GET /api/v2/minikit/transaction/{transaction_id}
+**Kind**
+endpoint
+
+**Summary**
+Returns the current payment or transaction status for a previously submitted MiniKit operation.
+
+**Definition**
+Language: http
+Source: https://docs.world.org/api-reference/developer-portal/get-transaction
+
+```http
+GET https://developer.world.org/api/v2/minikit/transaction/{transaction_id}?app_id=<app_id>&type=payment|transaction
+```
+
+**Guidance**
+- Use this endpoint from the backend to reconcile `pay` or `sendTransaction` submissions.
+- Keep both `reference` and `transaction_id` so you can map returned status to internal orders or workflows.
+- Distinguish `pending`, `mined`, and `failed` as separate business states instead of collapsing them into success or failure immediately.
+
+**Example**
+Language: typescript
+
+```ts
+const status = await fetch(
+  `https://developer.world.org/api/v2/minikit/transaction/${transactionId}?app_id=${appId}&type=payment`
+).then((r) => r.json());
+
+if (status.transaction_status === "mined") {
+  await markPaymentComplete(status.reference, status.transaction_hash);
+}
+```
+
+### Permissions And Notifications
+**Exports**
+- MiniKit.commandsAsync.getPermissions
+- MiniKit.commandsAsync.requestPermission
+- POST /api/v2/minikit/send-notification
+
+These symbols cover permission-aware product logic and notification delivery to
+users who have opted in.
+
+#### MiniKit.commandsAsync.getPermissions
+**Kind**
+function
+
+**Summary**
+Reads the current permission grant state for the Mini App.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/get-permissions; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+enum Permission {
+  Notifications = "notifications",
+  Contacts = "contacts",
+  Microphone = "microphone",
+}
+
+type MiniAppGetPermissionsSuccessPayload = {
+  status: "success";
+  permissions: Record<Permission, unknown>;
+  timestamp: string;
+  version: number;
+};
+
+declare class MiniKit {
+  static get commandsAsync(): {
+    getPermissions: () => Promise<{
+      commandPayload: {} | null;
+      finalPayload: MiniAppGetPermissionsPayload;
+    }>;
+  };
+}
+```
+
+**Guidance**
+- Check current grant state before prompting so the app can avoid redundant or poorly timed permission requests.
+- Treat unknown or missing permission values conservatively.
+- Use the returned state to decide whether notification or microphone-dependent UI should be shown.
+
+**Example**
+Language: typescript
+
+```ts
+const { finalPayload } = await MiniKit.commandsAsync.getPermissions();
+
+if (finalPayload.status === "success" && finalPayload.permissions.notifications) {
+  await showNotificationSettings();
+}
+```
+
+#### MiniKit.commandsAsync.requestPermission
+**Kind**
+function
+
+**Summary**
+Requests a single World App device permission such as notifications or microphone access.
+
+**Definition**
+Language: typescript
+Source: https://docs.world.org/mini-apps/commands/request-permission; npm:@worldcoin/minikit-js@1.11.0/build/index.d.ts
+
+```ts
+enum Permission {
+  Notifications = "notifications",
+  Contacts = "contacts",
+  Microphone = "microphone",
+}
+
+type RequestPermissionInput = {
+  permission: Permission;
+};
+
+type MiniAppRequestPermissionSuccessPayload = {
+  status: "success";
+  permission: Permission;
+  timestamp: string;
+  version: number;
+};
+```
+
+**Guidance**
+- Request one permission at a time and only when the user is about to use the feature that needs it.
+- If a user has already rejected or disabled the permission, expect to route them toward settings rather than relying on repeated prompts.
+- Pair this with `getPermissions` so UX and backend notification logic stay permission-aware.
+
+**Example**
+Language: typescript
+
+```ts
+const { finalPayload } = await MiniKit.commandsAsync.requestPermission({
+  permission: Permission.Notifications,
+});
+
+if (finalPayload.status === "success") {
+  await enableNotificationsInProfile();
+}
+```
+
+#### POST /api/v2/minikit/send-notification
+**Kind**
+endpoint
+
+**Summary**
+Sends notifications to opted-in Mini App users through the Developer Portal notification API.
+
+**Definition**
+Language: http
+Source: https://docs.world.org/api-reference/developer-portal/send-notification
+
+```http
+POST https://developer.world.org/api/v2/minikit/send-notification
+Content-Type: application/json
+
+{
+  "app_id": "app_xxxxx",
+  "wallet_addresses": ["0x123", "0x456"],
+  "title": "title",
+  "message": "Hello ${username}, your transaction is complete!",
+  "mini_app_path": "mini_app_path"
+}
+```
+
+**Guidance**
+- Only send notifications to users who have opted in; permission state and product flows should make that explicit.
+- Keep notification content correlated with a concrete workflow such as a completed payment, verification reminder, or pending action.
+- Treat localized payload variants as an extension of the same endpoint contract and keep server-side validation explicit if you adopt them.
+
+**Example**
+Language: typescript
+
+```ts
+await fetch("https://developer.world.org/api/v2/minikit/send-notification", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    app_id: process.env.WORLD_APP_ID,
+    wallet_addresses: [walletAddress],
+    title: "Payment confirmed",
+    message: "Your payment has been confirmed.",
+    mini_app_path: "/orders/123",
+  }),
+});
+```

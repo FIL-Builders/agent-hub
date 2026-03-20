@@ -1,0 +1,17 @@
+{
+  "tool_id": "near-twitter-contract-rs",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/near-twitter-contract-rs/0.4.0.md",
+  "display_name": "NEAR Twitter Contract RS",
+  "description": "Use for NEAR Twitter Contract RS tasks. Helps with work with the NEAR Twitter-like Rust contract at a senior-developer level: initialize state correctly, create and like tweets through write methods, enforce author-only deletion, and use paginated view methods without assuming indexed query performance.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

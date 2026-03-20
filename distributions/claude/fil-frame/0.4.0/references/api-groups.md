@@ -1,0 +1,751 @@
+# FIL-Frame API Groups
+
+### Deal Contracts
+
+**Exports**
+- DealClient
+- DealInfo
+
+The Filecoin onchain surfaces for proposing and reading deals.
+
+#### DealClient
+**Kind**
+class
+
+**Summary**
+Primary onchain contract for submitting Filecoin deal requests and tracking proposal lifecycle state.
+
+**Definition**
+Language: solidity
+Source: `FIL-Builders/fil-frame:packages/hardhat/contracts/DealClient.sol`
+
+```solidity
+struct DealRequest {
+    bytes piece_cid;
+    uint64 piece_size;
+    bool verified_deal;
+    string label;
+    int64 start_epoch;
+    int64 end_epoch;
+    uint256 storage_price_per_epoch;
+    uint256 provider_collateral;
+    uint256 client_collateral;
+    uint64 extra_params_version;
+    ExtraParamsV1 extra_params;
+}
+
+struct ExtraParamsV1 {
+    string location_ref;
+    uint64 car_size;
+    bool skip_ipni_announce;
+    bool remove_unsealed_copy;
+}
+
+contract DealClient {
+    event DealProposalCreate(bytes32 indexed id, uint64 size, bool indexed verified, uint256 price);
+
+    function getProviderSet(bytes calldata cid) public view returns (ProviderSet memory);
+    function getProposalIdSet(bytes calldata cid) public view returns (RequestId memory);
+    function dealsLength() public view returns (uint256);
+    function getDealByIndex(uint256 index) public view returns (DealRequest memory);
+    function makeDealProposal(DealRequest calldata deal) public returns (bytes32);
+    function getDealProposal(bytes32 proposalId) public view returns (bytes memory);
+    function getExtraParams(bytes32 proposalId) public view returns (bytes memory);
+    function updateActivationStatus(bytes memory pieceCid) public;
+    function addBalance(uint256 value) public;
+    function withdrawBalance(address client, uint256 value) public returns (uint);
+    function handle_filecoin_method(uint64 method, uint64, bytes memory params)
+        public
+        returns (uint32, uint64, bytes memory);
+}
+```
+
+**Guidance**
+- Convert the CommP CID into raw bytes before populating `piece_cid`; do not pass a display CID string directly.
+- Compute `start_epoch` and `end_epoch` from real chain timing with enough lead time for providers to pick up and publish the proposal.
+- Treat `location_ref` and `car_size` as provider-facing metadata, not as proof that the deal already exists onchain.
+- Index `DealProposalCreate` offchain so the UI can reconcile proposal IDs and later activation checks.
+
+**Example**
+Language: typescript
+Description: Submit a `DealRequest` through the contract after upload prep has already produced the piece metadata.
+
+```ts
+const deal = {
+  piece_cid: "0x...commpbytes",
+  piece_size: 262144,
+  verified_deal: true,
+  label: "my-data",
+  start_epoch: 1200000,
+  end_epoch: 1210000,
+  storage_price_per_epoch: 0,
+  provider_collateral: 0,
+  client_collateral: 0,
+  extra_params_version: 1,
+  extra_params: {
+    location_ref: "https://data-depot.lighthouse.storage/api/download/download_car?fileId=123.car",
+    car_size: 262144,
+    skip_ipni_announce: false,
+    remove_unsealed_copy: false,
+  },
+};
+
+await dealClient.makeDealProposal(deal);
+```
+
+#### DealInfo
+**Kind**
+class
+
+**Summary**
+Read helper contract that consolidates Filecoin market and activation reads for an existing deal ID.
+
+**Definition**
+Language: solidity
+Source: `FIL-Builders/fil-frame:packages/hardhat/contracts/DealInfo.sol`
+
+```solidity
+contract DealInfo {
+    struct DealData {
+        CommonTypes.DealLabel dealLabel;
+        uint64 dealClientActorId;
+        uint64 dealProviderActorId;
+        MarketTypes.GetDealDataCommitmentReturn dealCommitment;
+        MarketTypes.GetDealTermReturn dealTerm;
+        CommonTypes.BigInt dealPricePerEpoch;
+        CommonTypes.BigInt clientCollateral;
+        CommonTypes.BigInt providerCollateral;
+        bool isDealActivated;
+        MarketTypes.GetDealActivationReturn activationStatus;
+    }
+
+    function getDealLabel(uint64 dealId) public view returns (CommonTypes.DealLabel memory);
+    function getDealClient(uint64 dealId) public view returns (uint64);
+    function getDealProvider(uint64 dealId) public view returns (uint64);
+    function getDealCommitment(uint64 dealId) public view returns (MarketTypes.GetDealDataCommitmentReturn memory);
+    function getDealTerm(uint64 dealId) public view returns (MarketTypes.GetDealTermReturn memory);
+    function getDealTotalPrice(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+    function getClientCollateral(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+    function getProviderCollateral(uint64 dealId) public view returns (CommonTypes.BigInt memory);
+    function getDealVerification(uint64 dealId) public view returns (bool);
+    function getDealActivationStatus(uint64 dealId) public view returns (MarketTypes.GetDealActivationReturn memory);
+    function getAllDealData(uint64 dealId) public view returns (DealData memory);
+}
+```
+
+**Guidance**
+- Use `getAllDealData` as the default read path when the task is UI display or operational inspection.
+- Expect Filecoin-native structs and CBOR-style big integer fields rather than Ethereum-style flat numeric returns.
+- Keep `DealInfo` separate from proposal creation flows; it reads market state after a deal exists.
+
+**Example**
+Language: typescript
+Description: Read consolidated deal data for an existing deal.
+
+```ts
+const data = await dealInfo.getAllDealData(12345n);
+console.log(data.dealProviderActorId, data.isDealActivated);
+```
+
+### Hardhat Automation
+
+**Exports**
+- make-deal-proposal
+- get-deal-data
+- verify-contract
+- generateTsAbis
+
+The operational shell around the Filecoin contracts.
+
+#### make-deal-proposal
+**Kind**
+workflow
+
+**Summary**
+Hardhat task that converts CLI arguments into a `DealRequest` and calls `DealClient.makeDealProposal`.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/hardhat/tasks/deal-client/make-deal-proposal.ts`
+
+```ts
+task("make-deal-proposal", "Makes a deal proposal via the client contract.")
+  .addParam("contract", "The address of the deal client solidity")
+  .addParam("pieceCid", "The piece CID of the data you want to put up a bounty for")
+  .addParam("pieceSize", "The size of the data")
+  .addParam("verifiedDeal", "Whether the deal is verified")
+  .addParam("label", "The deal label")
+  .addParam("startEpoch", "The epoch the deal will start")
+  .addParam("endEpoch", "The epoch the deal will end")
+  .addParam("storagePricePerEpoch", "The cost per epoch")
+  .addParam("providerCollateral", "Provider collateral")
+  .addParam("clientCollateral", "Client collateral")
+  .addParam("extraParamsVersion", "")
+  .addParam("locationRef", "Where the data is located")
+  .addParam("carSize", "The size of the .car file")
+  .addParam("skipIpniAnnounce", "")
+  .addParam("removeUnsealedCopy", "")
+  .setAction(async (taskArgs, hre) => {
+    const cidHex = "0x" + new CID(taskArgs.pieceCid).toString("base16").substring(1);
+    const dealClient = await hre.ethers.getContractAt("DealClient", taskArgs.contract);
+    const tx = await dealClient.makeDealProposal(/* DealRequestStruct */);
+    const receipt = await tx.wait();
+    console.log(receipt.logs[0].topics[1]);
+  });
+```
+
+**Guidance**
+- Pass booleans in CLI-friendly string form because the task performs the coercion itself.
+- Let the task convert the human-readable piece CID into hex bytes; do not preconvert and then double-encode.
+- Keep `label`, `locationRef`, and CAR metadata aligned with the uploaded asset so providers can actually act on the proposal.
+
+**Example**
+Language: bash
+Description: Submit a proposal on Calibration after upload metadata is ready.
+
+```bash
+npx hardhat make-deal-proposal \
+  --network calibration \
+  --contract 0xDea1... \
+  --pieceCid bafkqa... \
+  --pieceSize 262144 \
+  --verifiedDeal true \
+  --label my-data \
+  --startEpoch 1200000 \
+  --endEpoch 1210000 \
+  --storagePricePerEpoch 0 \
+  --providerCollateral 0 \
+  --clientCollateral 0 \
+  --extraParamsVersion 1 \
+  --locationRef "https://.../123.car" \
+  --carSize 262144 \
+  --skipIpniAnnounce false \
+  --removeUnsealedCopy false
+```
+
+#### get-deal-data
+**Kind**
+workflow
+
+**Summary**
+Hardhat task that reads `DealInfo.getAllDealData` for a given deal ID and prints the fields.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/hardhat/tasks/deal-info/get-deal-data.ts`
+
+```ts
+task("get-deal-data", "Fetches and displays all deal information for a given deal ID")
+  .addParam("contract", "The address of the DealInfo contract")
+  .addParam("dealId", "The ID of the deal to fetch information for")
+  .setAction(async (taskArgs, hre) => {
+    const wallet = await hre.ethers.provider.getSigner();
+    const dealInfo = await hre.ethers.getContractAt("DealInfo", taskArgs.contract, wallet);
+    const dealData = await dealInfo.getAllDealData(taskArgs.dealId);
+    console.log(dealData);
+  });
+```
+
+**Guidance**
+- Use this as the fastest CLI-level sanity check after submitting or indexing a deal.
+- Keep the network explicit because deal IDs are meaningful only on the target Filecoin network.
+- Expect nested values and structs when printing the result; parse or pretty-print them before exposing them to end users.
+
+**Example**
+Language: bash
+Description: Inspect an existing deal on Calibration.
+
+```bash
+npx hardhat get-deal-data --network calibration --contract 0xInfo... --dealId 12345
+```
+
+#### verify-contract
+**Kind**
+workflow
+
+**Summary**
+Hardhat task that posts deployment metadata to Filfox for Filecoin-network contract verification.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/hardhat/tasks/verify-contract.ts`
+
+```ts
+task("verify-contract", "Verifies a contract on Filfox")
+  .addParam("contractName", "The name of the contract to verify")
+  .setAction(async (taskArgs, hre) => {
+    const networkName = hre.network.name;
+    const verificationData = extractVerificationData(networkName, taskArgs.contractName);
+    const url =
+      networkName === "calibration"
+        ? "https://calibration.filfox.info/api/v1/tools/verifyContract"
+        : "https://filfox.info/api/v1/tools/verifyContract";
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(verificationData),
+    });
+  });
+```
+
+**Guidance**
+- Use this only for `calibration` and `filecoin`; other networks should use the normal Hardhat verifier flow.
+- Make sure the deployment metadata and `solcInput` artifacts exist under `deployments/<network>` before trying to verify.
+- Treat explorer verification as a separate operational step from deployment success.
+
+**Example**
+Language: bash
+Description: Verify the `DealClient` deployment on Calibration.
+
+```bash
+npx hardhat verify-contract --network calibration --contractName DealClient
+```
+
+#### generateTsAbis
+**Kind**
+workflow
+
+**Summary**
+Final deploy script that regenerates TypeScript ABI artifacts from deployment and artifact data.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/hardhat/deploy/99_generateTsAbis.ts`
+
+```ts
+/**
+ * This script generates the file containing the contracts Abi definitions.
+ * This script should run as the last deploy script.
+ */
+
+const generatedContractComment = `
+/**
+ * This file is autogenerated by FIL-Frame.
+ * You should not edit it manually or your changes might be overwritten.
+ */
+`;
+```
+
+**Guidance**
+- Treat ABI generation as mandatory after deploys, not as optional cleanup.
+- Regenerate before debugging frontend contract-call failures so the UI and deployed contracts stay aligned.
+- Do not hand-edit generated ABI output; fix the contract or deploy inputs instead.
+
+**Example**
+Language: bash
+Description: Run deployment tags and let the final deploy script regenerate frontend ABIs.
+
+```bash
+yarn deploy --network calibration --tags DealClient,DealInfo
+```
+
+### Next.js Deal Helpers
+
+**Exports**
+- makeDealFunction
+- createDealObject
+- getDefaultDealInputs
+
+Helpers that bridge upload metadata and form state into the onchain deal-call shape.
+
+#### makeDealFunction
+**Kind**
+constant
+
+**Summary**
+Compact `viem` ABI fragment for the `DealClient.makeDealProposal` call.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/utils.ts`
+
+```ts
+export const makeDealFunction: AbiFunction = {
+  inputs: [
+    {
+      internalType: "struct DealRequest",
+      name: "deal",
+      type: "tuple",
+      components: [
+        { internalType: "bytes", name: "piece_cid", type: "bytes" },
+        { internalType: "uint64", name: "piece_size", type: "uint64" },
+        { internalType: "bool", name: "verified_deal", type: "bool" },
+        { internalType: "string", name: "label", type: "string" },
+        { internalType: "int64", name: "start_epoch", type: "int64" },
+        { internalType: "int64", name: "end_epoch", type: "int64" },
+        { internalType: "uint256", name: "storage_price_per_epoch", type: "uint256" },
+        { internalType: "uint256", name: "provider_collateral", type: "uint256" },
+        { internalType: "uint256", name: "client_collateral", type: "uint256" },
+        { internalType: "uint64", name: "extra_params_version", type: "uint64" },
+        { internalType: "struct ExtraParamsV1", name: "extra_params", type: "tuple" }
+      ]
+    }
+  ],
+  name: "makeDealProposal",
+  outputs: [{ internalType: "bytes32", name: "", type: "bytes32" }],
+  stateMutability: "nonpayable",
+  type: "function"
+};
+```
+
+**Guidance**
+- Use this when the UI only needs the single function ABI instead of a full generated contract ABI.
+- Keep this helper synchronized with the contract struct layout; stale field ordering will break writes.
+- Prefer generated contract artifacts for broader interactions, but this helper is useful for focused forms and debug tooling.
+
+**Example**
+Language: typescript
+Description: Call `makeDealProposal` through `viem` using the compact ABI fragment.
+
+```ts
+await writeContractAsync({
+  address: dealClientAddress,
+  abi: [makeDealFunction],
+  functionName: "makeDealProposal",
+  args: [deal],
+});
+```
+
+#### createDealObject
+**Kind**
+function
+
+**Summary**
+Helper that maps flat frontend `DealInputs` fields into the nested `DealRequest` contract object.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/utils.ts`
+
+```ts
+export interface DealInputs {
+  piece_cid: string;
+  piece_size: number;
+  verified_deal: boolean;
+  label: string;
+  start_epoch: number;
+  end_epoch: number;
+  storage_price_per_epoch: number;
+  provider_collateral: number;
+  client_collateral: number;
+  extra_params_version: number;
+  location_ref: string;
+  car_size: number;
+  skip_ipni_announce: boolean;
+  remove_unsealed_copy: boolean;
+}
+
+export function createDealObject(inputs: DealInputs) {
+  return {
+    piece_cid: inputs.piece_cid,
+    piece_size: inputs.piece_size,
+    verified_deal: inputs.verified_deal,
+    label: inputs.label,
+    start_epoch: inputs.start_epoch,
+    end_epoch: inputs.end_epoch,
+    storage_price_per_epoch: inputs.storage_price_per_epoch,
+    provider_collateral: inputs.provider_collateral,
+    client_collateral: inputs.client_collateral,
+    extra_params_version: inputs.extra_params_version,
+    extra_params: {
+      location_ref: inputs.location_ref,
+      car_size: inputs.car_size,
+      skip_ipni_announce: inputs.skip_ipni_announce,
+      remove_unsealed_copy: inputs.remove_unsealed_copy,
+    },
+  };
+}
+```
+
+**Guidance**
+- Use this as the single form-to-contract bridge so field naming and nesting stay consistent.
+- Populate it only after upload prep has already produced the real piece and CAR metadata.
+- Validate epoch ranges and pricing values before the helper call; this helper reshapes data but does not enforce policy.
+
+**Example**
+Language: typescript
+Description: Build a deal object from reviewable form values before contract submission.
+
+```ts
+const deal = createDealObject({
+  ...getDefaultDealInputs(uploadResult),
+  label: uploadResult.payloadCid,
+  verified_deal: true,
+});
+```
+
+#### getDefaultDealInputs
+**Kind**
+function
+
+**Summary**
+Seed default `DealInputs` values from Lighthouse upload metadata and template defaults.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/utils.ts`
+
+```ts
+export const getDefaultDealInputs = (dealParams?: DealInfoData) => ({
+  piece_cid: dealParams?.pieceCid ?? "0x00",
+  piece_size: dealParams?.pieceSize ?? 0,
+  verified_deal: true,
+  label: "",
+  start_epoch: dealParams?.dealStartBlock ?? 0,
+  end_epoch: dealParams?.dealEndBlock ?? 0,
+  storage_price_per_epoch: 0,
+  provider_collateral: 0,
+  client_collateral: 0,
+  extra_params_version: 1,
+  location_ref: dealParams?.carLink ?? "",
+  car_size: dealParams?.carSize ?? 0,
+  skip_ipni_announce: false,
+  remove_unsealed_copy: false,
+});
+```
+
+**Guidance**
+- Use this to preload a review form, not as proof that every default is production-safe.
+- Review `verified_deal`, epochs, and pricing explicitly before submission.
+- Keep upload-derived values and user-entered overrides visible in the UI so mistakes are easy to catch.
+
+**Example**
+Language: typescript
+Description: Seed a form from upload metadata and then edit the remaining business fields.
+
+```ts
+const defaults = getDefaultDealInputs(uploadResult);
+setFormState({ ...defaults, label: "customer-backup-01" });
+```
+
+### Storage Onramp And Upload Helpers
+
+**Exports**
+- uploadToLighthouseDataDepot
+- uploadToIPFS
+- LighthouseGetFileDealParams
+- GetFileDealParams
+
+Provider-specific upload preparation and example UI flows.
+
+#### uploadToLighthouseDataDepot
+**Kind**
+function
+
+**Summary**
+Server-side helper that uploads a file to Lighthouse Data Depot and returns CAR and piece metadata needed for deal creation.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/api/lighthouse/data-depot.ts`
+
+```ts
+export const uploadToLighthouseDataDepot = async (
+  file: File,
+  apiKey: string,
+): Promise<{
+  carLink: string;
+  carSize: number;
+  pieceCid: string;
+  pieceSize: number;
+  mimeType: string;
+}> => {
+  const authToken = await lighthouse.dataDepotAuth(apiKey);
+  let response = await lighthouse.viewCarFiles(1, authToken.data.access_token);
+  let fileParams = response.data.filter((item: any) => item.fileName === file.name);
+
+  if (!fileParams.length) {
+    await lighthouse.createCar(filePath, authToken.data.access_token);
+    for (let i = 0; i < 180; i++) {
+      response = await lighthouse.viewCarFiles(1, authToken.data.access_token);
+      fileParams = response.data.filter((item: any) => item.fileName === file.name);
+      if (fileParams.length && fileParams[0].pieceCid) break;
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+
+  return {
+    carLink: `${dataDepotUrl}/api/download/download_car?fileId=${fileParams[0].id}.car`,
+    carSize: fileParams[0].carSize,
+    pieceCid: fileParams[0].pieceCid,
+    pieceSize: fileParams[0].pieceSize,
+    mimeType: fileParams[0].mimeType,
+  };
+};
+```
+
+**Guidance**
+- Expect Lighthouse to populate piece metadata asynchronously; the helper already polls for it.
+- Keep the API key on the server side and do not move this helper into an untrusted browser context.
+- Treat the returned `carLink` and piece metadata as upload-prep output, not as evidence that a deal has been accepted.
+
+**Example**
+Language: typescript
+Description: Use the Next.js route or helper to derive upload metadata for the deal form.
+
+```ts
+const result = await uploadToLighthouseDataDepot(file, process.env.LIGHTHOUSE_API_KEY!);
+const defaults = getDefaultDealInputs({
+  pieceCid: result.pieceCid,
+  pieceSize: result.pieceSize,
+  carLink: result.carLink,
+  carSize: result.carSize,
+});
+```
+
+#### uploadToIPFS
+**Kind**
+function
+
+**Summary**
+Server action that uploads a file to Pinata and returns the resulting IPFS pin metadata.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/_components/Pinata.tsx`
+
+```ts
+export type PinataResponse = {
+  ipfsHash: string;
+  pinSize: number;
+  timeStamp: string;
+  isDuplicate: boolean;
+};
+
+export async function uploadToIPFS(data: FormData): Promise<PinataResponse> {
+  const apiKey = process.env.NEXT_PUBLIC_PINATA_API_KEY;
+  const res = await fetch("https://api.pinata.cloud/pinning/pinFileToIPFS", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: data,
+  });
+  return await res.json();
+}
+```
+
+**Guidance**
+- This helper returns Pinata pin metadata only; it does not compute CommP or create a Filecoin deal.
+- Keep the token and gateway assumptions explicit because this is provider-specific behavior, not generic IPFS.
+- Use this flow only when the task explicitly needs the Pinata-based example path.
+
+**Example**
+Language: typescript
+Description: Upload form data to Pinata and read the pinned CID.
+
+```ts
+const form = new FormData();
+form.append("file", file);
+const pin = await uploadToIPFS(form);
+console.log(pin.ipfsHash);
+```
+
+#### LighthouseGetFileDealParams
+**Kind**
+component
+
+**Summary**
+Lightweight file-input component that delegates upload handling to the Lighthouse hook-based flow.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/_components/LighthouseUpload.tsx`
+
+```tsx
+export const LighthouseGetFileDealParams = ({
+  handleGetDealParams,
+  dealDurationInMonths,
+}: {
+  handleGetDealParams: (params: DealInfoData) => void;
+  dealDurationInMonths: number;
+}) => {
+  const uploadFile = useLighthouseGetFilecoinDealParams({
+    onUploadSuccess: (dealInfoData: DealInfoData) => {
+      handleGetDealParams(dealInfoData);
+    },
+    onUploadError: (error: any) => {
+      console.error("Error uploading file:", error);
+    },
+  });
+  // file input omitted
+};
+```
+
+**Guidance**
+- Prefer this component pattern for ordinary template work because it keeps the provider-specific upload complexity in the hook layer.
+- Clear the file input after upload so repeat attempts behave correctly.
+- Feed the resulting `DealInfoData` into `getDefaultDealInputs` or a review form before calling the contract.
+
+**Example**
+Language: tsx
+Description: Populate a deal form from Lighthouse upload results.
+
+```tsx
+<LighthouseGetFileDealParams
+  dealDurationInMonths={6}
+  handleGetDealParams={(params) => {
+    setDealInputs(getDefaultDealInputs(params));
+  }}
+/>
+```
+
+#### GetFileDealParams
+**Kind**
+component
+
+**Summary**
+Legacy example component that uploads a file, derives CID and CommP locally, and submits an `offerData` write with hard-coded addresses.
+
+**Definition**
+Language: typescript
+Source: `FIL-Builders/fil-frame:packages/nextjs/app/dealClient/_components/Upload.tsx`
+
+```tsx
+export const GetFileDealParams = () => {
+  const [pieceSize, setPieceSize] = useState<number | null>(null);
+  const [pieceCID, setPieceCID] = useState<any | null>(null);
+  const [ipfsUrl, setIpfsUrl] = useState<string | null>(null);
+  const [cid, setCid] = useState<string | null>(null);
+
+  const { data: hash, isPending, writeContract } = useWriteContract();
+
+  const handleSubmit = async () => {
+    const pieceCidBytes = ethers.utils.hexlify(pieceCID.bytes);
+    const offer = {
+      commP: pieceCidBytes as `0x${string}`,
+      size: BigInt(pieceSize),
+      cid: cid,
+      location: ipfsUrl,
+      amount: BigInt(0),
+      token: WETH_ADDRESS as `0x${string}`,
+    };
+    writeContract({
+      address: ONRAMP_CONTRACT_ADDRESS_SRC_CHAIN,
+      abi: onRampContractAbi,
+      functionName: "offerData",
+      args: [offer],
+    });
+  };
+};
+```
+
+**Guidance**
+- Treat this as a legacy or illustrative component, not the preferred current integration surface.
+- The hard-coded contract and token addresses mean it is unsafe to copy blindly into a new deployment.
+- It mixes `ethers`, `wagmi`, local CID or CommP generation, and Pinata upload assumptions; isolate and modernize those concerns before reuse.
+
+**Example**
+Language: tsx
+Description: Reuse only the local CommP or CID derivation ideas, not the hard-coded submission path.
+
+```tsx
+const result = await uploadFile(file);
+setDraft({
+  piece_cid: ethers.utils.hexlify(result.pieceCID.bytes),
+  piece_size: result.pieceSize,
+  location_ref: result.ipfsUrl,
+});
+```
+
+**Deprecated**
+- Reason: the component hard-codes addresses and preserves an older mixed integration style that is less suitable than the Lighthouse hook-based flow.
+- Replaced by: `LighthouseGetFileDealParams` plus `getDefaultDealInputs`, `createDealObject`, and the current generated ABI path.

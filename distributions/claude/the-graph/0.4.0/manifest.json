@@ -1,0 +1,17 @@
+{
+  "tool_id": "the-graph",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/the-graph/0.4.0.md",
+  "display_name": "The Graph",
+  "description": "Use for The Graph tasks. Helps with work on The Graph as a developer platform: authoring subgraphs, keeping manifest, schema, mappings, and generated artifacts aligned, deploying with graph-cli, querying indexed entities correctly, and handling indexer-management operations without collapsing them into the default developer workflow.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

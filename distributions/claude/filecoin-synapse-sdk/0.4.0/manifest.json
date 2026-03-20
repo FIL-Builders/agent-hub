@@ -1,0 +1,17 @@
+{
+  "tool_id": "filecoin-synapse-sdk",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/filecoin-synapse-sdk/0.4.0.md",
+  "display_name": "Filecoin Synapse SDK",
+  "description": "Use for Filecoin Synapse SDK tasks. Helps with the current Filecoin Synapse SDK at a senior-developer level: initialize the top-level `Synapse` object with the current viem-based model, manage payment balances and service approvals correctly, use storage-manager and storage-context workflows appropriately, inspect provider and warm-storage state, and avoid carrying forward outdated `0.24.x` assumptions.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

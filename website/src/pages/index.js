@@ -16,7 +16,7 @@ export default function Home() {
     {
       label: 'Tutorial/MCP',
       title: 'Use The MCP Tutorial',
-      description: 'Use this guide to connect Agent Hub to your AI tool so it can fetch the right guidance when a task needs it, instead of relying on memory or oversized prompts. It walks through setup, verification, and live retrieval from the deployed server.',
+      description: 'Use this guide to connect Agent Hub over MCP, verify live retrieval from the deployed server, and understand when runtime fetch is a better fit than installing a local Claude-compatible skill.',
       link: '/tutorials/use-agent-hub-through-mcp',
       cta: 'Read Tutorial',
     },
@@ -48,8 +48,9 @@ export default function Home() {
         <div className="agenthub-home-panel cg-glass-panel cg-industrial-border">
           <p className="agenthub-home-panel__label">System Overview</p>
           <p className="agenthub-home-panel__copy">
-            Agent Hub helps AI coding agents fetch the right expert guidance when a task needs
-            it, instead of relying on memory or oversized prompts. That means more accurate
+            Agent Hub helps AI coding agents use the right expert guidance in the right form:
+            canonical packs for source truth, Claude-compatible skills for local installation,
+            and MCP retrieval when runtime fetch is the better fit. That means more accurate
             answers, cleaner context, and results that are easier to repeat.
           </p>
         </div>

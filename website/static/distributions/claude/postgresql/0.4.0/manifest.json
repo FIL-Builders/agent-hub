@@ -1,0 +1,17 @@
+{
+  "tool_id": "postgresql",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/postgresql/0.4.0.md",
+  "display_name": "PostgreSQL",
+  "description": "Use for PostgreSQL tasks. Helps with postgreSQL 18.3 for schema design, constraints, transactions, indexing, query tuning, concurrency control, and migration planning while keeping PostgreSQL-specific planner and locking behavior distinct from generic SQL, ORM, or extension advice.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

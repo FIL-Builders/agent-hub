@@ -1,0 +1,17 @@
+{
+  "tool_id": "scaffold-eth-2",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/scaffold-eth-2/0.4.0.md",
+  "display_name": "Scaffold-ETH 2",
+  "description": "Use for Scaffold-ETH 2 app setup, contract/frontend workflow, deployment, and debugging tasks. Helps with the local dev loop, generated bindings, and app structure decisions.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

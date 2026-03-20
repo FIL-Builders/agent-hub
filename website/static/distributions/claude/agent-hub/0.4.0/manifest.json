@@ -1,0 +1,17 @@
+{
+  "tool_id": "agent-hub",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/agent-hub/0.4.0.md",
+  "display_name": "Agent Hub",
+  "description": "Use for Agent Hub MCP retrieval, pack discovery, version selection, onboarding, and pack-authoring workflow tasks. Helps with runtime context delivery, version pinning, and contribution decisions.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

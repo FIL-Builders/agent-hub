@@ -1,0 +1,17 @@
+{
+  "tool_id": "fetchai",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/fetchai/0.4.0.md",
+  "display_name": "FetchAI Agentverse Hosting API",
+  "description": "Use for FetchAI Agentverse Hosting API tasks. Helps with the FetchAI Agentverse Hosting API at a senior-developer level: create and inspect hosted agents, treat agent addresses as stable identifiers, reason about revisions and runtime state correctly, and separate usage reporting from deployment lifecycle actions.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

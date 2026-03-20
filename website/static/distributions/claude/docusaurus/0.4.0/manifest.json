@@ -1,0 +1,17 @@
+{
+  "tool_id": "docusaurus",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/docusaurus/0.4.0.md",
+  "display_name": "Docusaurus",
+  "description": "Use for Docusaurus tasks. Helps with work on Docusaurus 3 sites and extensions with correct separation between page-runtime APIs, build-time plugin lifecycle APIs, CLI commands, config fields, and project-local customization boundaries such as swizzles and `@site/...` imports.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}

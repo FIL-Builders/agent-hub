@@ -1,0 +1,17 @@
+{
+  "tool_id": "vite",
+  "version": "0.4.0",
+  "distribution": "claude",
+  "entrypoint": "SKILL.md",
+  "generated_from": "agents/vite/0.4.0.md",
+  "display_name": "Vite",
+  "description": "Use for Vite tasks. Helps with vite 8 effectively for config authoring, dev-server behavior, plugin boundaries, env handling, build output, SSR integration, and framework setup without collapsing those concerns into generic bundler or framework advice.",
+  "files": [
+    "manifest.json",
+    "references/api-groups.md",
+    "references/overview.md",
+    "references/troubleshooting.md",
+    "references/workflows.md",
+    "SKILL.md"
+  ]
+}
