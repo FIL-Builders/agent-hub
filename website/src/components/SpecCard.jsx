@@ -8,7 +8,13 @@ import { parseAgentMeta } from '@site/src/utils/agentSpec';
  * SpecCard displays a canonical Markdown pack in a styled card and
  * keeps actions close to the content for copy/download/open flows.
  */
-const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions = false }) => {
+const SpecCard = ({
+  spec,
+  downloadUrl,
+  hideHeader = false,
+  disableMobileActions = false,
+  hideActions = false,
+}) => {
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
@@ -55,22 +61,24 @@ const SpecCard = ({ spec, downloadUrl, hideHeader = false, disableMobileActions 
             {purpose && <p className="spec-card-purpose">{purpose}</p>}
           </div>
         )}
-        <div className="spec-actions">
-          {rawUrl && (
-            <a className="spec-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
-          )}
-          {viewUrl && (
-            <a className="spec-action-btn" href={viewUrl} title="View Canonical Pack">🔍 View Canonical Pack</a>
-          )}
-          {promptText && (
-            <a className="spec-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
-          )}
-          {promptText && (
-            <a className="spec-action-btn" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in Claude">✨ Open in Claude</a>
-          )}
-          <button className="spec-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
-        </div>
-        {!disableMobileActions && (
+        {!hideActions && (
+          <div className="spec-actions">
+            {rawUrl && (
+              <a className="spec-action-btn" href={rawUrl} download title="Download">⬇️ Download</a>
+            )}
+            {viewUrl && (
+              <a className="spec-action-btn" href={viewUrl} title="View Canonical Pack">🔍 View Canonical Pack</a>
+            )}
+            {promptText && (
+              <a className="spec-action-btn" href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in ChatGPT">🤖 Open in ChatGPT</a>
+            )}
+            {promptText && (
+              <a className="spec-action-btn" href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`} target="_blank" rel="noopener noreferrer" title="Open in Claude">✨ Open in Claude</a>
+            )}
+            <button className="spec-action-btn" onClick={handleCopy} title={copied ? 'Copied!' : 'Copy'}>📋 {copied ? 'Copied' : 'Copy'}</button>
+          </div>
+        )}
+        {!hideActions && !disableMobileActions && (
           <div className="spec-actions-mobile" ref={menuRef}>
             <button className="spec-action-btn" onClick={() => setMenuOpen((value) => !value)} aria-haspopup="menu" aria-expanded={menuOpen} title="Actions">⋯</button>
             {menuOpen && (

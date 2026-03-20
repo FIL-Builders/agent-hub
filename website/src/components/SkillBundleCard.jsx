@@ -15,6 +15,7 @@ export default function SkillBundleCard({
   selectedFile,
   selectedContent,
   onSelectFile,
+  hideActions = false,
 }) {
   const files = manifest?.files || [];
   const normalizedSelected = normalizeSkillFile(selectedFile || manifest?.entrypoint || 'SKILL.md');
@@ -25,7 +26,7 @@ export default function SkillBundleCard({
       <aside className="skill-bundle-nav ai-card cg-glass-panel cg-industrial-border">
         <div className="skill-bundle-nav__header">
           <p className="agenthub-page-header__label">Claude-Compatible Skill</p>
-          <h3 className="skill-bundle-nav__title">{manifest?.displayName || project}</h3>
+          <h3 className="skill-bundle-nav__title">{manifest?.displayName || manifest?.display_name || project}</h3>
           {manifest?.description ? (
             <p className="skill-bundle-nav__copy">{manifest.description}</p>
           ) : null}
@@ -58,17 +59,19 @@ export default function SkillBundleCard({
                 <p className="spec-card-purpose">Generated from {manifest.generated_from}</p>
               ) : null}
             </div>
-            <div className="spec-actions">
-              <a className="spec-action-btn" href={selectedDownloadUrl} download>
-                ⬇️ Download File
-              </a>
-              <a
-                className="spec-action-btn"
-                href={`/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(`${version}.md`)}`}
-              >
-                🔍 View Canonical Pack
-              </a>
-            </div>
+            {!hideActions ? (
+              <div className="spec-actions">
+                <a className="spec-action-btn" href={selectedDownloadUrl} download>
+                  ⬇️ Download File
+                </a>
+                <a
+                  className="spec-action-btn"
+                  href={`/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(`${version}.md`)}`}
+                >
+                  🔍 View Canonical Pack
+                </a>
+              </div>
+            ) : null}
           </div>
           <div className="skill-bundle-install cg-glass-panel cg-industrial-border-accent">
             <p className="skill-bundle-install__copy">

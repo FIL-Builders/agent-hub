@@ -125,7 +125,6 @@ export default function AgentsIndex() {
                 key={project}
                 project={project}
                 latest={latestSpec}
-                older={sorted.slice(1)}
                 meta={meta}
                 latestSkill={skillByProjectVersion.get(`${project}:${stripSpecExtension(latestSpec.file)}`) || null}
               />

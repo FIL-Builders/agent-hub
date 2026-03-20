@@ -10,7 +10,7 @@ export default function Home() {
     {
       label: 'Onboarding',
       title: 'AI Agent Onboarding',
-      description: 'Start here if you want the fastest way to use Agent Hub inside your AI coding workflow. Copy one prompt and your agent will either connect Agent Hub for you or give you the exact setup steps to finish it manually.',
+      description: 'Paste one setup prompt into your AI coding agent. It should connect Agent Hub for you, verify the setup, and explain when MCP or a local Claude-compatible skill is the better fit.',
       onboarding: true,
     },
     {
@@ -66,7 +66,7 @@ export default function Home() {
               ) : (
                 <p>{feature.description}</p>
               )}
-              {feature.onboarding && <AIAgentOnboardingPrompt compact buttonLabel="Copy Prompt" />}
+              {feature.onboarding && <AIAgentOnboardingPrompt compact buttonLabel="Copy Full Prompt" />}
               {feature.link && (
                 <Link className="button button--secondary button--sm agenthub-feature-card__cta" to={feature.link}>
                   {feature.cta}

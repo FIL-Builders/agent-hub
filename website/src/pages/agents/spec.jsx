@@ -3,7 +3,7 @@ import Layout from '@theme/Layout';
 import SpecCard from '@site/src/components/SpecCard';
 import {useLocation} from '@docusaurus/router';
 import { buildPrompt } from '@site/src/utils/prompt';
-import { parseAgentMeta } from '@site/src/utils/agentSpec';
+import { buildPackPageUrl, parseAgentMeta, stripSpecExtension } from '@site/src/utils/agentSpec';
 
 function useQuery() {
   const {search} = useLocation();
@@ -20,6 +20,12 @@ export default function AgentSpecPage() {
   const [error, setError] = React.useState('');
 
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const packPageUrl = project && file
+    ? buildPackPageUrl(project, {
+      version: stripSpecExtension(file),
+      format: 'canonical',
+    })
+    : '/agents/';
 
   React.useEffect(() => {
     let cancelled = false;
@@ -62,8 +68,8 @@ export default function AgentSpecPage() {
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Pack'}>
       <main className="container spec-page agenthub-page-shell">
         <div className="spec-page-nav">
-          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Packs</a>
-          <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
+          <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-desktop">← Pack Overview</a>
+          <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
         {status === 'loading' && (
           <div className="ai-card cg-glass-panel cg-industrial-border" aria-busy="true">

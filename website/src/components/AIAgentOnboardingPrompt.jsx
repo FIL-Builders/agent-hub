@@ -36,24 +36,22 @@ Success criteria:
 
 function compactPrompt() {
   return [
-    'Connect Agent Hub MCP in this CLI AI agent environment.',
+    'Set up Agent Hub in this AI coding environment.',
     '',
-    'Agent Hub MCP is a versioned context server for agent packs.',
-    'Use it to list available packs, check versions, and fetch the right spec at runtime instead of pasting large prompt blobs into each session.',
+    'Goal:',
+    '- connect Agent Hub MCP when runtime retrieval is the right fit',
+    '- or tell me when a local Claude-compatible skill is the better setup path',
     '',
     'Server:',
     'https://agent-hub-1.netlify.app/mcp',
     '',
     'Your job:',
-    '1. Detect whether this environment supports MCP configuration and find the correct config file or settings location.',
-    '2. If you can edit it safely, add an MCP server named "agent-hub" using the smallest correct change.',
-    '3. If you cannot edit it automatically, give me the exact file path, config snippet, and next step to do manually.',
-    '4. Verify the connection by listing tools and fetching a known pack, such as the latest "agent-hub" pack.',
-    '5. Fetch the latest "agent-hub" pack and derive a short routing note that teaches when to use Agent Hub efficiently.',
-    '6. Make sure that note explains the difference between MCP runtime retrieval and local Claude-compatible skill installation.',
-    '7. Install that note into persistent agent instructions if possible, or print the exact note and where I should paste it.',
-    '8. If this environment explicitly prefers local Claude-compatible skills over MCP, say so and tell me how you would fetch or install the generated skill bundle instead.',
-    '9. Summarize what you changed, what worked, what note you installed or generated, and anything I still need to do.',
+    '1. Detect the right setup path for this environment.',
+    '2. Configure Agent Hub MCP, or explain why a local Claude-compatible skill is the better fit here.',
+    '3. Verify the setup by fetching the latest "agent-hub" pack.',
+    '4. Install or print a short routing note that explains when to use MCP vs a local skill.',
+    '',
+    'Then summarize what you changed, what worked, and anything I still need to do.',
   ].join('\n');
 }
 
@@ -75,6 +73,11 @@ export default function AIAgentOnboardingPrompt({
   return (
     <div className="agenthub-onboarding-prompt">
       <pre className="agenthub-onboarding-prompt__code">{prompt}</pre>
+      {compact ? (
+        <p className="agenthub-onboarding-prompt__meta">
+          Copying this button uses the full setup prompt, not just the preview.
+        </p>
+      ) : null}
       <button type="button" className="button button--secondary button--sm" onClick={handleCopy}>
         {copied ? 'Copied' : buttonLabel}
       </button>
