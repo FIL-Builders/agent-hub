@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { splitFrontmatter } from '@site/src/utils/agentSpec';
 import {
   buildSkillBundleUrl,
   isJsonFile,
@@ -20,6 +21,9 @@ export default function SkillBundleCard({
   const files = manifest?.files || [];
   const normalizedSelected = normalizeSkillFile(selectedFile || manifest?.entrypoint || 'SKILL.md');
   const selectedDownloadUrl = buildSkillBundleUrl(project, version, normalizedSelected);
+  const renderedMarkdown = isMarkdownFile(normalizedSelected)
+    ? splitFrontmatter(selectedContent || '').body
+    : selectedContent;
 
   return (
     <div className="skill-bundle-shell">
@@ -83,7 +87,7 @@ export default function SkillBundleCard({
           <div className="spec-card-content markdown">
             {isMarkdownFile(normalizedSelected) ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {selectedContent}
+                {renderedMarkdown}
               </ReactMarkdown>
             ) : isJsonFile(normalizedSelected) ? (
               <pre className="skill-bundle-code">{selectedContent}</pre>
