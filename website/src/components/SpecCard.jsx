@@ -53,7 +53,7 @@ const SpecCard = ({
 
   const { specName, purpose } = parseAgentMeta(spec);
   return (
-    <div className="spec-card ai-card">
+    <div className="spec-card ai-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
       <div className="spec-card-header">
         {!hideHeader && (
           <div className="spec-card-headings">

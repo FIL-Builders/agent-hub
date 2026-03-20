@@ -67,7 +67,7 @@ export default function AgentSpecPage() {
   return (
     <Layout title={project && file ? `${project} – ${file}` : 'Agent Pack'}>
       <main className="container spec-page agenthub-page-shell">
-        <div className="spec-page-nav">
+        <div className="spec-page-nav cg-glass-panel cg-industrial-border-accent">
           <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-desktop">← Pack Overview</a>
           <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>

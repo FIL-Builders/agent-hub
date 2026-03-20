@@ -1103,28 +1103,42 @@ html[data-theme='dark'] .glass-panel::after {
   top: calc(100% + 0.55rem);
   right: 0;
   min-width: 15rem;
-  padding: 0.3rem;
+  padding: 0.25rem;
   border: 1px solid hsl(var(--border));
-  background: hsl(var(--popover) / 0.98);
-  box-shadow: 8px 8px 0 rgba(0, 0, 0, 0.18);
-  z-index: 2000;
+  background: hsl(var(--card) / 0.98);
+  box-shadow:
+    6px 6px 0 rgba(0, 0, 0, 0.16),
+    0 0 0 1px hsl(var(--primary) / 0.1);
+  z-index: 5000;
 }
 
 .spec-dropdown-item {
   display: block;
   width: 100%;
-  padding: 0.75rem 0.85rem;
-  border: 0;
-  background: transparent;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid transparent;
+  background: hsl(var(--background) / 0.55);
   color: hsl(var(--foreground));
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  box-shadow: none;
 }
 
 .spec-dropdown-item:hover,
 .spec-dropdown-item:focus-visible {
-  background: hsl(var(--secondary) / 0.7);
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.12);
+}
+
+.spec-dropdown-label {
+  display: block;
+  padding: 0.8rem 0.8rem 0.45rem;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
 }
 
 .agent-mobile-actions,
@@ -1204,6 +1218,9 @@ html[data-theme='dark'] .glass-panel::after {
   gap: 1rem;
   margin-bottom: 1rem;
   padding: 1rem 1.15rem;
+  overflow: visible;
+  z-index: 40;
+  isolation: isolate;
 }
 
 .pack-view-toolbar__group {
@@ -1219,6 +1236,14 @@ html[data-theme='dark'] .glass-panel::after {
 .pack-view-toolbar__group--actions {
   position: relative;
   align-items: flex-end;
+  z-index: 60;
+}
+
+.pack-summary-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
 }
 
 .pack-view-toolbar__label {
@@ -1243,18 +1268,23 @@ html[data-theme='dark'] .glass-panel::after {
   border: 1px solid hsl(var(--border));
   background: hsl(var(--background) / 0.7);
   color: hsl(var(--foreground));
-  padding: 0.75rem 0.95rem;
+  padding: 0.82rem 1rem;
   font-family: var(--ifm-heading-font-family);
   font-weight: 700;
   cursor: pointer;
   box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.08);
 }
 
-.pack-format-toggle__button.is-active,
 .pack-format-toggle__button:hover,
 .pack-format-toggle__button:focus-visible {
   border-color: hsl(var(--accent));
   background: hsl(var(--accent) / 0.12);
+}
+
+.pack-format-toggle__button.is-active {
+  border-color: hsl(var(--accent));
+  background: hsl(var(--accent) / 0.18);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.12);
 }
 
 .pack-format-toggle__button:disabled {
@@ -1263,15 +1293,89 @@ html[data-theme='dark'] .glass-panel::after {
   box-shadow: none;
 }
 
-.pack-view-summary {
+.pack-primary-actions-panel {
+  position: relative;
   margin-bottom: 1rem;
+  padding: 1rem 1.15rem;
+  overflow: visible;
+  z-index: 50;
+  isolation: isolate;
+}
+
+.pack-primary-actions-panel__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-top: 0.65rem;
+  overflow: visible;
+}
+
+.pack-primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.pack-skill-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.pack-skill-actions__support {
+  width: 100%;
+  margin: 0;
+  color: hsl(var(--muted-foreground));
+  font-size: 0.92rem;
+}
+
+.pack-skill-actions__support a {
+  color: hsl(var(--accent));
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+
+.skill-install-commands {
+  margin-bottom: 1.5rem;
   padding: 1rem 1.15rem;
 }
 
-.pack-view-summary__copy {
-  margin: 0;
-  color: hsl(var(--foreground));
-  line-height: 1.65;
+.skill-install-commands__title {
+  margin: 0.2rem 0 0.55rem;
+}
+
+.skill-install-commands__copy {
+  margin: 0 0 0.8rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.skill-install-commands__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.skill-install-commands .theme-code-block {
+  margin-bottom: 0.8rem;
+}
+
+.skill-install-prompt {
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.15rem;
+}
+
+.skill-install-prompt__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.pack-primary-actions-panel .pack-view-toolbar__group--actions {
+  flex: 0 0 auto;
+  min-width: 9rem;
 }
 
 .spec-page-nav {
@@ -1279,6 +1383,8 @@ html[data-theme='dark'] .glass-panel::after {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  padding: 0.7rem 0.95rem;
+  overflow: visible;
 }
 
 .spec-breadcrumb {
@@ -1288,6 +1394,9 @@ html[data-theme='dark'] .glass-panel::after {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
 }
 
 .spec-breadcrumb:hover {
@@ -1365,8 +1474,8 @@ html[data-theme='dark'] .glass-panel::after {
 }
 
 .skill-bundle-nav {
-  position: sticky;
-  top: calc(var(--ifm-navbar-height) + 1rem);
+  position: static;
+  align-self: start;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -2071,5 +2180,24 @@ footer a {
   .pack-format-toggle {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .pack-primary-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .pack-primary-actions-panel__body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .skill-install-commands__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .skill-install-prompt__header {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

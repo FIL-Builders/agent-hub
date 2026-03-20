@@ -109,7 +109,7 @@ export default function AgentSkillPage() {
   return (
     <Layout title={project && version ? `${project} – Claude Skill ${version}` : 'Claude-Compatible Skill'}>
       <main className="container spec-page agenthub-page-shell">
-        <div className="spec-page-nav">
+        <div className="spec-page-nav cg-glass-panel cg-industrial-border-accent">
           <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-desktop">← Pack Overview</a>
           <a href={packPageUrl} className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>

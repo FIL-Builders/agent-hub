@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -70,7 +68,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`
+  return `
 Install generated Claude-compatible skill bundles into a local skills directory.
 
 Usage:
@@ -85,7 +83,7 @@ Examples:
 Defaults:
   - installs version 0.4.0
   - installs into .claude/skills in the current working directory unless --global or --target is set
-  `);
+  `;
 }
 
 function resolveInstallRoot(options) {
@@ -126,8 +124,8 @@ function installSkill(skillId, version, installRoot) {
   return { skillId, sourceDir, destDir };
 }
 
-function main() {
-  const options = parseArgs(process.argv.slice(2));
+function installFromArgv(argv, output = console) {
+  const options = parseArgs(argv);
   const skillIds = resolveSkillIds(options);
   const installRoot = resolveInstallRoot(options);
 
@@ -137,15 +135,34 @@ function main() {
 
   const installed = skillIds.map((skillId) => installSkill(skillId, options.version, installRoot));
 
-  console.log(`Installed ${installed.length} Claude-compatible skill bundle(s) into ${installRoot}`);
+  output.log(`Installed ${installed.length} Claude-compatible skill bundle(s) into ${installRoot}`);
   installed.forEach(({ skillId, destDir }) => {
-    console.log(`- ${skillId} -> ${destDir}`);
+    output.log(`- ${skillId} -> ${destDir}`);
   });
+
+  return {installRoot, installed, options};
 }
 
-try {
-  main();
-} catch (error) {
-  console.error(error.message || String(error));
-  process.exit(1);
+if (require.main === module) {
+  try {
+    if (process.argv.includes('--help') || process.argv.includes('-h')) {
+      console.log(printHelp());
+      process.exit(0);
+    }
+
+    installFromArgv(process.argv.slice(2));
+  } catch (error) {
+    console.error(error.message || String(error));
+    process.exit(1);
+  }
 }
+
+module.exports = {
+  PILOT_SKILLS,
+  parseArgs,
+  printHelp,
+  resolveInstallRoot,
+  resolveSkillIds,
+  installSkill,
+  installFromArgv,
+};

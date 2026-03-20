@@ -50,7 +50,7 @@ export default function SkillBundleCard({
       </aside>
 
       <div className="skill-bundle-main">
-        <div className="spec-card ai-card">
+        <div className="spec-card ai-card cg-glass-panel cg-industrial-border cg-industrial-border-accent">
           <div className="spec-card-header">
             <div className="spec-card-headings">
               <p className="agenthub-page-header__label">Bundle File</p>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Layout from '@theme/Layout';
 import {useLocation} from '@docusaurus/router';
+import JSZip from 'jszip';
 import SkillBundleCard from '@site/src/components/SkillBundleCard';
 import SpecCard from '@site/src/components/SpecCard';
 import agentSpecs from '@site/src/generated/agent-index.json';
@@ -10,6 +11,7 @@ import {
   buildPackPageUrl,
   stripSpecExtension,
 } from '@site/src/utils/agentSpec';
+import {buildInstallOptionsUrl} from '@site/src/utils/skillInstall';
 import {
   buildSkillBundleUrl,
   buildSkillManifestUrl,
@@ -92,6 +94,7 @@ export default function AgentPackPage() {
   const [skillStatus, setSkillStatus] = React.useState('idle');
   const [skillError, setSkillError] = React.useState('');
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [ctaState, setCtaState] = React.useState('idle');
   const menuRef = React.useRef(null);
 
   const selectedSpec = specsForProject.find((spec) => stripSpecExtension(spec.file) === selectedVersion) || latestSpec;
@@ -100,6 +103,7 @@ export default function AgentPackPage() {
   const selectedMeta = selectedSpec || {};
   const selectedTitle = selectedMeta.specName || selectedMeta.project || project;
   const selectedPurpose = selectedMeta.purpose || '';
+  const selectedLanguage = selectedMeta.language || '';
   const currentPackUrl = buildPackPageUrl(project, {
     version: selectedVersion,
     format: effectiveFormat,
@@ -304,12 +308,51 @@ export default function AgentPackPage() {
   const rawUrl = buildCanonicalRawUrl(project, selectedVersion);
   const promptText = buildPrompt(rawUrl);
   const canonicalDownloadUrl = `/${buildCanonicalDownloadUrl(project, selectedVersion)}`;
-  const skillDownloadUrl = effectiveFormat === 'claude'
-    ? buildSkillBundleUrl(project, selectedVersion, selectedSkillFile || 'SKILL.md')
-    : '';
-  const directFormatUrl = effectiveFormat === 'claude'
-    ? `/agents/skill?project=${encodeURIComponent(project)}&version=${encodeURIComponent(selectedVersion)}`
-    : `/agents/spec?project=${encodeURIComponent(project)}&file=${encodeURIComponent(`${selectedVersion}.md`)}`;
+  const installGuideUrl = buildInstallOptionsUrl(project, selectedVersion);
+  const installPromptUrl = buildInstallOptionsUrl(project, selectedVersion, 'install-via-prompt');
+
+  async function handleCopyPrompt() {
+    try {
+      await navigator.clipboard.writeText(promptText);
+      setCtaState('prompt-copied');
+      window.setTimeout(() => setCtaState('idle'), 1600);
+    } catch {
+      setCtaState('idle');
+    }
+  }
+
+  async function handleDownloadSkillBundle() {
+    if (!selectedSkill || !skillManifest) {
+      return;
+    }
+
+    try {
+      setCtaState('downloading');
+      const zip = new JSZip();
+      const files = Array.isArray(skillManifest.files) ? skillManifest.files : [];
+
+      await Promise.all(files.map(async (file) => {
+        const response = await fetch(buildSkillBundleUrl(project, selectedVersion, file));
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ${file}`);
+        }
+        const content = await response.text();
+        zip.file(file, content);
+      }));
+
+      const blob = await zip.generateAsync({type: 'blob'});
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${project}-${selectedVersion}-claude-skill.zip`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setCtaState('downloaded');
+      window.setTimeout(() => setCtaState('idle'), 1600);
+    } catch {
+      setCtaState('idle');
+    }
+  }
 
   const renderBody = () => {
     if (effectiveFormat === 'canonical') {
@@ -352,7 +395,7 @@ export default function AgentPackPage() {
   return (
     <Layout title={`${selectedTitle} – Agent Pack`}>
       <main className="container spec-page agenthub-page-shell">
-        <div className="spec-page-nav">
+        <div className="spec-page-nav cg-glass-panel cg-industrial-border-accent">
           <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-desktop">← All Agent Packs</a>
           <a href="/agents/" className="spec-breadcrumb spec-breadcrumb-mobile">← Back</a>
         </div>
@@ -363,25 +406,17 @@ export default function AgentPackPage() {
           {selectedPurpose ? (
             <p className="agenthub-page-header__copy">{selectedPurpose}</p>
           ) : null}
+          <div className="pack-summary-pills">
+            {selectedLanguage ? (
+              <span className="pill-link">{selectedLanguage}</span>
+            ) : null}
+            <span className="pill-link">
+              {selectedSkill ? 'Markdown + Claude Skill' : 'Markdown Only'}
+            </span>
+          </div>
         </div>
 
         <div className="pack-view-toolbar cg-glass-panel cg-industrial-border-accent">
-          <div className="pack-view-toolbar__group">
-            <label className="pack-view-toolbar__label" htmlFor="pack-version-select">Version</label>
-            <select
-              id="pack-version-select"
-              className="agents-select pack-view-toolbar__select"
-              value={selectedVersion}
-              onChange={(event) => setSelectedVersion(event.target.value)}
-            >
-              {availableVersions.map((version) => (
-                <option key={version} value={version}>
-                  {version}
-                </option>
-              ))}
-            </select>
-          </div>
-
           <div className="pack-view-toolbar__group pack-view-toolbar__group--formats">
             <span className="pack-view-toolbar__label">Format</span>
             <div className="pack-format-toggle" role="tablist" aria-label="Pack format">
@@ -390,82 +425,105 @@ export default function AgentPackPage() {
                 className={`pack-format-toggle__button ${effectiveFormat === 'canonical' ? 'is-active' : ''}`}
                 onClick={() => setSelectedFormat('canonical')}
               >
-                Canonical Pack
+                Markdown Pack
               </button>
               <button
                 type="button"
                 className={`pack-format-toggle__button ${effectiveFormat === 'claude' ? 'is-active' : ''}`}
                 onClick={() => setSelectedFormat('claude')}
                 disabled={!selectedSkill}
-                title={selectedSkill ? 'View Claude-compatible skill' : 'No Claude-compatible skill for this version'}
+                title={selectedSkill ? 'View Claude skill' : 'No Claude skill for this version'}
               >
-                Claude-Compatible Skill
+                Claude Skill
               </button>
             </div>
           </div>
 
-          <div className="pack-view-toolbar__group pack-view-toolbar__group--actions" ref={menuRef}>
-            <span className="pack-view-toolbar__label">Details</span>
-            <button type="button" className="agent-action-btn" onClick={() => setMenuOpen((value) => !value)}>
-              More ▾
-            </button>
-            {menuOpen ? (
-              <div className="spec-dropdown-menu" style={{right: 0, left: 'auto'}}>
-                <a className="spec-dropdown-item" href={directFormatUrl}>
-                  🔍 Open Direct {effectiveFormat === 'claude' ? 'Claude Skill' : 'Canonical Pack'} Page
-                </a>
-                <a
-                  className="spec-dropdown-item"
-                  href={effectiveFormat === 'claude' ? skillDownloadUrl : canonicalDownloadUrl}
-                  download
-                >
-                  ⬇️ Download Current View
-                </a>
-                <button
-                  className="spec-dropdown-item"
-                  onClick={() => {
-                    navigator.clipboard.writeText(currentPackUrl).finally(() => setMenuOpen(false));
-                  }}
-                >
-                  🔗 Copy Pack Link
-                </button>
-                {effectiveFormat === 'canonical' && promptText ? (
-                  <a
-                    className="spec-dropdown-item"
-                    href={`https://chatgpt.com/?prompt=${encodeURIComponent(promptText)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    🤖 Open in ChatGPT
-                  </a>
-                ) : null}
-                {effectiveFormat === 'canonical' && promptText ? (
-                  <a
-                    className="spec-dropdown-item"
-                    href={`https://claude.ai/new?q=${encodeURIComponent(promptText)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    ✨ Open in Claude
-                  </a>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
         </div>
 
-        {selectedSkill || effectiveFormat === 'canonical' ? (
-          <div className="pack-view-summary cg-glass-panel cg-industrial-border">
-            <p className="agenthub-page-header__label">Current View</p>
-            <p className="pack-view-summary__copy">
-              {effectiveFormat === 'canonical'
-                ? 'Inspect the canonical Markdown pack for this version, then switch to the Claude-compatible skill if you want the generated local-install distribution.'
-                : 'Inspect the generated Claude-compatible skill for this version, then switch back to the canonical pack if you want the source Markdown pack.'}
-            </p>
+        <div className="pack-primary-actions-panel cg-glass-panel cg-industrial-border-accent">
+          <p className="pack-view-toolbar__label">Next Step</p>
+          <div className="pack-primary-actions-panel__body">
+            <div className="pack-primary-actions">
+              {effectiveFormat === 'canonical' ? (
+                <>
+                <button
+                  type="button"
+                  className="button button--secondary button--sm"
+                  onClick={handleCopyPrompt}
+                >
+                  {ctaState === 'prompt-copied' ? 'Pack Text Copied' : 'Copy Pack Text'}
+                </button>
+                <a className="button button--secondary button--sm" href={canonicalDownloadUrl} download>
+                  Download Markdown
+                </a>
+              </>
+            ) : (
+                <div className="pack-skill-actions">
+                  <button
+                    type="button"
+                    className="button button--secondary button--sm"
+                    onClick={handleDownloadSkillBundle}
+                    disabled={ctaState === 'downloading'}
+                  >
+                    {ctaState === 'downloading'
+                      ? 'Preparing Bundle'
+                      : ctaState === 'downloaded'
+                        ? 'Bundle Downloaded'
+                        : 'Download Skill Bundle'}
+                  </button>
+                  <a className="button button--secondary button--sm" href={installPromptUrl}>
+                    Install Via Prompt
+                  </a>
+                  <a className="button button--secondary button--sm" href={installGuideUrl}>
+                    Install Options
+                  </a>
+                  <p className="pack-skill-actions__support">
+                    Download the bundle, hand the install prompt to a local AI agent, or review the install options for Claude Code and repo-local workflows.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="pack-view-toolbar__group pack-view-toolbar__group--actions" ref={menuRef}>
+              <span className="pack-view-toolbar__label">Utilities</span>
+              <button type="button" className="agent-action-btn" onClick={() => setMenuOpen((value) => !value)}>
+                Utilities ▾
+              </button>
+              {menuOpen ? (
+                <div className="spec-dropdown-menu" style={{right: 0, left: 'auto'}}>
+                  <button
+                    className="spec-dropdown-item"
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentPackUrl).finally(() => setMenuOpen(false));
+                    }}
+                  >
+                    🔗 Copy Pack Link
+                  </button>
+                  {availableVersions.length > 1 ? (
+                    <>
+                      <span className="spec-dropdown-label">Older Versions</span>
+                      {availableVersions
+                        .filter((version) => version !== selectedVersion)
+                        .map((version) => (
+                          <a
+                            key={version}
+                            className="spec-dropdown-item"
+                            href={buildPackPageUrl(project, {
+                              version,
+                              format: effectiveFormat,
+                            })}
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            ↳ Open {version}
+                          </a>
+                        ))}
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           </div>
-        ) : null}
+        </div>
 
         {renderBody()}
       </main>
